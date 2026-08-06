@@ -13,7 +13,8 @@ mod store;
 
 pub use actor::{ActorError, EventBatch, HealthSnapshot, WorldActorConfig, WorldActorHandle};
 pub use definition_stage4::{
-    Affordance, ConnectionView, ObjectPlacement, ObjectView, PlacementRelation, WorldDefinition,
+    Affordance, ConnectionView, ObjectCondition, ObjectPlacement, ObjectQuantity, ObjectView,
+    PlacementRelation, QuantityUnit, WorldDefinition,
 };
 pub use domain::{
     ClockSample, CommandEnvelope, CommandPayload, CommandResult, CommandStatus, PerceptionWindow,

@@ -205,7 +205,8 @@
       "dimensions_mm": { "width": 600, "depth": 600, "height": 850 }, "mass_g": 52000,
       "components": ["powerable", "heatable", "container", "openable", "temperature_controlled", "cleanable"],
       "observed_properties": { "power": "off" },
-      "actions": [{ "action_id": "object.toggle_power", "description": "Переключить питание плиты", "duration_ms": 600, "required_resources": ["hands", "vision", "attention"], "interruptibility": "safe_point" }]
+      "actions": [{ "action_id": "object.toggle_power", "description": "Переключить питание плиты", "duration_ms": 600, "required_resources": ["hands", "vision", "attention"], "interruptibility": "safe_point" }],
+      "initial_state": { "temperature_millicelsius": 20000 }
     },
     {
       "id": "template.refrigerator", "name": "Холодильник",
@@ -213,7 +214,7 @@
       "components": ["powerable", "container", "openable", "temperature_controlled", "cleanable"],
       "slots": [{ "id": "cold_storage", "kind": "container", "capacity": 24, "max_total_mass_g": 55000, "max_item_dimensions_mm": { "width": 500, "depth": 520, "height": 500 } }],
       "observed_properties": {},
-      "initial_state": { "power": true },
+      "initial_state": { "power": true, "temperature_millicelsius": 4000 },
       "hidden_properties": { "canary_factory_serial": "hidden-refrigerator-template-canary" },
       "actions": [{ "action_id": "object.toggle_power", "description": "Переключить питание холодильника", "duration_ms": 900, "required_resources": ["hands", "vision", "attention"], "interruptibility": "safe_point" }]
     },
@@ -232,7 +233,7 @@
     { "id": "template.chair", "name": "Стул", "dimensions_mm": { "width": 500, "depth": 520, "height": 900 }, "mass_g": 6500, "components": ["surface", "cleanable", "movable"] },
     { "id": "template.window", "name": "Окно", "dimensions_mm": { "width": 1700, "depth": 180, "height": 1450 }, "mass_g": 65000, "components": ["openable", "cleanable"] },
     { "id": "template.window_covering", "name": "Шторы или жалюзи", "dimensions_mm": { "width": 1800, "depth": 100, "height": 2200 }, "mass_g": 5500, "components": ["openable", "cleanable"] },
-    { "id": "template.radiator", "name": "Радиатор", "dimensions_mm": { "width": 1200, "depth": 180, "height": 600 }, "mass_g": 26000, "components": ["heatable", "temperature_controlled"] },
+    { "id": "template.radiator", "name": "Радиатор", "dimensions_mm": { "width": 1200, "depth": 180, "height": 600 }, "mass_g": 26000, "components": ["heatable", "temperature_controlled"], "initial_state": { "temperature_millicelsius": 42000 } },
     {
       "id": "template.sofa", "name": "Диван",
       "dimensions_mm": { "width": 2200, "depth": 950, "height": 850 }, "mass_g": 85000, "components": ["surface", "cleanable"],
@@ -274,7 +275,7 @@
       "components": ["powerable", "sound_emitter", "movable"], "placement_requires_power": true,
       "actions": [{ "action_id": "object.toggle_power", "description": "Включить или выключить колонки", "duration_ms": 350, "required_resources": ["hands", "hearing", "vision"], "interruptibility": "immediate" }]
     },
-    { "id": "template.phone", "name": "Смартфон", "dimensions_mm": { "width": 80, "depth": 12, "height": 170 }, "mass_g": 230, "components": ["chargeable", "sound_emitter", "movable"] },
+    { "id": "template.phone", "name": "Смартфон", "dimensions_mm": { "width": 80, "depth": 12, "height": 170 }, "mass_g": 230, "components": ["chargeable", "sound_emitter", "movable"], "initial_state": { "charge_permille": 860 } },
     {
       "id": "template.bed", "name": "Кровать",
       "dimensions_mm": { "width": 1550, "depth": 2150, "height": 650 }, "mass_g": 90000, "components": ["surface", "cleanable"],
@@ -327,7 +328,7 @@
     { "id": "object.intercom", "name": "Домофон", "anchor_id": "front_door", "template_id": "template.intercom", "placement": { "relation": "anchor" } },
     { "id": "object.coat_rack", "name": "Вешалка", "anchor_id": "coat_and_shoe_area", "template_id": "template.coat_rack", "placement": { "relation": "anchor" } },
     { "id": "object.shoe_cabinet", "name": "Обувная тумба", "anchor_id": "coat_and_shoe_area", "template_id": "template.storage_cabinet", "placement": { "relation": "anchor" }, "observed_properties": { "purpose": "shoes" } },
-    { "id": "object.hall_mirror", "name": "Зеркало в прихожей", "anchor_id": "hall_mirror", "template_id": "template.mirror", "placement": { "relation": "anchor" } },
+    { "id": "object.hall_mirror", "name": "Зеркало в прихожей", "anchor_id": "hall_mirror", "template_id": "template.mirror", "placement": { "relation": "anchor" }, "initial_state": { "cleanliness_permille": 850 } },
     { "id": "object.entryway_light", "name": "Свет прихожей", "anchor_id": "hall_mirror", "template_id": "template.light", "placement": { "relation": "anchor" }, "observed_properties": { "kind": "ceiling" } },
     { "id": "object.corridor_light", "name": "Свет коридора", "anchor_id": "corridor_center", "template_id": "template.light", "placement": { "relation": "anchor" }, "observed_properties": { "kind": "ceiling" } },
     { "id": "object.utility_cabinet", "name": "Хозяйственный шкаф", "anchor_id": "utility_cabinet", "template_id": "template.storage_cabinet", "placement": { "relation": "anchor" }, "hidden_properties": { "canary_private_storage": "hidden-utility-canary" } },
@@ -348,8 +349,8 @@
     { "id": "object.dishware_set", "name": "Посуда: кружки, тарелки, миски и стаканы", "anchor_id": "kitchen_worktop", "template_id": "template.kit", "placement": { "relation": "container", "parent_object_id": "object.kitchen_worktop", "slot_id": "cabinet" }, "observed_properties": { "contents": "two_mugs_two_plates_two_bowls_two_glasses" } },
     { "id": "object.cutlery_set", "name": "Набор столовых приборов", "anchor_id": "kitchen_worktop", "template_id": "template.kit", "placement": { "relation": "container", "parent_object_id": "object.kitchen_worktop", "slot_id": "cabinet" }, "observed_properties": { "contents": "forks_spoons_knives" } },
     { "id": "object.cookware_set", "name": "Кастрюля, сковорода, нож и разделочная доска", "anchor_id": "kitchen_worktop", "template_id": "template.kit", "placement": { "relation": "container", "parent_object_id": "object.kitchen_worktop", "slot_id": "cabinet" }, "observed_properties": { "contents": "pot_pan_knife_cutting_board" } },
-    { "id": "object.pantry_food", "name": "Безопасный запас сухих продуктов", "anchor_id": "kitchen_worktop", "template_id": "template.kit", "placement": { "relation": "container", "parent_object_id": "object.kitchen_worktop", "slot_id": "cabinet" }, "observed_properties": { "contents": "oats_rice_pasta_tea_salt_oil_bread", "quantity": "small_starting_stock" } },
-    { "id": "object.refrigerated_food", "name": "Небольшой запас продуктов в холодильнике", "anchor_id": "fridge", "template_id": "template.kit", "placement": { "relation": "container", "parent_object_id": "object.refrigerator", "slot_id": "cold_storage" }, "observed_properties": { "contents": "eggs_milk_butter_cheese_apples", "quantity": "small_starting_stock" } },
+    { "id": "object.pantry_food", "name": "Безопасный запас сухих продуктов", "anchor_id": "kitchen_worktop", "template_id": "template.kit", "placement": { "relation": "container", "parent_object_id": "object.kitchen_worktop", "slot_id": "cabinet" }, "observed_properties": { "contents": "oats_rice_pasta_tea_salt_oil_bread" }, "initial_state": { "quantity": { "amount": 12, "unit": "serving" } } },
+    { "id": "object.refrigerated_food", "name": "Небольшой запас продуктов в холодильнике", "anchor_id": "fridge", "template_id": "template.kit", "placement": { "relation": "container", "parent_object_id": "object.refrigerator", "slot_id": "cold_storage" }, "observed_properties": { "contents": "eggs_milk_butter_cheese_apples" }, "initial_state": { "quantity": { "amount": 10, "unit": "serving" } } },
 
     { "id": "object.sofa", "name": "Диван", "anchor_id": "sofa", "template_id": "template.sofa", "placement": { "relation": "anchor" }, "observed_properties": { "color": "muted_green" } },
     { "id": "object.living_room_table", "name": "Небольшой столик", "anchor_id": "sofa", "template_id": "template.table", "placement": { "relation": "anchor" }, "observed_properties": { "kind": "coffee_table" } },

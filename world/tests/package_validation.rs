@@ -48,3 +48,40 @@ fn rejects_unreachable_anchor() {
     );
     assert!(WorldDefinition::load(path, &PathGuard::default()).is_err());
 }
+
+#[test]
+fn rejects_condition_without_matching_component() {
+    let (_temp, path) = write_manifest(
+        r#"{
+          "schema_version": 1,
+          "world_id": "invalid-condition",
+          "locations": [{"id":"room","name":"Room","anchors":[{"id":"desk","name":"Desk"}]}],
+          "connections": [],
+          "objects": [{
+            "id":"lamp","name":"Lamp","anchor_id":"desk",
+            "initial_state":{"charge_permille":500}
+          }]
+        }"#,
+    );
+    let error = WorldDefinition::load(path, &PathGuard::default()).unwrap_err();
+    assert!(error.to_string().contains("without chargeable component"));
+}
+
+#[test]
+fn rejects_condition_outside_physical_bounds() {
+    let (_temp, path) = write_manifest(
+        r#"{
+          "schema_version": 1,
+          "world_id": "invalid-temperature",
+          "locations": [{"id":"room","name":"Room","anchors":[{"id":"desk","name":"Desk"}]}],
+          "connections": [],
+          "objects": [{
+            "id":"heater","name":"Heater","anchor_id":"desk",
+            "components":["heatable"],
+            "initial_state":{"temperature_millicelsius":500001}
+          }]
+        }"#,
+    );
+    let error = WorldDefinition::load(path, &PathGuard::default()).unwrap_err();
+    assert!(error.to_string().contains("outside physical bounds"));
+}

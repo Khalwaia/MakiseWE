@@ -141,6 +141,10 @@ phone.execute
 
 `world.perform` принимает `action_id`, `target_id` и типизированные параметры из action registry. Добавление нового предмета или рецепта не меняет tool schema.
 
+В protocol V1 значения `PerformAction.parameters` передаются строками и проверяются по `parameters_schema_json`. Числа кодируются десятичной строкой; схема обязана объявлять `type: string` и точный `pattern`, чтобы Brain не отправлял несовместимый JSON number.
+
+Stage 4B.3 регистрирует `object.clean` и `object.consume_quantity`. Наблюдаемые причинные состояния имеют явные целочисленные единицы: `charge_permille`, `cleanliness_permille`, `quantity_amount` + `quantity_unit`, `temperature_millicelsius`. Handshake объявляет capability `causal-object-condition-v1`.
+
 Admin-команды находятся в отдельном сервисе и не публикуются Brain.
 
 ## 9. BrainDecision

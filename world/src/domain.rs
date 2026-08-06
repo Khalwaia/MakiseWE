@@ -2,7 +2,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Affordance, ObjectPlacement, PlacementRelation, Result, WorldDefinition, WorldError};
+use crate::{
+    Affordance, ObjectCondition, ObjectPlacement, PlacementRelation, Result, WorldDefinition,
+    WorldError,
+};
 
 pub const COMMAND_SCHEMA_VERSION: u32 = 1;
 pub const EVENT_SCHEMA_VERSION: u32 = 1;
@@ -83,6 +86,10 @@ pub enum ActivityCompletion {
         object_id: String,
         placement: ObjectPlacement,
     },
+    SetObjectCondition {
+        object_id: String,
+        condition: ObjectCondition,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -101,6 +108,8 @@ pub struct WorldState {
     object_open: BTreeMap<String, bool>,
     #[serde(default)]
     object_placements: BTreeMap<String, ObjectPlacement>,
+    #[serde(default)]
+    object_conditions: BTreeMap<String, ObjectCondition>,
 }
 
 impl WorldState {
@@ -118,6 +127,7 @@ impl WorldState {
             object_power: BTreeMap::new(),
             object_open: BTreeMap::new(),
             object_placements: BTreeMap::new(),
+            object_conditions: BTreeMap::new(),
         }
     }
 
@@ -226,6 +236,12 @@ impl WorldState {
                     } => {
                         self.object_placements.insert(object_id, placement);
                     }
+                    ActivityCompletion::SetObjectCondition {
+                        object_id,
+                        condition,
+                    } => {
+                        self.object_conditions.insert(object_id, condition);
+                    }
                 }
             }
             DomainEvent::DowntimeObserved { .. } => {}
@@ -275,6 +291,17 @@ impl WorldState {
             .get(object_id)
             .cloned()
             .or_else(|| definition.initial_object_placement(object_id))
+    }
+
+    pub(crate) fn object_condition(
+        &self,
+        object_id: &str,
+        definition: &WorldDefinition,
+    ) -> ObjectCondition {
+        self.object_conditions
+            .get(object_id)
+            .cloned()
+            .unwrap_or_else(|| definition.initial_object_condition(object_id))
     }
 
     pub(crate) fn object_placements(
@@ -554,6 +581,31 @@ impl PerceptionWindow {
                             .into();
                         }
                     }
+                }
+                let condition = state.object_condition(&object.id, definition);
+                if let Some(value) = condition.charge_permille {
+                    observed_properties.insert("charge_permille".into(), value.to_string());
+                }
+                if let Some(value) = condition.cleanliness_permille {
+                    observed_properties.insert("cleanliness_permille".into(), value.to_string());
+                    if value >= 1_000 {
+                        affordances.retain(|action| action.action_id != "object.clean");
+                    }
+                }
+                if let Some(quantity) = condition.quantity {
+                    observed_properties
+                        .insert("quantity_amount".into(), quantity.amount.to_string());
+                    observed_properties
+                        .insert("quantity_unit".into(), quantity.unit.as_str().into());
+                    if quantity.amount == 0 {
+                        affordances.retain(|action| action.action_id != "object.consume_quantity");
+                    }
+                } else {
+                    affordances.retain(|action| action.action_id != "object.consume_quantity");
+                }
+                if let Some(value) = condition.temperature_millicelsius {
+                    observed_properties
+                        .insert("temperature_millicelsius".into(), value.to_string());
                 }
                 if let Some(placement) = state.object_placement(&object.id, definition) {
                     observed_properties.insert("anchor_id".into(), placement.anchor_id);

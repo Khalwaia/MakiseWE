@@ -84,6 +84,7 @@ impl WorldService for WorldRpc {
                 "bounded-backpressure".into(),
                 "perform-parameters-v1".into(),
                 "dynamic-object-placement".into(),
+                "causal-object-condition-v1".into(),
             ],
         }))
     }

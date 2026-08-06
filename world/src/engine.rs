@@ -364,7 +364,11 @@ impl WorldEngine {
                         "object is not available at the current anchor",
                     )));
                 }
-                if action_id != "object.relocate" && !parameters.is_empty() {
+                let accepts_parameters = matches!(
+                    action_id.as_str(),
+                    "object.relocate" | "object.consume_quantity"
+                );
+                if !accepts_parameters && !parameters.is_empty() {
                     return Err(Box::new(self.command_error(
                         command,
                         CommandStatus::InvalidArgument,
@@ -451,6 +455,65 @@ impl WorldEngine {
                         ActivityCompletion::SetObjectPlacement {
                             object_id: target_id.clone(),
                             placement,
+                        }
+                    }
+                    "object.clean" => {
+                        let mut condition =
+                            self.state.object_condition(target_id, &self.definition);
+                        let Some(cleanliness) = condition.cleanliness_permille else {
+                            return Err(Box::new(self.command_error(
+                                command,
+                                CommandStatus::RejectedPrecondition,
+                                "NOT_CLEANABLE",
+                                "object has no cleanliness state",
+                            )));
+                        };
+                        if cleanliness >= 1_000 {
+                            return Err(Box::new(self.command_error(
+                                command,
+                                CommandStatus::RejectedPrecondition,
+                                "ALREADY_CLEAN",
+                                "object is already clean",
+                            )));
+                        }
+                        condition.cleanliness_permille = Some(1_000);
+                        ActivityCompletion::SetObjectCondition {
+                            object_id: target_id.clone(),
+                            condition,
+                        }
+                    }
+                    "object.consume_quantity" => {
+                        let amount =
+                            parse_quantity_amount(parameters).map_err(|(code, message)| {
+                                Box::new(self.command_error(
+                                    command,
+                                    CommandStatus::InvalidArgument,
+                                    code,
+                                    message,
+                                ))
+                            })?;
+                        let mut condition =
+                            self.state.object_condition(target_id, &self.definition);
+                        let Some(quantity) = condition.quantity.as_mut() else {
+                            return Err(Box::new(self.command_error(
+                                command,
+                                CommandStatus::RejectedPrecondition,
+                                "NO_QUANTITY_STATE",
+                                "object has no finite quantity",
+                            )));
+                        };
+                        if amount > quantity.amount {
+                            return Err(Box::new(self.command_error(
+                                command,
+                                CommandStatus::RejectedPrecondition,
+                                "INSUFFICIENT_QUANTITY",
+                                format!("requested {amount}, available {}", quantity.amount),
+                            )));
+                        }
+                        quantity.amount -= amount;
+                        ActivityCompletion::SetObjectCondition {
+                            object_id: target_id.clone(),
+                            condition,
                         }
                     }
                     _ => {
@@ -610,6 +673,36 @@ fn parse_relocation_parameters(
         parent_object_id,
         slot_id,
     })
+}
+
+fn parse_quantity_amount(
+    parameters: &BTreeMap<String, String>,
+) -> std::result::Result<u64, (&'static str, String)> {
+    if let Some(key) = parameters.keys().find(|key| key.as_str() != "amount") {
+        return Err((
+            "UNKNOWN_PARAMETER",
+            format!("object.consume_quantity does not accept parameter {key}"),
+        ));
+    }
+    let value = parameters.get("amount").ok_or_else(|| {
+        (
+            "MISSING_PARAMETER",
+            "amount is required for object.consume_quantity".into(),
+        )
+    })?;
+    let amount = value.parse::<u64>().map_err(|_| {
+        (
+            "INVALID_PARAMETER",
+            "amount must be a positive integer".into(),
+        )
+    })?;
+    if amount == 0 {
+        return Err((
+            "INVALID_PARAMETER",
+            "amount must be greater than zero".into(),
+        ));
+    }
+    Ok(amount)
 }
 
 fn required_parameter<'a>(

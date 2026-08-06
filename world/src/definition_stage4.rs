@@ -221,19 +221,91 @@ struct InitialObjectStateDefinition {
     power: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     open: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    charge_permille: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cleanliness_permille: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    quantity: Option<ObjectQuantity>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    temperature_millicelsius: Option<i32>,
 }
 
 impl InitialObjectStateDefinition {
     fn is_empty(&self) -> bool {
-        self.power.is_none() && self.open.is_none()
+        self.power.is_none()
+            && self.open.is_none()
+            && self.charge_permille.is_none()
+            && self.cleanliness_permille.is_none()
+            && self.quantity.is_none()
+            && self.temperature_millicelsius.is_none()
     }
 
     fn merged_with(&self, overrides: &Self) -> Self {
         Self {
             power: overrides.power.or(self.power),
             open: overrides.open.or(self.open),
+            charge_permille: overrides.charge_permille.or(self.charge_permille),
+            cleanliness_permille: overrides.cleanliness_permille.or(self.cleanliness_permille),
+            quantity: overrides.quantity.clone().or_else(|| self.quantity.clone()),
+            temperature_millicelsius: overrides
+                .temperature_millicelsius
+                .or(self.temperature_millicelsius),
         }
     }
+
+    fn condition(&self, components: &BTreeSet<String>) -> ObjectCondition {
+        ObjectCondition {
+            charge_permille: self
+                .charge_permille
+                .or_else(|| components.contains("chargeable").then_some(1_000)),
+            cleanliness_permille: self
+                .cleanliness_permille
+                .or_else(|| components.contains("cleanable").then_some(1_000)),
+            quantity: self.quantity.clone(),
+            temperature_millicelsius: self.temperature_millicelsius,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QuantityUnit {
+    Count,
+    Serving,
+    Milliliter,
+    Gram,
+}
+
+impl QuantityUnit {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Count => "count",
+            Self::Serving => "serving",
+            Self::Milliliter => "milliliter",
+            Self::Gram => "gram",
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObjectQuantity {
+    pub amount: u64,
+    pub unit: QuantityUnit,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObjectCondition {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub charge_permille: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cleanliness_permille: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quantity: Option<ObjectQuantity>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub temperature_millicelsius: Option<i32>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -356,6 +428,7 @@ struct ObjectRecord {
     placement_requires_power: bool,
     initial_power: bool,
     initial_open: bool,
+    initial_condition: ObjectCondition,
 }
 
 type ObjectCatalog = BTreeMap<String, ObjectRecord>;
@@ -687,6 +760,13 @@ impl WorldDefinition {
         self.objects
             .get(object_id)
             .is_some_and(|object| object.initial_open)
+    }
+
+    pub(crate) fn initial_object_condition(&self, object_id: &str) -> ObjectCondition {
+        self.objects
+            .get(object_id)
+            .map(|object| object.initial_condition.clone())
+            .unwrap_or_default()
     }
 
     pub(crate) fn object_has_component(&self, object_id: &str, component: &str) -> bool {
@@ -1021,6 +1101,7 @@ fn validate_objects(
             .map(|value| value.initial_state.merged_with(&object.initial_state))
             .unwrap_or_else(|| object.initial_state.clone());
         validate_initial_state(&object.id, &initial_state, &components)?;
+        let initial_condition = initial_state.condition(&components);
         let record = ObjectRecord {
             template_id: object.template_id,
             anchor_id: object.anchor_id.clone(),
@@ -1033,6 +1114,7 @@ fn validate_objects(
                 .unwrap_or(false),
             initial_power: initial_state.power.unwrap_or(false),
             initial_open: initial_state.open.unwrap_or(false),
+            initial_condition,
         };
         if objects.insert(object.id.clone(), record).is_some() {
             return invalid(format!("duplicate object {}", object.id));
@@ -1184,7 +1266,11 @@ fn validate_actions(
         require_name("action.description", &action.description)?;
         if !matches!(
             action.action_id.as_str(),
-            "object.toggle_power" | "object.toggle_open" | "object.relocate"
+            "object.toggle_power"
+                | "object.toggle_open"
+                | "object.relocate"
+                | "object.clean"
+                | "object.consume_quantity"
         ) {
             return invalid(format!(
                 "{owner} action {} has no registered executor",
@@ -1267,6 +1353,34 @@ fn add_component_actions(
             preconditions: Vec::new(),
         });
     }
+    if components.contains("cleanable")
+        && !actions
+            .iter()
+            .any(|action| action.action_id == "object.clean")
+    {
+        actions.push(ObjectActionDefinition {
+            action_id: "object.clean".into(),
+            description: format!("Очистить {object_name}"),
+            duration_ms: 20_000,
+            required_resources: vec!["hands".into(), "vision".into(), "attention".into()],
+            interruptibility: "safe_point".into(),
+            preconditions: Vec::new(),
+        });
+    }
+    if components.contains("quantity")
+        && !actions
+            .iter()
+            .any(|action| action.action_id == "object.consume_quantity")
+    {
+        actions.push(ObjectActionDefinition {
+            action_id: "object.consume_quantity".into(),
+            description: format!("Взять часть из {object_name}"),
+            duration_ms: 1_000,
+            required_resources: vec!["hands".into(), "vision".into(), "attention".into()],
+            interruptibility: "immediate".into(),
+            preconditions: Vec::new(),
+        });
+    }
 }
 
 fn empty_parameters_schema() -> String {
@@ -1277,6 +1391,9 @@ fn action_parameters_schema(action_id: &str) -> &'static str {
     match action_id {
         "object.relocate" => {
             r#"{"additionalProperties":false,"properties":{"anchor_id":{"type":"string"},"parent_object_id":{"type":"string"},"relation":{"enum":["anchor","surface","container"],"type":"string"},"slot_id":{"type":"string"}},"required":["anchor_id","relation"],"type":"object"}"#
+        }
+        "object.consume_quantity" => {
+            r#"{"additionalProperties":false,"properties":{"amount":{"maxLength":20,"pattern":"^[1-9][0-9]*$","type":"string"}},"required":["amount"],"type":"object"}"#
         }
         _ => r#"{"additionalProperties":false,"type":"object"}"#,
     }
@@ -1296,6 +1413,44 @@ fn validate_initial_state(
         return invalid(format!(
             "{owner} declares open state without openable component"
         ));
+    }
+    if state.charge_permille.is_some() && !components.contains("chargeable") {
+        return invalid(format!(
+            "{owner} declares charge state without chargeable component"
+        ));
+    }
+    if state.charge_permille.is_some_and(|value| value > 1_000) {
+        return invalid(format!("{owner} charge_permille exceeds 1000"));
+    }
+    if state.cleanliness_permille.is_some() && !components.contains("cleanable") {
+        return invalid(format!(
+            "{owner} declares cleanliness without cleanable component"
+        ));
+    }
+    if state
+        .cleanliness_permille
+        .is_some_and(|value| value > 1_000)
+    {
+        return invalid(format!("{owner} cleanliness_permille exceeds 1000"));
+    }
+    if state.quantity.is_some() && !components.contains("quantity") {
+        return invalid(format!(
+            "{owner} declares quantity without quantity component"
+        ));
+    }
+    if state.temperature_millicelsius.is_some()
+        && !components.contains("heatable")
+        && !components.contains("temperature_controlled")
+    {
+        return invalid(format!(
+            "{owner} declares temperature without a thermal component"
+        ));
+    }
+    if state
+        .temperature_millicelsius
+        .is_some_and(|value| !(-100_000..=500_000).contains(&value))
+    {
+        return invalid(format!("{owner} temperature is outside physical bounds"));
     }
     Ok(())
 }

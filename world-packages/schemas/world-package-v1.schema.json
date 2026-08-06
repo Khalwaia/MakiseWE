@@ -238,12 +238,29 @@
         "movable"
       ]
     },
+    "object_quantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["amount", "unit"],
+      "properties": {
+        "amount": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 },
+        "unit": { "enum": ["count", "serving", "milliliter", "gram"] }
+      }
+    },
     "initial_object_state": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "power": { "type": "boolean" },
-        "open": { "type": "boolean" }
+        "open": { "type": "boolean" },
+        "charge_permille": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "cleanliness_permille": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "quantity": { "$ref": "#/$defs/object_quantity" },
+        "temperature_millicelsius": {
+          "type": "integer",
+          "minimum": -100000,
+          "maximum": 500000
+        }
       },
       "minProperties": 1
     },

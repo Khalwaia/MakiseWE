@@ -593,3 +593,241 @@ fn relocation_enforces_dimensions_power_and_cycles() {
         "PLACEMENT_CYCLE",
     );
 }
+
+#[test]
+fn causal_conditions_are_visible_and_cleaning_is_durable() {
+    let temp = tempfile::tempdir().unwrap();
+    let database = temp.path().join("conditions.db");
+    let identity = "test-makise-conditions";
+    let mut engine = WorldEngine::open(
+        &database,
+        identity,
+        definition(),
+        "hall_mirror",
+        30_000_000,
+        &PathGuard::default(),
+    )
+    .unwrap();
+
+    let mirror = engine
+        .perception()
+        .unwrap()
+        .observed_objects
+        .into_iter()
+        .find(|object| object.object_id == "object.hall_mirror")
+        .unwrap();
+    assert_eq!(mirror.observed_properties["cleanliness_permille"], "850");
+    assert!(
+        mirror
+            .affordances
+            .iter()
+            .any(|action| action.action_id == "object.clean")
+    );
+
+    let clean = perform_command(
+        &engine,
+        identity,
+        "cmd-clean-mirror",
+        30_000_010,
+        "object.clean",
+        "object.hall_mirror",
+        &[],
+    );
+    assert_eq!(
+        engine.execute_command(&clean, 30_000_010).unwrap().status,
+        CommandStatus::Committed
+    );
+    engine
+        .tick(ClockSample {
+            utc_ms: 30_020_010,
+            monotonic_elapsed_ms: 20_010,
+        })
+        .unwrap();
+
+    let cleaned = engine
+        .perception()
+        .unwrap()
+        .observed_objects
+        .into_iter()
+        .find(|object| object.object_id == "object.hall_mirror")
+        .unwrap();
+    assert_eq!(cleaned.observed_properties["cleanliness_permille"], "1000");
+    assert!(
+        cleaned
+            .affordances
+            .iter()
+            .all(|action| action.action_id != "object.clean")
+    );
+    drop(engine);
+
+    let recovered = WorldEngine::open(
+        &database,
+        identity,
+        definition(),
+        "hall_mirror",
+        30_020_010,
+        &PathGuard::default(),
+    )
+    .unwrap();
+    let replayed = recovered
+        .perception()
+        .unwrap()
+        .observed_objects
+        .into_iter()
+        .find(|object| object.object_id == "object.hall_mirror")
+        .unwrap();
+    assert_eq!(replayed.observed_properties["cleanliness_permille"], "1000");
+}
+
+#[test]
+fn finite_quantity_consumption_is_checked_and_durable() {
+    let temp = tempfile::tempdir().unwrap();
+    let database = temp.path().join("quantity.db");
+    let identity = "test-makise-quantity";
+    let mut engine = WorldEngine::open(
+        &database,
+        identity,
+        definition(),
+        "kitchen_worktop",
+        40_000_000,
+        &PathGuard::default(),
+    )
+    .unwrap();
+
+    let open = perform_command(
+        &engine,
+        identity,
+        "cmd-open-pantry",
+        40_000_010,
+        "object.toggle_open",
+        "object.kitchen_worktop",
+        &[],
+    );
+    engine.execute_command(&open, 40_000_010).unwrap();
+    engine
+        .tick(ClockSample {
+            utc_ms: 40_000_510,
+            monotonic_elapsed_ms: 510,
+        })
+        .unwrap();
+
+    let pantry = engine
+        .perception()
+        .unwrap()
+        .observed_objects
+        .into_iter()
+        .find(|object| object.object_id == "object.pantry_food")
+        .unwrap();
+    assert_eq!(pantry.observed_properties["quantity_amount"], "12");
+    assert_eq!(pantry.observed_properties["quantity_unit"], "serving");
+    let consume = pantry
+        .affordances
+        .iter()
+        .find(|action| action.action_id == "object.consume_quantity")
+        .unwrap();
+    let schema: serde_json::Value = serde_json::from_str(&consume.parameters_schema_json).unwrap();
+    assert_eq!(schema["required"][0], "amount");
+    assert_eq!(schema["properties"]["amount"]["type"], "string");
+
+    let consume = perform_command(
+        &engine,
+        identity,
+        "cmd-consume-pantry",
+        40_000_520,
+        "object.consume_quantity",
+        "object.pantry_food",
+        &[("amount", "3")],
+    );
+    engine.execute_command(&consume, 40_000_520).unwrap();
+    engine
+        .tick(ClockSample {
+            utc_ms: 40_001_520,
+            monotonic_elapsed_ms: 1_010,
+        })
+        .unwrap();
+
+    let pantry = engine
+        .perception()
+        .unwrap()
+        .observed_objects
+        .into_iter()
+        .find(|object| object.object_id == "object.pantry_food")
+        .unwrap();
+    assert_eq!(pantry.observed_properties["quantity_amount"], "9");
+
+    let excessive = perform_command(
+        &engine,
+        identity,
+        "cmd-consume-too-much",
+        40_001_530,
+        "object.consume_quantity",
+        "object.pantry_food",
+        &[("amount", "10")],
+    );
+    assert_rejected_code(
+        &engine.execute_command(&excessive, 40_001_530).unwrap(),
+        "INSUFFICIENT_QUANTITY",
+    );
+    drop(engine);
+
+    let recovered = WorldEngine::open(
+        &database,
+        identity,
+        definition(),
+        "kitchen_worktop",
+        40_001_530,
+        &PathGuard::default(),
+    )
+    .unwrap();
+    let pantry = recovered
+        .perception()
+        .unwrap()
+        .observed_objects
+        .into_iter()
+        .find(|object| object.object_id == "object.pantry_food")
+        .unwrap();
+    assert_eq!(pantry.observed_properties["quantity_amount"], "9");
+}
+
+#[test]
+fn apartment_exposes_typed_charge_and_temperature() {
+    let temp = tempfile::tempdir().unwrap();
+    let phone_engine = WorldEngine::open(
+        temp.path().join("phone.db"),
+        "test-makise-phone-condition",
+        definition(),
+        "work_desk",
+        50_000_000,
+        &PathGuard::default(),
+    )
+    .unwrap();
+    let phone = phone_engine
+        .perception()
+        .unwrap()
+        .observed_objects
+        .into_iter()
+        .find(|object| object.object_id == "object.makise_phone")
+        .unwrap();
+    assert_eq!(phone.observed_properties["charge_permille"], "860");
+
+    let fridge_engine = WorldEngine::open(
+        temp.path().join("fridge-condition.db"),
+        "test-makise-fridge-condition",
+        definition(),
+        "fridge",
+        50_000_000,
+        &PathGuard::default(),
+    )
+    .unwrap();
+    let refrigerator = fridge_engine
+        .perception()
+        .unwrap()
+        .observed_objects
+        .into_iter()
+        .find(|object| object.object_id == "object.refrigerator")
+        .unwrap();
+    assert_eq!(
+        refrigerator.observed_properties["temperature_millicelsius"],
+        "4000"
+    );
+}
