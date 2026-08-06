@@ -1,0 +1,189 @@
+syntax = "proto3";
+
+package makise.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+service WorldService {
+  rpc Handshake(HandshakeRequest) returns (HandshakeResponse);
+  rpc ExecuteCommand(CommandEnvelope) returns (CommandResult);
+  rpc GetCommandResult(GetCommandResultRequest) returns (CommandResult);
+  rpc GetPerception(GetPerceptionRequest) returns (PerceptionWindow);
+  rpc SubscribeEvents(SubscribeEventsRequest) returns (stream EventEnvelope);
+  rpc Health(google.protobuf.Empty) returns (HealthResponse);
+}
+
+message HandshakeRequest {
+  string client_name = 1;
+  uint32 min_protocol_version = 2;
+  uint32 max_protocol_version = 3;
+  string expected_identity_id = 4;
+  string expected_world_definition_hash = 5;
+  repeated string capabilities = 6;
+}
+
+message HandshakeResponse {
+  uint32 selected_protocol_version = 1;
+  string identity_id = 2;
+  string world_definition_hash = 3;
+  uint64 world_version = 4;
+  uint64 last_event_seq = 5;
+  repeated string server_capabilities = 6;
+}
+
+message CommandEnvelope {
+  string command_id = 1;
+  string identity_id = 2;
+  string agent_id = 3;
+  uint64 expected_world_version = 4;
+  uint32 schema_version = 5;
+  string decision_id = 6;
+  google.protobuf.Timestamp issued_at = 7;
+  google.protobuf.Duration ttl = 8;
+  oneof payload {
+    MoveTo move_to = 20;
+    PerformAction perform = 21;
+    Inspect inspect = 22;
+    ManagePlan manage_plan = 23;
+    WaitUntil wait_until = 24;
+    PhoneAction phone = 25;
+  }
+}
+
+message MoveTo { string target_anchor_id = 1; }
+
+message PerformAction {
+  string action_id = 1;
+  string target_id = 2;
+  google.protobuf.Struct parameters = 3;
+}
+
+message Inspect { string target_id = 1; }
+
+message ManagePlan {
+  string operation = 1;
+  string plan_id = 2;
+  repeated string step_ids = 3;
+}
+
+message WaitUntil {
+  google.protobuf.Timestamp until = 1;
+  string reason = 2;
+}
+
+message PhoneAction {
+  string operation = 1;
+  string target_id = 2;
+  google.protobuf.Struct parameters = 3;
+}
+
+enum CommandStatus {
+  COMMAND_STATUS_UNSPECIFIED = 0;
+  COMMITTED = 1;
+  ALREADY_COMMITTED = 2;
+  REJECTED_PRECONDITION = 3;
+  RESOURCE_CONFLICT = 4;
+  STALE_WORLD = 5;
+  EXPIRED_DECISION = 6;
+  UNAUTHORIZED = 7;
+  INVALID_ARGUMENT = 8;
+  RATE_LIMITED = 9;
+  TEMPORARILY_UNAVAILABLE = 10;
+  INTERNAL_ERROR = 11;
+}
+
+message ErrorDetail {
+  string code = 1;
+  string message = 2;
+  map<string, string> fields = 3;
+}
+
+message Affordance {
+  string action_id = 1;
+  string target_id = 2;
+  string description = 3;
+  google.protobuf.Duration duration = 4;
+  repeated string required_resources = 5;
+  string parameters_schema_json = 6;
+}
+
+message CommandResult {
+  string command_id = 1;
+  CommandStatus status = 2;
+  uint64 committed_world_version = 3;
+  uint64 first_event_seq = 4;
+  uint64 last_event_seq = 5;
+  ErrorDetail error = 6;
+  repeated Affordance suggested_recovery = 7;
+}
+
+message GetCommandResultRequest { string command_id = 1; }
+
+message EventEnvelope {
+  string event_id = 1;
+  uint64 event_seq = 2;
+  uint64 world_version = 3;
+  uint32 event_schema_version = 4;
+  google.protobuf.Timestamp occurred_at = 5;
+  optional string causation_command_id = 6;
+  optional string correlation_id = 7;
+  string event_type = 8;
+  bytes payload_json = 9;
+}
+
+message SubscribeEventsRequest { uint64 after_seq = 1; }
+
+message GetPerceptionRequest {
+  string agent_id = 1;
+  optional string previous_perception_id = 2;
+}
+
+message ObservedObject {
+  string object_id = 1;
+  string name = 2;
+  map<string, string> observed_properties = 3;
+  repeated Affordance affordances = 4;
+}
+
+message ActivityView {
+  string activity_id = 1;
+  string action_id = 2;
+  google.protobuf.Timestamp completes_at = 3;
+  repeated string reserved_resources = 4;
+}
+
+message PerceptionWindow {
+  string perception_id = 1;
+  uint64 world_version = 2;
+  string location_id = 3;
+  string anchor_id = 4;
+  repeated string qualitative_body_state = 5;
+  repeated ObservedObject observed_objects = 6;
+  repeated Affordance affordances = 7;
+  repeated ActivityView activities = 8;
+  uint32 unread_notification_count = 9;
+  repeated string significant_changes = 10;
+  repeated string environment_cues = 11;
+}
+
+enum HealthStatus {
+  HEALTH_STATUS_UNSPECIFIED = 0;
+  HEALTHY = 1;
+  DEGRADED = 2;
+  NOT_READY = 3;
+  SAFE_STOP = 4;
+  TIME_ANOMALY = 5;
+}
+
+message HealthResponse {
+  HealthStatus status = 1;
+  bool live = 2;
+  bool ready = 3;
+  string version = 4;
+  uint64 world_version = 5;
+  uint64 last_event_seq = 6;
+}
+

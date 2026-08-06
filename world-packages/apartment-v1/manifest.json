@@ -1,0 +1,405 @@
+{
+  "schema_version": 1,
+  "world_id": "apartment-v1",
+  "initial_anchor_id": "bed",
+  "metadata": {
+    "city": "Новосибирск",
+    "timezone": "Asia/Novosibirsk",
+    "floor": 7,
+    "area_m2": 48,
+    "weather_fallback": "Последнее подтверждённое состояние Новосибирска; при отсутствии данных — сезонная безопасная оценка с низкой уверенностью"
+  },
+  "map": { "asset": "map.svg", "width": 1200, "height": 760 },
+  "topology": { "require_strong_connectivity": true },
+  "locations": [
+    {
+      "id": "entryway",
+      "name": "Прихожая",
+      "sensory": {
+        "light": ["мягкий потолочный свет без прямого окна"],
+        "sound": ["приглушённые звуки подъезда иногда доходят через входную дверь"],
+        "temperature": ["стабильная комнатная температура, у двери немного прохладнее"],
+        "smell": ["слабый запах дерева, ткани и уличного воздуха на верхней одежде"]
+      },
+      "anchors": [
+        { "id": "front_door", "name": "Входная дверь", "map_point": { "x": 58, "y": 405 }, "sensory": { "sound": ["за дверью различимы только достаточно громкие звуки площадки"], "temperature": ["у порога ощущается слабый прохладный поток"] } },
+        { "id": "coat_and_shoe_area", "name": "Вешалка и обувная зона", "map_point": { "x": 130, "y": 405 } },
+        { "id": "hall_mirror", "name": "Зеркало в прихожей", "map_point": { "x": 220, "y": 345 } }
+      ]
+    },
+    {
+      "id": "corridor",
+      "name": "Коридор",
+      "sensory": {
+        "light": ["рассеянный свет соседних комнат и тёплый потолочный свет"],
+        "sound": ["звуки квартиры сходятся здесь и ослабевают за закрытыми дверями"],
+        "temperature": ["ровная внутренняя температура"],
+        "smell": ["нейтральный воздух с едва заметными запахами кухни и чистящих средств"]
+      },
+      "anchors": [
+        { "id": "corridor_center", "name": "Центр коридора", "map_point": { "x": 355, "y": 400 } },
+        { "id": "utility_cabinet", "name": "Хозяйственный шкаф", "map_point": { "x": 350, "y": 655 }, "sensory": { "smell": ["при открытом шкафу заметен запах чистящих средств"] } }
+      ]
+    },
+    {
+      "id": "kitchen",
+      "name": "Кухня",
+      "sensory": {
+        "light": ["холодный утренний свет с востока и нейтральное потолочное освещение"],
+        "sound": ["тихий гул холодильника и бытовые звуки воды и посуды"],
+        "temperature": ["обычно тепло; готовка локально нагревает рабочую зону"],
+        "smell": ["нейтральный кухонный воздух, меняющийся только от реально открытых продуктов и готовки"]
+      },
+      "anchors": [
+        { "id": "sink", "name": "Кухонная мойка", "map_point": { "x": 88, "y": 125 }, "sensory": { "sound": ["при открытом кране доминирует звук воды"], "smell": ["чистый слабый запах воды и моющего средства"] } },
+        { "id": "kitchen_worktop", "name": "Рабочая столешница", "map_point": { "x": 190, "y": 125 } },
+        { "id": "stove", "name": "Плита", "map_point": { "x": 305, "y": 125 }, "sensory": { "temperature": ["нагрев ощущается только от включённой плиты или духовки"], "smell": ["запах появляется только от реально готовящейся еды"] } },
+        { "id": "fridge", "name": "Холодильник", "map_point": { "x": 355, "y": 225 }, "sensory": { "sound": ["ровный тихий гул работающего компрессора"], "temperature": ["рядом немного прохладнее только при открытой дверце"] } },
+        { "id": "dining_table", "name": "Обеденный стол", "map_point": { "x": 190, "y": 245 } },
+        { "id": "kitchen_window", "name": "Кухонное окно", "map_point": { "x": 85, "y": 55 }, "sensory": { "light": ["холодный утренний свет и вид на северо-восточную часть города"], "sound": ["при открытом окне слышен далёкий городской фон"], "temperature": ["окно передаёт наружный холод или летнее тепло"] } }
+      ]
+    },
+    {
+      "id": "living_room",
+      "name": "Гостиная",
+      "sensory": {
+        "light": ["мягкий локальный свет и тёплый юго-западный свет во второй половине дня"],
+        "sound": ["комната подходит для музыки; закрытая дверь спальни заметно глушит её"],
+        "temperature": ["комфортная температура, зависящая от радиатора и балконной двери"],
+        "smell": ["слабый запах ткани дивана, бумаги и электроники"]
+      },
+      "anchors": [
+        { "id": "sofa", "name": "Диван", "map_point": { "x": 550, "y": 185 } },
+        { "id": "work_desk", "name": "Рабочий стол", "map_point": { "x": 820, "y": 155 }, "sensory": { "sound": ["слышны только реально включённые компьютер, колонки или наушники"], "light": ["локальная настольная лампа освещает рабочую поверхность"] } },
+        { "id": "media_bookshelf", "name": "Книжная полка", "map_point": { "x": 820, "y": 350 } },
+        { "id": "living_room_center", "name": "Центр гостиной", "map_point": { "x": 650, "y": 255 } },
+        { "id": "balcony_door", "name": "Балконная дверь", "map_point": { "x": 910, "y": 250 }, "sensory": { "light": ["через стекло проходит вечерний свет"], "sound": ["закрытая дверь заметно глушит улицу"], "temperature": ["открытая дверь быстро связывает температуру гостиной и балкона"] } }
+      ]
+    },
+    {
+      "id": "bedroom",
+      "name": "Спальня",
+      "sensory": {
+        "light": ["холодный утренний свет и регулируемый тёплый локальный свет"],
+        "sound": ["самая тихая комната квартиры; плотные ткани и коридор гасят шум"],
+        "temperature": ["ровная температура, подходящая для сна"],
+        "smell": ["чистое постельное бельё, ткань и очень слабый запах дерева"]
+      },
+      "anchors": [
+        { "id": "bed", "name": "Кровать", "map_point": { "x": 620, "y": 575 } },
+        { "id": "wardrobe", "name": "Гардероб", "map_point": { "x": 500, "y": 665 } },
+        { "id": "bedside_table", "name": "Прикроватная тумба", "map_point": { "x": 740, "y": 575 } },
+        { "id": "bedroom_window", "name": "Окно спальни", "map_point": { "x": 755, "y": 695 }, "sensory": { "light": ["восточный утренний свет исчезает за плотными шторами"], "sound": ["закрытое окно сохраняет тишину"], "temperature": ["проветривание постепенно меняет температуру спальни"] } }
+      ]
+    },
+    {
+      "id": "bathroom",
+      "name": "Ванная",
+      "sensory": {
+        "light": ["ровный нейтральный потолочный свет без окна"],
+        "sound": ["вода и стиральная машина отражаются от твёрдых поверхностей"],
+        "temperature": ["обычно чуть теплее и влажнее остальных комнат"],
+        "smell": ["чистые средства гигиены; сырость появляется только после использования воды"]
+      },
+      "anchors": [
+        { "id": "sink_mirror", "name": "Раковина и зеркало", "map_point": { "x": 85, "y": 555 } },
+        { "id": "shower_bath", "name": "Ванна и душ", "map_point": { "x": 180, "y": 655 } },
+        { "id": "toilet", "name": "Туалет", "map_point": { "x": 80, "y": 660 } },
+        { "id": "washing_machine", "name": "Стиральная машина", "map_point": { "x": 210, "y": 555 } }
+      ]
+    },
+    {
+      "id": "balcony",
+      "name": "Застеклённый балкон",
+      "sensory": {
+        "light": ["яркий дневной и тёплый вечерний свет через юго-западное остекление"],
+        "sound": ["город слышен заметнее, но остекление приглушает резкие звуки"],
+        "temperature": ["температура сильнее следует погоде, чем в жилых комнатах"],
+        "smell": ["сухой воздух хранения и слабый городской запах при открытом окне"]
+      },
+      "anchors": [
+        { "id": "balcony_table_chair", "name": "Стол и стул на балконе", "map_point": { "x": 1035, "y": 215 } },
+        { "id": "balcony_windows", "name": "Окна балкона", "map_point": { "x": 1140, "y": 125 }, "sensory": { "light": ["открытый вид на юго-западный городской свет"], "sound": ["открытая створка усиливает городской фон"], "temperature": ["наружный воздух быстро влияет на балкон"] } },
+        { "id": "balcony_storage", "name": "Хранение на балконе", "map_point": { "x": 1050, "y": 380 } }
+      ]
+    }
+  ],
+  "connections": [
+    { "from": "front_door", "to": "coat_and_shoe_area", "duration_ms": 1800, "bidirectional": true, "passage_id": "entryway.inside" },
+    { "from": "coat_and_shoe_area", "to": "hall_mirror", "duration_ms": 1200, "bidirectional": true, "passage_id": "entryway.mirror" },
+    { "from": "hall_mirror", "to": "corridor_center", "duration_ms": 1800, "bidirectional": true, "passage_id": "entryway.corridor" },
+    { "from": "coat_and_shoe_area", "to": "corridor_center", "duration_ms": 2200, "bidirectional": true, "passage_id": "entryway.direct" },
+    { "from": "corridor_center", "to": "utility_cabinet", "duration_ms": 1200, "bidirectional": true, "passage_id": "corridor.utility" },
+    { "from": "corridor_center", "to": "dining_table", "duration_ms": 3200, "bidirectional": true, "passage_id": "doorway.kitchen" },
+    { "from": "corridor_center", "to": "living_room_center", "duration_ms": 3000, "bidirectional": true, "passage_id": "doorway.living_room" },
+    { "from": "corridor_center", "to": "wardrobe", "duration_ms": 3400, "bidirectional": true, "passage_id": "door.bedroom" },
+    { "from": "corridor_center", "to": "sink_mirror", "duration_ms": 2600, "bidirectional": true, "passage_id": "door.bathroom" },
+    { "from": "dining_table", "to": "kitchen_worktop", "duration_ms": 2100, "bidirectional": true, "passage_id": "kitchen.center" },
+    { "from": "kitchen_worktop", "to": "sink", "duration_ms": 1000, "bidirectional": true, "passage_id": "kitchen.sink" },
+    { "from": "kitchen_worktop", "to": "stove", "duration_ms": 1000, "bidirectional": true, "passage_id": "kitchen.stove" },
+    { "from": "kitchen_worktop", "to": "fridge", "duration_ms": 1700, "bidirectional": true, "passage_id": "kitchen.fridge" },
+    { "from": "sink", "to": "kitchen_window", "duration_ms": 800, "bidirectional": true, "passage_id": "kitchen.window_near_sink" },
+    { "from": "dining_table", "to": "kitchen_window", "duration_ms": 1700, "bidirectional": true, "passage_id": "kitchen.window_from_table" },
+    { "from": "living_room_center", "to": "sofa", "duration_ms": 1900, "bidirectional": true, "passage_id": "living_room.sofa" },
+    { "from": "living_room_center", "to": "work_desk", "duration_ms": 2300, "bidirectional": true, "passage_id": "living_room.desk" },
+    { "from": "living_room_center", "to": "media_bookshelf", "duration_ms": 1900, "bidirectional": true, "passage_id": "living_room.bookshelf" },
+    { "from": "living_room_center", "to": "balcony_door", "duration_ms": 2600, "bidirectional": true, "passage_id": "living_room.balcony_door" },
+    { "from": "sofa", "to": "media_bookshelf", "duration_ms": 1600, "bidirectional": true, "passage_id": "living_room.sofa_bookshelf" },
+    { "from": "work_desk", "to": "media_bookshelf", "duration_ms": 1700, "bidirectional": true, "passage_id": "living_room.desk_bookshelf" },
+    { "from": "wardrobe", "to": "bed", "duration_ms": 2100, "bidirectional": true, "passage_id": "bedroom.bed" },
+    { "from": "bed", "to": "bedside_table", "duration_ms": 700, "bidirectional": true, "passage_id": "bedroom.bedside" },
+    { "from": "bed", "to": "bedroom_window", "duration_ms": 1900, "bidirectional": true, "passage_id": "bedroom.window_from_bed" },
+    { "from": "wardrobe", "to": "bedroom_window", "duration_ms": 2100, "bidirectional": true, "passage_id": "bedroom.window_from_wardrobe" },
+    { "from": "sink_mirror", "to": "shower_bath", "duration_ms": 1600, "bidirectional": true, "passage_id": "bathroom.shower" },
+    { "from": "sink_mirror", "to": "toilet", "duration_ms": 1300, "bidirectional": true, "passage_id": "bathroom.toilet" },
+    { "from": "sink_mirror", "to": "washing_machine", "duration_ms": 1500, "bidirectional": true, "passage_id": "bathroom.washing_machine" },
+    { "from": "toilet", "to": "shower_bath", "duration_ms": 1100, "bidirectional": true, "passage_id": "bathroom.inner" },
+    { "from": "balcony_door", "to": "balcony_table_chair", "duration_ms": 2300, "bidirectional": true, "passage_id": "door.balcony" },
+    { "from": "balcony_table_chair", "to": "balcony_windows", "duration_ms": 1000, "bidirectional": true, "passage_id": "balcony.windows" },
+    { "from": "balcony_table_chair", "to": "balcony_storage", "duration_ms": 1500, "bidirectional": true, "passage_id": "balcony.storage" }
+  ],
+  "object_templates": [
+    {
+      "id": "template.entry_door", "name": "Входная дверь с замком и глазком",
+      "dimensions_mm": { "width": 900, "depth": 110, "height": 2050 }, "mass_g": 45000,
+      "components": ["openable", "lockable", "cleanable"],
+      "observed_properties": { "material": "metal_and_wood", "opens_to": "internal_threshold_only" },
+      "hidden_properties": { "canary_path_guard": "hidden-entry-door-canary" }
+    },
+    {
+      "id": "template.intercom", "name": "Домофон",
+      "dimensions_mm": { "width": 220, "depth": 75, "height": 250 }, "mass_g": 700,
+      "components": ["powerable", "sound_emitter"],
+      "actions": [{ "action_id": "object.toggle_power", "description": "Переключить питание домофона", "duration_ms": 500, "required_resources": ["hands", "vision", "attention"], "interruptibility": "immediate" }]
+    },
+    {
+      "id": "template.light", "name": "Электрический светильник",
+      "dimensions_mm": { "width": 400, "depth": 400, "height": 1700 }, "mass_g": 3500,
+      "components": ["powerable"],
+      "actions": [{ "action_id": "object.toggle_power", "description": "Включить или выключить свет", "duration_ms": 350, "required_resources": ["hands", "vision"], "interruptibility": "immediate" }]
+    },
+    { "id": "template.coat_rack", "name": "Вешалка", "dimensions_mm": { "width": 800, "depth": 350, "height": 1850 }, "mass_g": 12000, "components": ["surface"] },
+    {
+      "id": "template.storage_cabinet", "name": "Шкаф для хранения",
+      "dimensions_mm": { "width": 1100, "depth": 600, "height": 2100 }, "mass_g": 70000,
+      "components": ["container", "surface", "openable", "cleanable"],
+      "slots": [
+        { "id": "interior", "kind": "container", "capacity": 12, "max_total_mass_g": 50000, "max_item_dimensions_mm": { "width": 850, "depth": 520, "height": 1650 } },
+        { "id": "top", "kind": "surface", "capacity": 4, "max_total_mass_g": 12000, "max_item_dimensions_mm": { "width": 700, "depth": 450, "height": 700 } }
+      ]
+    },
+    { "id": "template.mirror", "name": "Настенное зеркало", "dimensions_mm": { "width": 800, "depth": 45, "height": 1400 }, "mass_g": 9000, "components": ["cleanable"] },
+    { "id": "template.kit", "name": "Компактный набор предметов", "dimensions_mm": { "width": 400, "depth": 300, "height": 250 }, "mass_g": 5000, "components": ["quantity", "cleanable", "movable"] },
+    { "id": "template.sink", "name": "Раковина", "dimensions_mm": { "width": 700, "depth": 550, "height": 350 }, "mass_g": 18000, "components": ["fillable", "cleanable"] },
+    {
+      "id": "template.kitchen_worktop", "name": "Столешница со шкафами",
+      "dimensions_mm": { "width": 2600, "depth": 650, "height": 900 }, "mass_g": 150000,
+      "components": ["surface", "container", "openable", "cleanable"],
+      "slots": [
+        { "id": "appliance_zone", "kind": "surface", "capacity": 4, "max_total_mass_g": 35000, "max_item_dimensions_mm": { "width": 650, "depth": 600, "height": 800 }, "provides_power": true },
+        { "id": "cabinet", "kind": "container", "capacity": 10, "max_total_mass_g": 75000, "max_item_dimensions_mm": { "width": 600, "depth": 520, "height": 550 } }
+      ]
+    },
+    {
+      "id": "template.stove_oven", "name": "Плита с духовкой",
+      "dimensions_mm": { "width": 600, "depth": 600, "height": 850 }, "mass_g": 52000,
+      "components": ["powerable", "heatable", "container", "openable", "temperature_controlled", "cleanable"],
+      "observed_properties": { "power": "off" },
+      "actions": [{ "action_id": "object.toggle_power", "description": "Переключить питание плиты", "duration_ms": 600, "required_resources": ["hands", "vision", "attention"], "interruptibility": "safe_point" }]
+    },
+    {
+      "id": "template.refrigerator", "name": "Холодильник",
+      "dimensions_mm": { "width": 600, "depth": 650, "height": 1850 }, "mass_g": 76000,
+      "components": ["powerable", "container", "openable", "temperature_controlled", "cleanable"],
+      "slots": [{ "id": "cold_storage", "kind": "container", "capacity": 24, "max_total_mass_g": 55000, "max_item_dimensions_mm": { "width": 500, "depth": 520, "height": 500 } }],
+      "observed_properties": {},
+      "initial_state": { "power": true },
+      "hidden_properties": { "canary_factory_serial": "hidden-refrigerator-template-canary" },
+      "actions": [{ "action_id": "object.toggle_power", "description": "Переключить питание холодильника", "duration_ms": 900, "required_resources": ["hands", "vision", "attention"], "interruptibility": "safe_point" }]
+    },
+    {
+      "id": "template.kettle", "name": "Электрический чайник",
+      "dimensions_mm": { "width": 240, "depth": 190, "height": 270 }, "mass_g": 1400,
+      "components": ["powerable", "fillable", "heatable", "sound_emitter", "movable"], "placement_requires_power": true,
+      "observed_properties": { "power": "off", "water": "empty" },
+      "actions": [{ "action_id": "object.toggle_power", "description": "Включить или выключить чайник", "duration_ms": 450, "required_resources": ["hands", "vision", "attention"], "interruptibility": "immediate" }]
+    },
+    {
+      "id": "template.table", "name": "Стол",
+      "dimensions_mm": { "width": 1100, "depth": 750, "height": 760 }, "mass_g": 28000, "components": ["surface", "cleanable"],
+      "slots": [{ "id": "top", "kind": "surface", "capacity": 16, "max_total_mass_g": 35000, "max_item_dimensions_mm": { "width": 900, "depth": 650, "height": 650 } }]
+    },
+    { "id": "template.chair", "name": "Стул", "dimensions_mm": { "width": 500, "depth": 520, "height": 900 }, "mass_g": 6500, "components": ["surface", "cleanable", "movable"] },
+    { "id": "template.window", "name": "Окно", "dimensions_mm": { "width": 1700, "depth": 180, "height": 1450 }, "mass_g": 65000, "components": ["openable", "cleanable"] },
+    { "id": "template.window_covering", "name": "Шторы или жалюзи", "dimensions_mm": { "width": 1800, "depth": 100, "height": 2200 }, "mass_g": 5500, "components": ["openable", "cleanable"] },
+    { "id": "template.radiator", "name": "Радиатор", "dimensions_mm": { "width": 1200, "depth": 180, "height": 600 }, "mass_g": 26000, "components": ["heatable", "temperature_controlled"] },
+    {
+      "id": "template.sofa", "name": "Диван",
+      "dimensions_mm": { "width": 2200, "depth": 950, "height": 850 }, "mass_g": 85000, "components": ["surface", "cleanable"],
+      "slots": [{ "id": "seat", "kind": "surface", "capacity": 4, "max_total_mass_g": 180000, "max_item_dimensions_mm": { "width": 1800, "depth": 700, "height": 500 } }]
+    },
+    {
+      "id": "template.work_desk", "name": "Рабочий стол",
+      "dimensions_mm": { "width": 1700, "depth": 800, "height": 760 }, "mass_g": 48000, "components": ["surface", "container", "openable", "cleanable"],
+      "slots": [
+        { "id": "powered_desktop", "kind": "surface", "capacity": 14, "max_total_mass_g": 85000, "max_item_dimensions_mm": { "width": 700, "depth": 680, "height": 1800 }, "provides_power": true },
+        { "id": "drawer", "kind": "container", "capacity": 8, "max_total_mass_g": 15000, "max_item_dimensions_mm": { "width": 500, "depth": 450, "height": 300 } }
+      ]
+    },
+    {
+      "id": "template.computer", "name": "Настольный компьютер",
+      "dimensions_mm": { "width": 250, "depth": 520, "height": 500 }, "mass_g": 13000,
+      "components": ["powerable", "sound_emitter"], "placement_requires_power": true,
+      "actions": [{ "action_id": "object.toggle_power", "description": "Включить или выключить компьютер", "duration_ms": 800, "required_resources": ["hands", "vision", "attention"], "interruptibility": "immediate" }]
+    },
+    {
+      "id": "template.monitor", "name": "Монитор",
+      "dimensions_mm": { "width": 620, "depth": 230, "height": 460 }, "mass_g": 6500,
+      "components": ["powerable"], "placement_requires_power": true,
+      "actions": [{ "action_id": "object.toggle_power", "description": "Включить или выключить монитор", "duration_ms": 350, "required_resources": ["hands", "vision"], "interruptibility": "immediate" }]
+    },
+    { "id": "template.input_device", "name": "Устройство ввода", "dimensions_mm": { "width": 520, "depth": 260, "height": 80 }, "mass_g": 1200, "components": ["cleanable", "movable"] },
+    {
+      "id": "template.bookshelf", "name": "Книжная полка",
+      "dimensions_mm": { "width": 1250, "depth": 380, "height": 1950 }, "mass_g": 72000, "components": ["surface", "container", "openable", "cleanable"],
+      "slots": [
+        { "id": "open_shelves", "kind": "surface", "capacity": 18, "max_total_mass_g": 55000, "max_item_dimensions_mm": { "width": 850, "depth": 330, "height": 420 } },
+        { "id": "drawer", "kind": "container", "capacity": 8, "max_total_mass_g": 18000, "max_item_dimensions_mm": { "width": 700, "depth": 320, "height": 300 } }
+      ]
+    },
+    { "id": "template.headphones", "name": "Проводные наушники", "dimensions_mm": { "width": 220, "depth": 120, "height": 250 }, "mass_g": 450, "components": ["sound_emitter", "movable"] },
+    {
+      "id": "template.speakers", "name": "Колонки",
+      "dimensions_mm": { "width": 500, "depth": 300, "height": 380 }, "mass_g": 6000,
+      "components": ["powerable", "sound_emitter", "movable"], "placement_requires_power": true,
+      "actions": [{ "action_id": "object.toggle_power", "description": "Включить или выключить колонки", "duration_ms": 350, "required_resources": ["hands", "hearing", "vision"], "interruptibility": "immediate" }]
+    },
+    { "id": "template.phone", "name": "Смартфон", "dimensions_mm": { "width": 80, "depth": 12, "height": 170 }, "mass_g": 230, "components": ["chargeable", "sound_emitter", "movable"] },
+    {
+      "id": "template.bed", "name": "Кровать",
+      "dimensions_mm": { "width": 1550, "depth": 2150, "height": 650 }, "mass_g": 90000, "components": ["surface", "cleanable"],
+      "slots": [{ "id": "sleeping_surface", "kind": "surface", "capacity": 4, "max_total_mass_g": 150000, "max_item_dimensions_mm": { "width": 1500, "depth": 2100, "height": 450 } }]
+    },
+    { "id": "template.bedding", "name": "Постельное бельё", "dimensions_mm": { "width": 1450, "depth": 2050, "height": 180 }, "mass_g": 4500, "components": ["cleanable", "movable"] },
+    {
+      "id": "template.bedside_table", "name": "Прикроватная тумба",
+      "dimensions_mm": { "width": 520, "depth": 430, "height": 580 }, "mass_g": 14000, "components": ["surface", "container", "openable", "cleanable"],
+      "slots": [
+        { "id": "powered_top", "kind": "surface", "capacity": 4, "max_total_mass_g": 10000, "max_item_dimensions_mm": { "width": 420, "depth": 420, "height": 1800 }, "provides_power": true },
+        { "id": "drawer", "kind": "container", "capacity": 6, "max_total_mass_g": 10000, "max_item_dimensions_mm": { "width": 400, "depth": 350, "height": 180 } }
+      ]
+    },
+    {
+      "id": "template.wardrobe", "name": "Гардероб",
+      "dimensions_mm": { "width": 1650, "depth": 650, "height": 2200 }, "mass_g": 110000, "components": ["container", "openable", "cleanable"],
+      "slots": [{ "id": "clothes", "kind": "container", "capacity": 24, "max_total_mass_g": 45000, "max_item_dimensions_mm": { "width": 700, "depth": 560, "height": 600 } }]
+    },
+    {
+      "id": "template.vanity", "name": "Тумба ванной",
+      "dimensions_mm": { "width": 850, "depth": 520, "height": 850 }, "mass_g": 42000, "components": ["surface", "container", "openable", "cleanable"],
+      "slots": [
+        { "id": "sink_rim", "kind": "surface", "capacity": 5, "max_total_mass_g": 8000, "max_item_dimensions_mm": { "width": 350, "depth": 220, "height": 400 } },
+        { "id": "cabinet", "kind": "container", "capacity": 10, "max_total_mass_g": 18000, "max_item_dimensions_mm": { "width": 600, "depth": 420, "height": 450 } }
+      ]
+    },
+    { "id": "template.shower_bath", "name": "Ванна с душем", "dimensions_mm": { "width": 1750, "depth": 780, "height": 650 }, "mass_g": 90000, "components": ["fillable", "cleanable"] },
+    { "id": "template.toilet", "name": "Туалет", "dimensions_mm": { "width": 420, "depth": 700, "height": 780 }, "mass_g": 32000, "components": ["fillable", "cleanable"] },
+    {
+      "id": "template.washing_machine", "name": "Стиральная машина",
+      "dimensions_mm": { "width": 600, "depth": 620, "height": 850 }, "mass_g": 68000,
+      "components": ["powerable", "container", "openable", "cleanable", "sound_emitter"],
+      "slots": [{ "id": "drum", "kind": "container", "capacity": 10, "max_total_mass_g": 9000, "max_item_dimensions_mm": { "width": 500, "depth": 500, "height": 450 } }],
+      "actions": [{ "action_id": "object.toggle_power", "description": "Переключить питание стиральной машины", "duration_ms": 600, "required_resources": ["hands", "vision", "attention"], "interruptibility": "safe_point" }]
+    },
+    {
+      "id": "template.laundry_basket", "name": "Корзина для белья",
+      "dimensions_mm": { "width": 500, "depth": 420, "height": 650 }, "mass_g": 2500, "components": ["container", "movable"],
+      "slots": [{ "id": "basket", "kind": "container", "capacity": 14, "max_total_mass_g": 12000, "max_item_dimensions_mm": { "width": 450, "depth": 380, "height": 300 } }]
+    },
+    {
+      "id": "template.balcony_storage", "name": "Балконный ящик для хранения",
+      "dimensions_mm": { "width": 1050, "depth": 520, "height": 720 }, "mass_g": 28000, "components": ["container", "surface", "openable", "cleanable"],
+      "slots": [{ "id": "interior", "kind": "container", "capacity": 10, "max_total_mass_g": 40000, "max_item_dimensions_mm": { "width": 850, "depth": 450, "height": 550 } }]
+    }
+  ],
+  "objects": [
+    { "id": "object.entry_door", "name": "Входная дверь", "anchor_id": "front_door", "template_id": "template.entry_door", "placement": { "relation": "anchor" }, "hidden_properties": { "canary_lock_state": "hidden-entry-instance-canary" } },
+    { "id": "object.intercom", "name": "Домофон", "anchor_id": "front_door", "template_id": "template.intercom", "placement": { "relation": "anchor" } },
+    { "id": "object.coat_rack", "name": "Вешалка", "anchor_id": "coat_and_shoe_area", "template_id": "template.coat_rack", "placement": { "relation": "anchor" } },
+    { "id": "object.shoe_cabinet", "name": "Обувная тумба", "anchor_id": "coat_and_shoe_area", "template_id": "template.storage_cabinet", "placement": { "relation": "anchor" }, "observed_properties": { "purpose": "shoes" } },
+    { "id": "object.hall_mirror", "name": "Зеркало в прихожей", "anchor_id": "hall_mirror", "template_id": "template.mirror", "placement": { "relation": "anchor" } },
+    { "id": "object.entryway_light", "name": "Свет прихожей", "anchor_id": "hall_mirror", "template_id": "template.light", "placement": { "relation": "anchor" }, "observed_properties": { "kind": "ceiling" } },
+    { "id": "object.corridor_light", "name": "Свет коридора", "anchor_id": "corridor_center", "template_id": "template.light", "placement": { "relation": "anchor" }, "observed_properties": { "kind": "ceiling" } },
+    { "id": "object.utility_cabinet", "name": "Хозяйственный шкаф", "anchor_id": "utility_cabinet", "template_id": "template.storage_cabinet", "placement": { "relation": "anchor" }, "hidden_properties": { "canary_private_storage": "hidden-utility-canary" } },
+    { "id": "object.cleaning_kit", "name": "Набор для уборки: швабра, веник, совок и средства", "anchor_id": "utility_cabinet", "template_id": "template.kit", "placement": { "relation": "container", "parent_object_id": "object.utility_cabinet", "slot_id": "interior" }, "observed_properties": { "contents": "mop_broom_dustpan_detergent_trash_bags" } },
+
+    { "id": "object.kitchen_sink", "name": "Кухонная мойка", "anchor_id": "sink", "template_id": "template.sink", "placement": { "relation": "anchor" } },
+    { "id": "object.kitchen_worktop", "name": "Столешница и кухонные шкафы", "anchor_id": "kitchen_worktop", "template_id": "template.kitchen_worktop", "placement": { "relation": "anchor" } },
+    { "id": "object.stove_oven", "name": "Плита с духовкой", "anchor_id": "stove", "template_id": "template.stove_oven", "placement": { "relation": "anchor" } },
+    { "id": "object.refrigerator", "name": "Холодильник", "anchor_id": "fridge", "template_id": "template.refrigerator", "placement": { "relation": "anchor" }, "hidden_properties": { "canary_closed_inventory": "hidden-fridge-instance-canary" } },
+    { "id": "object.electric_kettle", "name": "Электрический чайник", "anchor_id": "kitchen_worktop", "template_id": "template.kettle", "placement": { "relation": "surface", "parent_object_id": "object.kitchen_worktop", "slot_id": "appliance_zone" } },
+    { "id": "object.dining_table", "name": "Обеденный стол", "anchor_id": "dining_table", "template_id": "template.table", "placement": { "relation": "anchor" }, "observed_properties": { "seats": "2" } },
+    { "id": "object.dining_chair.1", "name": "Обеденный стул слева", "anchor_id": "dining_table", "template_id": "template.chair", "placement": { "relation": "anchor" } },
+    { "id": "object.dining_chair.2", "name": "Обеденный стул справа", "anchor_id": "dining_table", "template_id": "template.chair", "placement": { "relation": "anchor" } },
+    { "id": "object.kitchen_window", "name": "Кухонное окно", "anchor_id": "kitchen_window", "template_id": "template.window", "placement": { "relation": "anchor" }, "observed_properties": { "orientation": "east_northeast" } },
+    { "id": "object.kitchen_blind", "name": "Кухонные жалюзи", "anchor_id": "kitchen_window", "template_id": "template.window_covering", "placement": { "relation": "anchor" } },
+    { "id": "object.kitchen_radiator", "name": "Радиатор кухни", "anchor_id": "kitchen_window", "template_id": "template.radiator", "placement": { "relation": "anchor" } },
+    { "id": "object.kitchen_light", "name": "Свет кухни", "anchor_id": "kitchen_worktop", "template_id": "template.light", "placement": { "relation": "anchor" }, "observed_properties": { "kind": "ceiling" } },
+    { "id": "object.dishware_set", "name": "Посуда: кружки, тарелки, миски и стаканы", "anchor_id": "kitchen_worktop", "template_id": "template.kit", "placement": { "relation": "container", "parent_object_id": "object.kitchen_worktop", "slot_id": "cabinet" }, "observed_properties": { "contents": "two_mugs_two_plates_two_bowls_two_glasses" } },
+    { "id": "object.cutlery_set", "name": "Набор столовых приборов", "anchor_id": "kitchen_worktop", "template_id": "template.kit", "placement": { "relation": "container", "parent_object_id": "object.kitchen_worktop", "slot_id": "cabinet" }, "observed_properties": { "contents": "forks_spoons_knives" } },
+    { "id": "object.cookware_set", "name": "Кастрюля, сковорода, нож и разделочная доска", "anchor_id": "kitchen_worktop", "template_id": "template.kit", "placement": { "relation": "container", "parent_object_id": "object.kitchen_worktop", "slot_id": "cabinet" }, "observed_properties": { "contents": "pot_pan_knife_cutting_board" } },
+    { "id": "object.pantry_food", "name": "Безопасный запас сухих продуктов", "anchor_id": "kitchen_worktop", "template_id": "template.kit", "placement": { "relation": "container", "parent_object_id": "object.kitchen_worktop", "slot_id": "cabinet" }, "observed_properties": { "contents": "oats_rice_pasta_tea_salt_oil_bread", "quantity": "small_starting_stock" } },
+    { "id": "object.refrigerated_food", "name": "Небольшой запас продуктов в холодильнике", "anchor_id": "fridge", "template_id": "template.kit", "placement": { "relation": "container", "parent_object_id": "object.refrigerator", "slot_id": "cold_storage" }, "observed_properties": { "contents": "eggs_milk_butter_cheese_apples", "quantity": "small_starting_stock" } },
+
+    { "id": "object.sofa", "name": "Диван", "anchor_id": "sofa", "template_id": "template.sofa", "placement": { "relation": "anchor" }, "observed_properties": { "color": "muted_green" } },
+    { "id": "object.living_room_table", "name": "Небольшой столик", "anchor_id": "sofa", "template_id": "template.table", "placement": { "relation": "anchor" }, "observed_properties": { "kind": "coffee_table" } },
+    { "id": "object.living_floor_lamp", "name": "Локальный свет у дивана", "anchor_id": "sofa", "template_id": "template.light", "placement": { "relation": "anchor" }, "observed_properties": { "kind": "floor", "tone": "warm" } },
+    { "id": "object.living_ceiling_light", "name": "Общий свет гостиной", "anchor_id": "living_room_center", "template_id": "template.light", "placement": { "relation": "anchor" }, "observed_properties": { "kind": "ceiling" } },
+    { "id": "object.work_desk", "name": "Рабочий стол", "anchor_id": "work_desk", "template_id": "template.work_desk", "placement": { "relation": "anchor" } },
+    { "id": "object.desktop_pc", "name": "Настольный компьютер", "anchor_id": "work_desk", "template_id": "template.computer", "placement": { "relation": "surface", "parent_object_id": "object.work_desk", "slot_id": "powered_desktop" } },
+    { "id": "object.monitor.1", "name": "Левый монитор", "anchor_id": "work_desk", "template_id": "template.monitor", "placement": { "relation": "surface", "parent_object_id": "object.work_desk", "slot_id": "powered_desktop" } },
+    { "id": "object.monitor.2", "name": "Правый монитор", "anchor_id": "work_desk", "template_id": "template.monitor", "placement": { "relation": "surface", "parent_object_id": "object.work_desk", "slot_id": "powered_desktop" } },
+    { "id": "object.keyboard", "name": "Клавиатура", "anchor_id": "work_desk", "template_id": "template.input_device", "placement": { "relation": "surface", "parent_object_id": "object.work_desk", "slot_id": "powered_desktop" }, "observed_properties": { "kind": "keyboard" } },
+    { "id": "object.mouse", "name": "Мышь", "anchor_id": "work_desk", "template_id": "template.input_device", "placement": { "relation": "surface", "parent_object_id": "object.work_desk", "slot_id": "powered_desktop" }, "observed_properties": { "kind": "mouse" } },
+    { "id": "object.desk_lamp", "name": "Настольная лампа", "anchor_id": "work_desk", "template_id": "template.light", "components": ["movable"], "placement": { "relation": "surface", "parent_object_id": "object.work_desk", "slot_id": "powered_desktop" }, "observed_properties": { "kind": "desk", "color": "dark_burgundy" } },
+    { "id": "object.wired_headphones", "name": "Проводные наушники", "anchor_id": "work_desk", "template_id": "template.headphones", "placement": { "relation": "surface", "parent_object_id": "object.work_desk", "slot_id": "powered_desktop" } },
+    { "id": "object.speakers", "name": "Колонки", "anchor_id": "work_desk", "template_id": "template.speakers", "placement": { "relation": "surface", "parent_object_id": "object.work_desk", "slot_id": "powered_desktop" } },
+    { "id": "object.makise_phone", "name": "Телефон Makise", "anchor_id": "work_desk", "template_id": "template.phone", "placement": { "relation": "surface", "parent_object_id": "object.work_desk", "slot_id": "powered_desktop" }, "hidden_properties": { "canary_private_device": "hidden-phone-canary" } },
+    { "id": "object.charger_set", "name": "Зарядные устройства и кабели", "anchor_id": "work_desk", "template_id": "template.kit", "placement": { "relation": "container", "parent_object_id": "object.work_desk", "slot_id": "drawer" }, "observed_properties": { "contents": "phone_charger_usb_cables_power_strip" } },
+    { "id": "object.media_bookshelf", "name": "Книжная полка", "anchor_id": "media_bookshelf", "template_id": "template.bookshelf", "placement": { "relation": "anchor" } },
+    { "id": "object.notebooks", "name": "Блокноты и базовая канцелярия", "anchor_id": "media_bookshelf", "template_id": "template.kit", "placement": { "relation": "surface", "parent_object_id": "object.media_bookshelf", "slot_id": "open_shelves" }, "observed_properties": { "contents": "notebooks_pens" } },
+    { "id": "object.electronics_toolkit", "name": "Базовый набор электронных инструментов", "anchor_id": "media_bookshelf", "template_id": "template.kit", "placement": { "relation": "container", "parent_object_id": "object.media_bookshelf", "slot_id": "drawer" } },
+    { "id": "object.balcony_door", "name": "Стеклянная балконная дверь", "anchor_id": "balcony_door", "template_id": "template.entry_door", "placement": { "relation": "anchor" }, "observed_properties": { "kind": "balcony", "opens_to": "balcony" } },
+    { "id": "object.living_radiator", "name": "Радиатор гостиной", "anchor_id": "balcony_door", "template_id": "template.radiator", "placement": { "relation": "anchor" } },
+
+    { "id": "object.bed", "name": "Кровать", "anchor_id": "bed", "template_id": "template.bed", "placement": { "relation": "anchor" } },
+    { "id": "object.bedding", "name": "Постельное бельё", "anchor_id": "bed", "template_id": "template.bedding", "placement": { "relation": "surface", "parent_object_id": "object.bed", "slot_id": "sleeping_surface" } },
+    { "id": "object.bedroom_light", "name": "Общий свет спальни", "anchor_id": "bed", "template_id": "template.light", "placement": { "relation": "anchor" }, "observed_properties": { "kind": "ceiling" } },
+    { "id": "object.bedside_table", "name": "Прикроватная тумба", "anchor_id": "bedside_table", "template_id": "template.bedside_table", "placement": { "relation": "anchor" } },
+    { "id": "object.bedside_lamp", "name": "Прикроватная лампа", "anchor_id": "bedside_table", "template_id": "template.light", "components": ["movable"], "placement": { "relation": "surface", "parent_object_id": "object.bedside_table", "slot_id": "powered_top" }, "observed_properties": { "kind": "bedside", "tone": "warm" } },
+    { "id": "object.wardrobe", "name": "Гардероб", "anchor_id": "wardrobe", "template_id": "template.wardrobe", "placement": { "relation": "anchor" } },
+    { "id": "object.starter_clothes", "name": "Небольшой стартовый набор одежды", "anchor_id": "wardrobe", "template_id": "template.kit", "placement": { "relation": "container", "parent_object_id": "object.wardrobe", "slot_id": "clothes" }, "observed_properties": { "contents": "dark_shirt_gray_tshirt_burgundy_sweater_jeans_lounge_pants_sleepwear_underwear_socks_slippers" } },
+    { "id": "object.bedroom_window", "name": "Окно спальни", "anchor_id": "bedroom_window", "template_id": "template.window", "placement": { "relation": "anchor" }, "observed_properties": { "orientation": "east_northeast" } },
+    { "id": "object.bedroom_curtains", "name": "Плотные шторы", "anchor_id": "bedroom_window", "template_id": "template.window_covering", "placement": { "relation": "anchor" }, "observed_properties": { "opacity": "blackout" } },
+    { "id": "object.bedroom_radiator", "name": "Радиатор спальни", "anchor_id": "bedroom_window", "template_id": "template.radiator", "placement": { "relation": "anchor" } },
+
+    { "id": "object.bathroom_sink", "name": "Раковина ванной", "anchor_id": "sink_mirror", "template_id": "template.sink", "placement": { "relation": "anchor" } },
+    { "id": "object.bathroom_vanity", "name": "Тумба ванной", "anchor_id": "sink_mirror", "template_id": "template.vanity", "placement": { "relation": "anchor" } },
+    { "id": "object.bathroom_mirror", "name": "Зеркало ванной", "anchor_id": "sink_mirror", "template_id": "template.mirror", "placement": { "relation": "anchor" } },
+    { "id": "object.hygiene_kit", "name": "Базовые средства гигиены", "anchor_id": "sink_mirror", "template_id": "template.kit", "placement": { "relation": "container", "parent_object_id": "object.bathroom_vanity", "slot_id": "cabinet" }, "observed_properties": { "contents": "toothbrush_toothpaste_soap_shampoo_toilet_paper" } },
+    { "id": "object.towel_set", "name": "Полотенца", "anchor_id": "sink_mirror", "template_id": "template.kit", "placement": { "relation": "container", "parent_object_id": "object.bathroom_vanity", "slot_id": "cabinet" } },
+    { "id": "object.bathroom_light", "name": "Свет ванной", "anchor_id": "sink_mirror", "template_id": "template.light", "placement": { "relation": "anchor" }, "observed_properties": { "kind": "ceiling" } },
+    { "id": "object.exhaust_fan", "name": "Вытяжной вентилятор", "anchor_id": "sink_mirror", "template_id": "template.intercom", "placement": { "relation": "anchor" }, "observed_properties": { "kind": "exhaust_fan" } },
+    { "id": "object.shower_bath", "name": "Ванна с душем", "anchor_id": "shower_bath", "template_id": "template.shower_bath", "placement": { "relation": "anchor" } },
+    { "id": "object.shower_curtain", "name": "Шторка для душа", "anchor_id": "shower_bath", "template_id": "template.window_covering", "placement": { "relation": "anchor" }, "observed_properties": { "kind": "shower_curtain" } },
+    { "id": "object.toilet", "name": "Туалет", "anchor_id": "toilet", "template_id": "template.toilet", "placement": { "relation": "anchor" } },
+    { "id": "object.washing_machine", "name": "Стиральная машина", "anchor_id": "washing_machine", "template_id": "template.washing_machine", "placement": { "relation": "anchor" } },
+    { "id": "object.laundry_basket", "name": "Корзина для белья", "anchor_id": "washing_machine", "template_id": "template.laundry_basket", "placement": { "relation": "anchor" } },
+
+    { "id": "object.balcony_table", "name": "Складной стол на балконе", "anchor_id": "balcony_table_chair", "template_id": "template.table", "placement": { "relation": "anchor" }, "observed_properties": { "kind": "folding" } },
+    { "id": "object.balcony_chair", "name": "Складной стул на балконе", "anchor_id": "balcony_table_chair", "template_id": "template.chair", "placement": { "relation": "anchor" }, "observed_properties": { "kind": "folding" } },
+    { "id": "object.balcony_light", "name": "Свет балкона", "anchor_id": "balcony_table_chair", "template_id": "template.light", "placement": { "relation": "anchor" }, "observed_properties": { "kind": "wall" } },
+    { "id": "object.balcony_windows", "name": "Остекление балкона", "anchor_id": "balcony_windows", "template_id": "template.window", "placement": { "relation": "anchor" }, "observed_properties": { "orientation": "southwest", "kind": "glazed_balcony" } },
+    { "id": "object.balcony_storage", "name": "Зона хранения балкона", "anchor_id": "balcony_storage", "template_id": "template.balcony_storage", "placement": { "relation": "anchor" } }
+  ]
+}

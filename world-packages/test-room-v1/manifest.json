@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "world_id": "test-room-v1",
+  "locations": [
+    {
+      "id": "test_room",
+      "name": "Тестовая комната",
+      "anchors": [
+        { "id": "bed", "name": "Кровать" },
+        { "id": "work_desk", "name": "Рабочий стол" }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "bed",
+      "to": "work_desk",
+      "duration_ms": 4000,
+      "bidirectional": true
+    }
+  ],
+  "objects": [
+    {
+      "id": "desk_lamp",
+      "name": "Настольная лампа",
+      "anchor_id": "work_desk",
+      "components": ["powerable"],
+      "observed_properties": {
+        "color": "dark_red"
+      },
+      "hidden_properties": {
+        "factory_serial": "MAKISE-SECRET-001"
+      },
+      "actions": [
+        {
+          "action_id": "object.toggle_power",
+          "description": "Переключить настольную лампу",
+          "duration_ms": 700,
+          "required_resources": ["hands", "vision", "attention"]
+        }
+      ]
+    }
+  ]
+}
+

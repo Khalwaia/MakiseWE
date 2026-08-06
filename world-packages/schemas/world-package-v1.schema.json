@@ -1,0 +1,334 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://makise.local/schemas/world-package-v1.schema.json",
+  "title": "Makise World Package V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "world_id", "locations", "connections", "objects"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "world_id": { "$ref": "#/$defs/stable_id" },
+    "locations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/location" }
+    },
+    "connections": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/connection" }
+    },
+    "objects": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/object" }
+    },
+    "initial_anchor_id": { "$ref": "#/$defs/stable_id" },
+    "metadata": { "$ref": "#/$defs/metadata" },
+    "map": { "$ref": "#/$defs/map" },
+    "topology": { "$ref": "#/$defs/topology" },
+    "object_templates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/object_template" }
+    }
+  },
+  "$defs": {
+    "stable_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 96,
+      "pattern": "^[a-z0-9_.-]+$"
+    },
+    "bounded_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "\\S"
+    },
+    "string_map": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/stable_id" },
+      "additionalProperties": { "type": "string" }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["city", "timezone", "floor", "area_m2", "weather_fallback"],
+      "properties": {
+        "city": { "$ref": "#/$defs/bounded_text" },
+        "timezone": { "$ref": "#/$defs/bounded_text" },
+        "floor": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "area_m2": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "weather_fallback": { "$ref": "#/$defs/bounded_text" }
+      }
+    },
+    "map": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset", "width", "height"],
+      "properties": {
+        "asset": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 512,
+          "pattern": "^[^/\\\\](?:.*[^/\\\\])?\\.svg$"
+        },
+        "width": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "height": { "type": "integer", "minimum": 1, "maximum": 4294967295 }
+      }
+    },
+    "topology": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "require_strong_connectivity": { "type": "boolean" }
+      }
+    },
+    "sensory": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "light": { "$ref": "#/$defs/sensory_descriptions" },
+        "sound": { "$ref": "#/$defs/sensory_descriptions" },
+        "temperature": { "$ref": "#/$defs/sensory_descriptions" },
+        "smell": { "$ref": "#/$defs/sensory_descriptions" }
+      }
+    },
+    "sensory_descriptions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/bounded_text" }
+    },
+    "map_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "y": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+      }
+    },
+    "anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "$ref": "#/$defs/stable_id" },
+        "name": { "$ref": "#/$defs/bounded_text" },
+        "map_point": { "$ref": "#/$defs/map_point" },
+        "sensory": { "$ref": "#/$defs/sensory" }
+      }
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "anchors"],
+      "properties": {
+        "id": { "$ref": "#/$defs/stable_id" },
+        "name": { "$ref": "#/$defs/bounded_text" },
+        "anchors": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/anchor" }
+        },
+        "sensory": { "$ref": "#/$defs/sensory" }
+      }
+    },
+    "connection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "duration_ms", "bidirectional"],
+      "properties": {
+        "from": { "$ref": "#/$defs/stable_id" },
+        "to": { "$ref": "#/$defs/stable_id" },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "bidirectional": { "type": "boolean" },
+        "passage_id": { "$ref": "#/$defs/stable_id" }
+      }
+    },
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "depth", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "depth": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "height": { "type": "integer", "minimum": 1, "maximum": 4294967295 }
+      }
+    },
+    "placement_relation": {
+      "enum": ["anchor", "surface", "container"]
+    },
+    "placement_slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "capacity",
+        "max_total_mass_g",
+        "max_item_dimensions_mm"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/stable_id" },
+        "kind": { "enum": ["surface", "container"] },
+        "capacity": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "max_total_mass_g": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 18446744073709551615
+        },
+        "max_item_dimensions_mm": { "$ref": "#/$defs/dimensions" },
+        "provides_power": { "type": "boolean" }
+      }
+    },
+    "precondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["property", "equals"],
+      "properties": {
+        "property": { "$ref": "#/$defs/stable_id" },
+        "equals": { "$ref": "#/$defs/bounded_text" }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action_id", "description", "duration_ms"],
+      "properties": {
+        "action_id": { "$ref": "#/$defs/stable_id" },
+        "description": { "$ref": "#/$defs/bounded_text" },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "required_resources": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": ["movement", "hands", "vision", "attention", "speech", "hearing", "background"]
+          }
+        },
+        "interruptibility": {
+          "enum": ["immediate", "safe_point", "non_interruptible_until_step", "background"]
+        },
+        "preconditions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/precondition" }
+        }
+      }
+    },
+    "component": {
+      "enum": [
+        "powerable",
+        "chargeable",
+        "openable",
+        "lockable",
+        "container",
+        "surface",
+        "fillable",
+        "heatable",
+        "cleanable",
+        "sound_emitter",
+        "provides_interaction_anchor",
+        "quantity",
+        "temperature_controlled",
+        "movable"
+      ]
+    },
+    "initial_object_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "power": { "type": "boolean" },
+        "open": { "type": "boolean" }
+      },
+      "minProperties": 1
+    },
+    "object_template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "dimensions_mm", "mass_g"],
+      "properties": {
+        "id": { "$ref": "#/$defs/stable_id" },
+        "name": { "$ref": "#/$defs/bounded_text" },
+        "dimensions_mm": { "$ref": "#/$defs/dimensions" },
+        "mass_g": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 18446744073709551615
+        },
+        "components": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/component" }
+        },
+        "placement_requires_power": { "type": "boolean" },
+        "slots": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/placement_slot" }
+        },
+        "observed_properties": { "$ref": "#/$defs/string_map" },
+        "hidden_properties": { "$ref": "#/$defs/string_map" },
+        "actions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/action" }
+        },
+        "initial_state": { "$ref": "#/$defs/initial_object_state" }
+      }
+    },
+    "placement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relation"],
+      "properties": {
+        "relation": { "$ref": "#/$defs/placement_relation" },
+        "parent_object_id": { "$ref": "#/$defs/stable_id" },
+        "slot_id": { "$ref": "#/$defs/stable_id" }
+      },
+      "oneOf": [
+        {
+          "properties": { "relation": { "const": "anchor" } },
+          "not": {
+            "anyOf": [
+              { "required": ["parent_object_id"] },
+              { "required": ["slot_id"] }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "relation": { "enum": ["surface", "container"] }
+          },
+          "required": ["parent_object_id", "slot_id"]
+        }
+      ]
+    },
+    "object": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "anchor_id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/stable_id" },
+        "name": { "$ref": "#/$defs/bounded_text" },
+        "anchor_id": { "$ref": "#/$defs/stable_id" },
+        "observed_properties": { "$ref": "#/$defs/string_map" },
+        "hidden_properties": { "$ref": "#/$defs/string_map" },
+        "actions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/action" }
+        },
+        "components": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/component" }
+        },
+        "template_id": { "$ref": "#/$defs/stable_id" },
+        "placement": { "$ref": "#/$defs/placement" },
+        "initial_state": { "$ref": "#/$defs/initial_object_state" }
+      }
+    }
+  }
+}

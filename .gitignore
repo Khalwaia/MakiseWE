@@ -1,0 +1,15 @@
+/target/
+/build/
+/.idea/
+/.vscode/
+*.swp
+*.tmp
+*.db
+*.db-shm
+*.db-wal
+
+# Runtime state and secrets never belong in the source repository.
+/runtime/
+/secrets/
+/.env
+
