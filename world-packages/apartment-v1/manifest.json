@@ -206,7 +206,8 @@
       "components": ["powerable", "heatable", "container", "openable", "temperature_controlled", "cleanable"],
       "observed_properties": { "power": "off" },
       "actions": [{ "action_id": "object.toggle_power", "description": "Переключить питание плиты", "duration_ms": 600, "required_resources": ["hands", "vision", "attention"], "interruptibility": "safe_point" }],
-      "initial_state": { "temperature_millicelsius": 20000 }
+      "initial_state": { "temperature_millicelsius": 20000 },
+      "passive_effects": [{ "kind": "temperature", "id": "stove_temperature", "when": { "power": true }, "active_target_millicelsius": 180000, "active_change_per_hour_millicelsius": 120000, "inactive_target_millicelsius": 20000, "inactive_change_per_hour_millicelsius": 45000 }]
     },
     {
       "id": "template.refrigerator", "name": "Холодильник",
@@ -216,7 +217,8 @@
       "observed_properties": {},
       "initial_state": { "power": true, "temperature_millicelsius": 4000 },
       "hidden_properties": { "canary_factory_serial": "hidden-refrigerator-template-canary" },
-      "actions": [{ "action_id": "object.toggle_power", "description": "Переключить питание холодильника", "duration_ms": 900, "required_resources": ["hands", "vision", "attention"], "interruptibility": "safe_point" }]
+      "actions": [{ "action_id": "object.toggle_power", "description": "Переключить питание холодильника", "duration_ms": 900, "required_resources": ["hands", "vision", "attention"], "interruptibility": "safe_point" }],
+      "passive_effects": [{ "kind": "temperature", "id": "refrigerator_temperature", "when": { "power": true }, "active_target_millicelsius": 4000, "active_change_per_hour_millicelsius": 18000, "inactive_target_millicelsius": 20000, "inactive_change_per_hour_millicelsius": 6000 }]
     },
     {
       "id": "template.kettle", "name": "Электрический чайник",
@@ -275,7 +277,7 @@
       "components": ["powerable", "sound_emitter", "movable"], "placement_requires_power": true,
       "actions": [{ "action_id": "object.toggle_power", "description": "Включить или выключить колонки", "duration_ms": 350, "required_resources": ["hands", "hearing", "vision"], "interruptibility": "immediate" }]
     },
-    { "id": "template.phone", "name": "Смартфон", "dimensions_mm": { "width": 80, "depth": 12, "height": 170 }, "mass_g": 230, "components": ["chargeable", "sound_emitter", "movable"], "initial_state": { "charge_permille": 860 } },
+    { "id": "template.phone", "name": "Смартфон", "dimensions_mm": { "width": 80, "depth": 12, "height": 170 }, "mass_g": 230, "components": ["chargeable", "sound_emitter", "movable"], "initial_state": { "charge_permille": 860 }, "passive_effects": [{ "kind": "charge", "id": "phone_charge_cycle", "when": { "powered_placement": true }, "active_delta_per_hour_permille": 400, "inactive_delta_per_hour_permille": -8 }] },
     {
       "id": "template.bed", "name": "Кровать",
       "dimensions_mm": { "width": 1550, "depth": 2150, "height": 650 }, "mass_g": 90000, "components": ["surface", "cleanable"],

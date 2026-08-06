@@ -831,3 +831,145 @@ fn apartment_exposes_typed_charge_and_temperature() {
         "4000"
     );
 }
+
+fn observed_property(engine: &WorldEngine, object_id: &str, property: &str) -> String {
+    engine
+        .perception()
+        .unwrap()
+        .observed_objects
+        .into_iter()
+        .find(|object| object.object_id == object_id)
+        .unwrap()
+        .observed_properties
+        .get(property)
+        .unwrap()
+        .clone()
+}
+
+#[test]
+fn passive_phone_charge_catches_up_and_replays() {
+    let temp = tempfile::tempdir().unwrap();
+    let started_at_ms = 60_000_000;
+    let resumed_at_ms = started_at_ms + 15 * 60_000;
+    let mut engine = WorldEngine::open(
+        temp.path().join("passive-phone.db"),
+        "test-makise-passive-phone",
+        definition(),
+        "work_desk",
+        started_at_ms,
+        &PathGuard::default(),
+    )
+    .unwrap();
+
+    engine.resume_after_downtime(resumed_at_ms).unwrap();
+    assert_eq!(
+        observed_property(&engine, "object.makise_phone", "charge_permille"),
+        "960"
+    );
+    assert_eq!(
+        observed_property(&engine, "object.makise_phone", "receiving_power"),
+        "true"
+    );
+    let completed_hash = engine.state().state_hash().unwrap();
+    drop(engine);
+
+    let replayed = WorldEngine::open(
+        temp.path().join("passive-phone.db"),
+        "test-makise-passive-phone",
+        definition(),
+        "work_desk",
+        resumed_at_ms,
+        &PathGuard::default(),
+    )
+    .unwrap();
+    assert_eq!(replayed.state().state_hash().unwrap(), completed_hash);
+}
+
+#[test]
+fn passive_evolution_is_independent_of_tick_partitioning() {
+    let temp = tempfile::tempdir().unwrap();
+    let started_at_ms = 70_000_000;
+    let mut single_tick = WorldEngine::open(
+        temp.path().join("single-tick.db"),
+        "test-makise-single-tick",
+        definition(),
+        "work_desk",
+        started_at_ms,
+        &PathGuard::default(),
+    )
+    .unwrap();
+    single_tick
+        .tick(ClockSample {
+            utc_ms: started_at_ms + 15 * 60_000,
+            monotonic_elapsed_ms: 15 * 60_000,
+        })
+        .unwrap();
+
+    let mut partitioned = WorldEngine::open(
+        temp.path().join("partitioned.db"),
+        "test-makise-partitioned",
+        definition(),
+        "work_desk",
+        started_at_ms,
+        &PathGuard::default(),
+    )
+    .unwrap();
+    for minute in 1..=15 {
+        partitioned
+            .tick(ClockSample {
+                utc_ms: started_at_ms + minute * 60_000,
+                monotonic_elapsed_ms: 60_000,
+            })
+            .unwrap();
+    }
+
+    assert_eq!(
+        observed_property(&single_tick, "object.makise_phone", "charge_permille"),
+        observed_property(&partitioned, "object.makise_phone", "charge_permille")
+    );
+}
+
+#[test]
+fn passive_timeline_splits_at_action_completion() {
+    let temp = tempfile::tempdir().unwrap();
+    let started_at_ms = 80_000_000;
+    let mut engine = WorldEngine::open(
+        temp.path().join("fridge-boundary.db"),
+        "test-makise-fridge-boundary",
+        definition(),
+        "fridge",
+        started_at_ms,
+        &PathGuard::default(),
+    )
+    .unwrap();
+    let issued_at_ms = started_at_ms + 10;
+    let command = CommandEnvelope {
+        command_id: "cmd-fridge-off-boundary".into(),
+        identity_id: "test-makise-fridge-boundary".into(),
+        agent_id: "makise".into(),
+        expected_world_version: engine.state().world_version(),
+        schema_version: 1,
+        decision_id: "decision-fridge-off-boundary".into(),
+        issued_at_ms,
+        ttl_ms: 30_000,
+        payload: CommandPayload::Perform {
+            action_id: "object.toggle_power".into(),
+            target_id: "object.refrigerator".into(),
+            parameters: BTreeMap::new(),
+        },
+    };
+    engine.execute_command(&command, issued_at_ms).unwrap();
+
+    let completion_ms = issued_at_ms + 900;
+    engine
+        .resume_after_downtime(completion_ms + 60 * 60_000)
+        .unwrap();
+    assert_eq!(
+        observed_property(&engine, "object.refrigerator", "temperature_millicelsius"),
+        "10000"
+    );
+    assert_eq!(
+        observed_property(&engine, "object.refrigerator", "power"),
+        "off"
+    );
+}

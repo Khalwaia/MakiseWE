@@ -85,6 +85,7 @@ impl WorldService for WorldRpc {
                 "perform-parameters-v1".into(),
                 "dynamic-object-placement".into(),
                 "causal-object-condition-v1".into(),
+                "passive-object-evolution-v1".into(),
             ],
         }))
     }

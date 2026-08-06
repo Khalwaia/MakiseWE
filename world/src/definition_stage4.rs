@@ -157,6 +157,8 @@ struct ObjectTemplateDefinition {
         skip_serializing_if = "InitialObjectStateDefinition::is_empty"
     )]
     initial_state: InitialObjectStateDefinition,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    passive_effects: Vec<PassiveEffect>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -212,6 +214,75 @@ struct ObjectDefinition {
         skip_serializing_if = "InitialObjectStateDefinition::is_empty"
     )]
     initial_state: InitialObjectStateDefinition,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    passive_effects: Vec<PassiveEffect>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PassiveActivation {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub power: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub open: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub powered_placement: Option<bool>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub(crate) enum PassiveEffect {
+    Charge {
+        id: String,
+        #[serde(default)]
+        when: PassiveActivation,
+        active_delta_per_hour_permille: i64,
+        #[serde(default)]
+        inactive_delta_per_hour_permille: i64,
+    },
+    Temperature {
+        id: String,
+        #[serde(default)]
+        when: PassiveActivation,
+        active_target_millicelsius: i32,
+        active_change_per_hour_millicelsius: i64,
+        inactive_target_millicelsius: i32,
+        inactive_change_per_hour_millicelsius: i64,
+    },
+    QuantityConsumption {
+        id: String,
+        #[serde(default)]
+        when: PassiveActivation,
+        active_amount_per_hour: u64,
+        #[serde(default)]
+        inactive_amount_per_hour: u64,
+    },
+}
+
+impl PassiveEffect {
+    pub(crate) fn id(&self) -> &str {
+        match self {
+            Self::Charge { id, .. }
+            | Self::Temperature { id, .. }
+            | Self::QuantityConsumption { id, .. } => id,
+        }
+    }
+
+    fn property(&self) -> &'static str {
+        match self {
+            Self::Charge { .. } => "charge_permille",
+            Self::Temperature { .. } => "temperature_millicelsius",
+            Self::QuantityConsumption { .. } => "quantity",
+        }
+    }
+
+    pub(crate) fn activation(&self) -> &PassiveActivation {
+        match self {
+            Self::Charge { when, .. }
+            | Self::Temperature { when, .. }
+            | Self::QuantityConsumption { when, .. } => when,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -415,6 +486,7 @@ struct ValidatedTemplate {
     observed_properties: BTreeMap<String, String>,
     actions: Vec<ObjectActionDefinition>,
     initial_state: InitialObjectStateDefinition,
+    passive_effects: BTreeMap<String, PassiveEffect>,
 }
 
 #[derive(Clone, Debug)]
@@ -429,6 +501,7 @@ struct ObjectRecord {
     initial_power: bool,
     initial_open: bool,
     initial_condition: ObjectCondition,
+    passive_effects: Vec<PassiveEffect>,
 }
 
 type ObjectCatalog = BTreeMap<String, ObjectRecord>;
@@ -769,6 +842,34 @@ impl WorldDefinition {
             .unwrap_or_default()
     }
 
+    pub(crate) fn passive_objects(&self) -> impl Iterator<Item = (&str, &[PassiveEffect])> + '_ {
+        self.objects
+            .iter()
+            .filter(|(_, object)| !object.passive_effects.is_empty())
+            .map(|(id, object)| (id.as_str(), object.passive_effects.as_slice()))
+    }
+
+    pub(crate) fn object_receives_placement_power(
+        &self,
+        placement: Option<&ObjectPlacement>,
+    ) -> bool {
+        let Some(placement) = placement else {
+            return false;
+        };
+        let (Some(parent_id), Some(slot_id)) = (
+            placement.parent_object_id.as_deref(),
+            placement.slot_id.as_deref(),
+        ) else {
+            return false;
+        };
+        self.objects
+            .get(parent_id)
+            .and_then(|parent| parent.template_id.as_deref())
+            .and_then(|template_id| self.templates.get(template_id))
+            .and_then(|template| template.slots.get(slot_id))
+            .is_some_and(|slot| slot.provides_power)
+    }
+
     pub(crate) fn object_has_component(&self, object_id: &str, component: &str) -> bool {
         self.objects
             .get(object_id)
@@ -979,6 +1080,12 @@ fn validate_templates(
         validate_properties("template observed property", &template.observed_properties)?;
         validate_properties("template hidden property", &template.hidden_properties)?;
         validate_initial_state(&template.id, &template.initial_state, &components)?;
+        let passive_effects = validate_passive_effects(
+            &template.id,
+            template.passive_effects.clone(),
+            &components,
+            &template.initial_state,
+        )?;
         let mut template_actions = template.actions.clone();
         add_component_actions(&template.name, &components, &mut template_actions);
         let actions = validate_actions(&template.id, &template_actions)?;
@@ -1022,6 +1129,7 @@ fn validate_templates(
             observed_properties: template.observed_properties.clone(),
             actions,
             initial_state: template.initial_state.clone(),
+            passive_effects,
         };
         if templates.insert(template.id.clone(), validated).is_some() {
             return invalid(format!("duplicate template {}", template.id));
@@ -1101,6 +1209,20 @@ fn validate_objects(
             .map(|value| value.initial_state.merged_with(&object.initial_state))
             .unwrap_or_else(|| object.initial_state.clone());
         validate_initial_state(&object.id, &initial_state, &components)?;
+        let mut passive_effects = template
+            .map(|value| value.passive_effects.clone())
+            .unwrap_or_default();
+        for effect in object.passive_effects.clone() {
+            passive_effects.insert(effect.id().to_owned(), effect);
+        }
+        let passive_effects = validate_passive_effects(
+            &object.id,
+            passive_effects.into_values().collect(),
+            &components,
+            &initial_state,
+        )?
+        .into_values()
+        .collect();
         let initial_condition = initial_state.condition(&components);
         let record = ObjectRecord {
             template_id: object.template_id,
@@ -1115,6 +1237,7 @@ fn validate_objects(
             initial_power: initial_state.power.unwrap_or(false),
             initial_open: initial_state.open.unwrap_or(false),
             initial_condition,
+            passive_effects,
         };
         if objects.insert(object.id.clone(), record).is_some() {
             return invalid(format!("duplicate object {}", object.id));
@@ -1455,6 +1578,101 @@ fn validate_initial_state(
     Ok(())
 }
 
+fn validate_passive_effects(
+    owner: &str,
+    effects: Vec<PassiveEffect>,
+    components: &BTreeSet<String>,
+    initial_state: &InitialObjectStateDefinition,
+) -> Result<BTreeMap<String, PassiveEffect>> {
+    const MAX_RATE: i64 = 1_000_000_000;
+    let mut by_id = BTreeMap::new();
+    let mut properties = BTreeSet::new();
+    for effect in effects {
+        require_id("passive_effect.id", effect.id())?;
+        if !properties.insert(effect.property()) {
+            return invalid(format!(
+                "{owner} declares multiple passive effects for {}",
+                effect.property()
+            ));
+        }
+        let activation = effect.activation();
+        if activation.power.is_some() && !components.contains("powerable") {
+            return invalid(format!(
+                "{owner} passive effect checks power without powerable component"
+            ));
+        }
+        if activation.open.is_some() && !components.contains("openable") {
+            return invalid(format!(
+                "{owner} passive effect checks open without openable component"
+            ));
+        }
+        match &effect {
+            PassiveEffect::Charge {
+                active_delta_per_hour_permille,
+                inactive_delta_per_hour_permille,
+                ..
+            } => {
+                if !components.contains("chargeable") || initial_state.charge_permille.is_none() {
+                    return invalid(format!(
+                        "{owner} passive charge requires chargeable component and initial charge"
+                    ));
+                }
+                if (*active_delta_per_hour_permille == 0 && *inactive_delta_per_hour_permille == 0)
+                    || active_delta_per_hour_permille.abs() > MAX_RATE
+                    || inactive_delta_per_hour_permille.abs() > MAX_RATE
+                {
+                    return invalid(format!("{owner} has invalid passive charge rates"));
+                }
+            }
+            PassiveEffect::Temperature {
+                active_target_millicelsius,
+                active_change_per_hour_millicelsius,
+                inactive_target_millicelsius,
+                inactive_change_per_hour_millicelsius,
+                ..
+            } => {
+                if (!components.contains("heatable")
+                    && !components.contains("temperature_controlled"))
+                    || initial_state.temperature_millicelsius.is_none()
+                {
+                    return invalid(format!(
+                        "{owner} passive temperature requires thermal component and initial temperature"
+                    ));
+                }
+                if !(-100_000..=500_000).contains(active_target_millicelsius)
+                    || !(-100_000..=500_000).contains(inactive_target_millicelsius)
+                    || !(1..=MAX_RATE).contains(active_change_per_hour_millicelsius)
+                    || !(1..=MAX_RATE).contains(inactive_change_per_hour_millicelsius)
+                {
+                    return invalid(format!("{owner} has invalid passive temperature values"));
+                }
+            }
+            PassiveEffect::QuantityConsumption {
+                active_amount_per_hour,
+                inactive_amount_per_hour,
+                ..
+            } => {
+                if !components.contains("quantity") || initial_state.quantity.is_none() {
+                    return invalid(format!(
+                        "{owner} passive quantity requires quantity component and initial quantity"
+                    ));
+                }
+                if (*active_amount_per_hour == 0 && *inactive_amount_per_hour == 0)
+                    || *active_amount_per_hour > MAX_RATE as u64
+                    || *inactive_amount_per_hour > MAX_RATE as u64
+                {
+                    return invalid(format!("{owner} has invalid passive quantity rates"));
+                }
+            }
+        }
+        let id = effect.id().to_owned();
+        if by_id.insert(id.clone(), effect).is_some() {
+            return invalid(format!("{owner} has duplicate passive effect {id}"));
+        }
+    }
+    Ok(by_id)
+}
+
 fn validate_properties(kind: &str, properties: &BTreeMap<String, String>) -> Result<()> {
     for key in properties.keys() {
         require_id(kind, key)?;
@@ -1562,6 +1780,9 @@ fn normalize_package(package: &mut WorldPackage) {
         .sort_by(|left, right| left.id.cmp(&right.id));
     for template in &mut package.object_templates {
         template.components.sort();
+        template
+            .passive_effects
+            .sort_by(|left, right| left.id().cmp(right.id()));
         template.slots.sort_by(|left, right| left.id.cmp(&right.id));
         template
             .actions
@@ -1575,6 +1796,9 @@ fn normalize_package(package: &mut WorldPackage) {
         .sort_by(|left, right| left.id.cmp(&right.id));
     for object in &mut package.objects {
         object.components.sort();
+        object
+            .passive_effects
+            .sort_by(|left, right| left.id().cmp(right.id()));
         object
             .actions
             .sort_by(|left, right| left.action_id.cmp(&right.action_id));

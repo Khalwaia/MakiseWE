@@ -90,6 +90,26 @@ pub enum ActivityCompletion {
         object_id: String,
         condition: ObjectCondition,
     },
+    SetObjectCleanliness {
+        object_id: String,
+        base_condition: ObjectCondition,
+        cleanliness_permille: u16,
+    },
+    ConsumeObjectQuantity {
+        object_id: String,
+        base_condition: ObjectCondition,
+        amount: u64,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct PassiveConditionUpdate {
+    pub object_id: String,
+    pub condition: ObjectCondition,
+}
+
+fn is_zero_i64(value: &i64) -> bool {
+    *value == 0
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -110,6 +130,10 @@ pub struct WorldState {
     object_placements: BTreeMap<String, ObjectPlacement>,
     #[serde(default)]
     object_conditions: BTreeMap<String, ObjectCondition>,
+    #[serde(default, skip_serializing_if = "is_zero_i64")]
+    passive_updated_at_ms: i64,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    passive_remainders: BTreeMap<String, i64>,
 }
 
 impl WorldState {
@@ -128,6 +152,8 @@ impl WorldState {
             object_open: BTreeMap::new(),
             object_placements: BTreeMap::new(),
             object_conditions: BTreeMap::new(),
+            passive_updated_at_ms: 0,
+            passive_remainders: BTreeMap::new(),
         }
     }
 
@@ -161,6 +187,25 @@ impl WorldState {
 
     pub fn activities(&self) -> impl Iterator<Item = &Activity> {
         self.activities.values()
+    }
+
+    pub(crate) fn passive_updated_at_ms(&self) -> i64 {
+        if self.passive_updated_at_ms == 0 {
+            self.last_utc_ms
+        } else {
+            self.passive_updated_at_ms
+        }
+    }
+
+    pub(crate) fn passive_remainder(&self, key: &str) -> i64 {
+        self.passive_remainders
+            .get(key)
+            .copied()
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn passive_remainders(&self) -> &BTreeMap<String, i64> {
+        &self.passive_remainders
     }
 
     pub fn state_hash(&self) -> Result<String> {
@@ -242,7 +287,64 @@ impl WorldState {
                     } => {
                         self.object_conditions.insert(object_id, condition);
                     }
+                    ActivityCompletion::SetObjectCleanliness {
+                        object_id,
+                        base_condition,
+                        cleanliness_permille,
+                    } => {
+                        self.object_conditions
+                            .entry(object_id)
+                            .or_insert(base_condition)
+                            .cleanliness_permille = Some(cleanliness_permille);
+                    }
+                    ActivityCompletion::ConsumeObjectQuantity {
+                        object_id,
+                        base_condition,
+                        amount,
+                    } => {
+                        let condition = self
+                            .object_conditions
+                            .entry(object_id)
+                            .or_insert(base_condition);
+                        let quantity = condition.quantity.as_mut().ok_or_else(|| {
+                            WorldError::StateInvariant(
+                                "quantity disappeared before activity completion".into(),
+                            )
+                        })?;
+                        quantity.amount = quantity.amount.saturating_sub(amount);
+                    }
                 }
+            }
+            DomainEvent::PassiveConditionsAdvanced {
+                from_utc_ms,
+                to_utc_ms,
+                updates,
+                remainders,
+            } => {
+                if *from_utc_ms != self.passive_updated_at_ms() {
+                    return Err(WorldError::StateInvariant(format!(
+                        "passive clock mismatch: expected {}, got {from_utc_ms}",
+                        self.passive_updated_at_ms()
+                    )));
+                }
+                if to_utc_ms < from_utc_ms || *to_utc_ms != envelope.occurred_at_ms {
+                    return Err(WorldError::StateInvariant(
+                        "invalid passive evolution interval".into(),
+                    ));
+                }
+                let mut seen = BTreeSet::new();
+                for update in updates {
+                    if !seen.insert(update.object_id.as_str()) {
+                        return Err(WorldError::StateInvariant(format!(
+                            "duplicate passive update for {}",
+                            update.object_id
+                        )));
+                    }
+                    self.object_conditions
+                        .insert(update.object_id.clone(), update.condition.clone());
+                }
+                self.passive_remainders = remainders.clone();
+                self.passive_updated_at_ms = *to_utc_ms;
             }
             DomainEvent::DowntimeObserved { .. } => {}
             DomainEvent::TimeAnomalyDetected { .. } => {
@@ -475,6 +577,12 @@ pub(crate) enum DomainEvent {
     ActivityCompleted {
         activity_id: String,
     },
+    PassiveConditionsAdvanced {
+        from_utc_ms: i64,
+        to_utc_ms: i64,
+        updates: Vec<PassiveConditionUpdate>,
+        remainders: BTreeMap<String, i64>,
+    },
     DowntimeObserved {
         from_utc_ms: i64,
         to_utc_ms: i64,
@@ -492,6 +600,7 @@ impl DomainEvent {
             Self::AgentAwakened { .. } => "agent_awakened",
             Self::ActivityScheduled { .. } => "activity_scheduled",
             Self::ActivityCompleted { .. } => "activity_completed",
+            Self::PassiveConditionsAdvanced { .. } => "passive_conditions_advanced",
             Self::DowntimeObserved { .. } => "downtime_observed",
             Self::TimeAnomalyDetected { .. } => "time_anomaly_detected",
         }
@@ -607,7 +716,16 @@ impl PerceptionWindow {
                     observed_properties
                         .insert("temperature_millicelsius".into(), value.to_string());
                 }
-                if let Some(placement) = state.object_placement(&object.id, definition) {
+                let placement = state.object_placement(&object.id, definition);
+                if definition.object_has_component(&object.id, "chargeable") {
+                    observed_properties.insert(
+                        "receiving_power".into(),
+                        definition
+                            .object_receives_placement_power(placement.as_ref())
+                            .to_string(),
+                    );
+                }
+                if let Some(placement) = placement {
                     observed_properties.insert("anchor_id".into(), placement.anchor_id);
                     observed_properties.insert(
                         "placement_relation".into(),
@@ -686,5 +804,32 @@ impl PerceptionWindow {
             activities,
             significant_changes: Vec::new(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn passive_defaults_preserve_legacy_state_shape() {
+        let mut state = WorldState::empty("test-makise".into(), "definition".into());
+        let event = PersistedEvent {
+            event_id: "event-1".into(),
+            event_seq: 1,
+            world_version: 1,
+            event_schema_version: 1,
+            occurred_at_ms: 1_000_000,
+            causation_command_id: None,
+            payload: DomainEvent::AgentAwakened {
+                anchor_id: "bed".into(),
+            },
+        };
+        state.apply(&event).unwrap();
+
+        let serialized = serde_json::to_value(&state).unwrap();
+        assert!(serialized.get("passive_updated_at_ms").is_none());
+        assert!(serialized.get("passive_remainders").is_none());
+        assert_eq!(state.passive_updated_at_ms(), 1_000_000);
     }
 }

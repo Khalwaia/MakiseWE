@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use makise_world::{PathGuard, WorldDefinition};
+use makise_world::{PathGuard, WorldDefinition, WorldEngine};
 
 fn write_manifest(json: &str) -> (tempfile::TempDir, std::path::PathBuf) {
     let temp = tempfile::tempdir().unwrap();
@@ -84,4 +84,79 @@ fn rejects_condition_outside_physical_bounds() {
     );
     let error = WorldDefinition::load(path, &PathGuard::default()).unwrap_err();
     assert!(error.to_string().contains("outside physical bounds"));
+}
+
+#[test]
+fn passive_quantity_consumption_uses_fractional_carry() {
+    let (temp, path) = write_manifest(
+        r#"{
+          "schema_version": 1,
+          "world_id": "passive-quantity",
+          "initial_anchor_id": "pantry",
+          "locations": [{"id":"room","name":"Room","anchors":[{"id":"pantry","name":"Pantry"}]}],
+          "connections": [],
+          "objects": [{
+            "id":"food","name":"Food","anchor_id":"pantry",
+            "components":["quantity"],
+            "initial_state":{"quantity":{"amount":10,"unit":"serving"}},
+            "passive_effects":[{
+              "kind":"quantity_consumption",
+              "id":"background-use",
+              "active_amount_per_hour":2
+            }]
+          }]
+        }"#,
+    );
+    let definition = WorldDefinition::load(path, &PathGuard::default()).unwrap();
+    let started_at_ms = 1_000_000;
+    let mut engine = WorldEngine::open(
+        temp.path().join("world.db"),
+        "test-passive-quantity",
+        definition,
+        "pantry",
+        started_at_ms,
+        &PathGuard::default(),
+    )
+    .unwrap();
+
+    engine
+        .resume_after_downtime(started_at_ms + 90 * 60_000)
+        .unwrap();
+    let food = engine
+        .perception()
+        .unwrap()
+        .observed_objects
+        .into_iter()
+        .find(|object| object.object_id == "food")
+        .unwrap();
+    assert_eq!(food.observed_properties["quantity_amount"], "7");
+}
+
+#[test]
+fn rejects_passive_activation_without_component() {
+    let (_temp, path) = write_manifest(
+        r#"{
+          "schema_version": 1,
+          "world_id": "invalid-passive-activation",
+          "locations": [{"id":"room","name":"Room","anchors":[{"id":"desk","name":"Desk"}]}],
+          "connections": [],
+          "objects": [{
+            "id":"phone","name":"Phone","anchor_id":"desk",
+            "components":["chargeable"],
+            "initial_state":{"charge_permille":500},
+            "passive_effects":[{
+              "kind":"charge",
+              "id":"charge",
+              "when":{"power":true},
+              "active_delta_per_hour_permille":100
+            }]
+          }]
+        }"#,
+    );
+    let error = WorldDefinition::load(path, &PathGuard::default()).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("checks power without powerable component")
+    );
 }

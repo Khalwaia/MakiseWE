@@ -2,14 +2,17 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use crate::WorldDefinition;
+use crate::definition_stage4::PassiveEffect;
 use crate::domain::{
     Activity, ActivityCompletion, COMMAND_SCHEMA_VERSION, ClockSample, CommandEnvelope,
-    CommandPayload, CommandResult, CommandStatus, DomainEvent, PerceptionWindow, PersistedEvent,
-    Resource, TimeStatus, WorldState,
+    CommandPayload, CommandResult, CommandStatus, DomainEvent, PassiveConditionUpdate,
+    PerceptionWindow, PersistedEvent, Resource, TimeStatus, WorldState,
 };
 use crate::store::{EventStore, digest};
 use crate::{ObjectPlacement, PathGuard, PlacementRelation, Result, WorldError};
 
+const PASSIVE_EVENT_INTERVAL_MS: i64 = 60_000;
+const MILLIS_PER_HOUR: i128 = 3_600_000;
 const CLOCK_CHECKPOINT_INTERVAL_MS: i64 = 5_000;
 const MIN_RECORDED_DOWNTIME_MS: i64 = 1_000;
 const MAX_CLOCK_DRIFT_MS: i64 = 60_000;
@@ -42,13 +45,18 @@ impl WorldEngine {
         let mut store = EventStore::open(database_path, identity_id, definition.hash(), guard)?;
         let mut state = store.load_state(identity_id, definition.hash())?;
         if state.last_event_seq() == 0 {
-            state = store.commit_system_events(
-                &state,
-                now_ms,
-                vec![DomainEvent::AgentAwakened {
-                    anchor_id: initial_anchor_id.into(),
-                }],
-            )?;
+            let mut events = vec![DomainEvent::AgentAwakened {
+                anchor_id: initial_anchor_id.into(),
+            }];
+            if definition.passive_objects().next().is_some() {
+                events.push(DomainEvent::PassiveConditionsAdvanced {
+                    from_utc_ms: now_ms,
+                    to_utc_ms: now_ms,
+                    updates: Vec::new(),
+                    remainders: BTreeMap::new(),
+                });
+            }
+            state = store.commit_system_events(&state, now_ms, events)?;
             store.force_snapshot(&state, now_ms)?;
         }
         let last_clock_utc_ms = store.clock_checkpoint_utc_ms()?.max(state.last_utc_ms());
@@ -167,7 +175,7 @@ impl WorldEngine {
             return Ok(());
         }
 
-        self.complete_due_activities(sample.utc_ms)?;
+        self.complete_due_activities(sample.utc_ms, false)?;
         self.last_clock_utc_ms = sample.utc_ms;
         if sample
             .utc_ms
@@ -194,22 +202,20 @@ impl WorldEngine {
                     monotonic_elapsed_ms: 0,
                 }],
             )?;
-        } else if now_ms.saturating_sub(previous) >= MIN_RECORDED_DOWNTIME_MS {
-            let mut events = vec![DomainEvent::DowntimeObserved {
-                from_utc_ms: previous,
-                to_utc_ms: now_ms,
-            }];
-            events.extend(
-                self.state
-                    .due_activities(now_ms)
-                    .into_iter()
-                    .map(|activity| DomainEvent::ActivityCompleted {
-                        activity_id: activity.activity_id,
-                    }),
-            );
-            self.state = self
-                .store
-                .commit_system_events(&self.state, now_ms, events)?;
+        } else {
+            let downtime_ms = now_ms.saturating_sub(previous);
+            let record_downtime = downtime_ms >= MIN_RECORDED_DOWNTIME_MS;
+            self.complete_due_activities(now_ms, record_downtime)?;
+            if record_downtime {
+                self.state = self.store.commit_system_events(
+                    &self.state,
+                    now_ms,
+                    vec![DomainEvent::DowntimeObserved {
+                        from_utc_ms: previous,
+                        to_utc_ms: now_ms,
+                    }],
+                )?;
+            }
         }
         self.last_clock_utc_ms = now_ms;
         self.checkpoint_clock(now_ms)
@@ -458,8 +464,7 @@ impl WorldEngine {
                         }
                     }
                     "object.clean" => {
-                        let mut condition =
-                            self.state.object_condition(target_id, &self.definition);
+                        let condition = self.state.object_condition(target_id, &self.definition);
                         let Some(cleanliness) = condition.cleanliness_permille else {
                             return Err(Box::new(self.command_error(
                                 command,
@@ -476,10 +481,10 @@ impl WorldEngine {
                                 "object is already clean",
                             )));
                         }
-                        condition.cleanliness_permille = Some(1_000);
-                        ActivityCompletion::SetObjectCondition {
+                        ActivityCompletion::SetObjectCleanliness {
                             object_id: target_id.clone(),
-                            condition,
+                            base_condition: condition,
+                            cleanliness_permille: 1_000,
                         }
                     }
                     "object.consume_quantity" => {
@@ -492,9 +497,8 @@ impl WorldEngine {
                                     message,
                                 ))
                             })?;
-                        let mut condition =
-                            self.state.object_condition(target_id, &self.definition);
-                        let Some(quantity) = condition.quantity.as_mut() else {
+                        let condition = self.state.object_condition(target_id, &self.definition);
+                        let Some(quantity) = condition.quantity.as_ref() else {
                             return Err(Box::new(self.command_error(
                                 command,
                                 CommandStatus::RejectedPrecondition,
@@ -510,10 +514,10 @@ impl WorldEngine {
                                 format!("requested {amount}, available {}", quantity.amount),
                             )));
                         }
-                        quantity.amount -= amount;
-                        ActivityCompletion::SetObjectCondition {
+                        ActivityCompletion::ConsumeObjectQuantity {
                             object_id: target_id.clone(),
-                            condition,
+                            base_condition: condition,
+                            amount,
                         }
                     }
                     _ => {
@@ -584,22 +588,211 @@ impl WorldEngine {
         CommandResult::rejected(&command.command_id, status, &self.state, code, message)
     }
 
-    fn complete_due_activities(&mut self, now_ms: i64) -> Result<()> {
-        let events = self
-            .state
-            .due_activities(now_ms)
-            .into_iter()
-            .map(|activity| DomainEvent::ActivityCompleted {
-                activity_id: activity.activity_id,
-            })
-            .collect();
+    fn complete_due_activities(&mut self, now_ms: i64, force_final: bool) -> Result<()> {
+        let mut due = self.state.due_activities(now_ms);
+        due.sort_by(|left, right| {
+            left.completes_at_ms
+                .cmp(&right.completes_at_ms)
+                .then_with(|| left.activity_id.cmp(&right.activity_id))
+        });
+
+        let mut start = 0;
+        while start < due.len() {
+            let completed_at_ms = due[start].completes_at_ms;
+            self.advance_passive(completed_at_ms, true)?;
+            let mut end = start + 1;
+            while end < due.len() && due[end].completes_at_ms == completed_at_ms {
+                end += 1;
+            }
+            let events = due[start..end]
+                .iter()
+                .map(|activity| DomainEvent::ActivityCompleted {
+                    activity_id: activity.activity_id.clone(),
+                })
+                .collect();
+            self.state = self
+                .store
+                .commit_system_events(&self.state, completed_at_ms, events)?;
+            start = end;
+        }
+
+        self.advance_passive(now_ms, force_final)
+    }
+
+    fn advance_passive(&mut self, to_utc_ms: i64, force: bool) -> Result<()> {
+        let Some(event) = self.build_passive_event(to_utc_ms, force) else {
+            return Ok(());
+        };
         self.state = self
             .store
-            .commit_system_events(&self.state, now_ms, events)?;
+            .commit_system_events(&self.state, to_utc_ms, vec![event])?;
         Ok(())
+    }
+
+    fn build_passive_event(&self, to_utc_ms: i64, force: bool) -> Option<DomainEvent> {
+        let from_utc_ms = self.state.passive_updated_at_ms();
+        let elapsed_ms = to_utc_ms.saturating_sub(from_utc_ms);
+        if elapsed_ms <= 0 || (!force && elapsed_ms < PASSIVE_EVENT_INTERVAL_MS) {
+            return None;
+        }
+
+        let mut has_effects = false;
+        let mut updates = Vec::new();
+        let mut remainders = self.state.passive_remainders().clone();
+        for (object_id, effects) in self.definition.passive_objects() {
+            has_effects = true;
+            let original = self.state.object_condition(object_id, &self.definition);
+            let mut condition = original.clone();
+            for effect in effects {
+                let active = self.passive_is_active(object_id, effect);
+                let key = format!("{object_id}:{}", effect.id());
+                let carry = self.state.passive_remainder(&key);
+                let (_, remainder) = match effect {
+                    PassiveEffect::Charge {
+                        active_delta_per_hour_permille,
+                        inactive_delta_per_hour_permille,
+                        ..
+                    } => {
+                        let current = i128::from(condition.charge_permille?);
+                        let rate = if active {
+                            *active_delta_per_hour_permille
+                        } else {
+                            *inactive_delta_per_hour_permille
+                        };
+                        let (next, remainder) =
+                            advance_linear(current, rate, elapsed_ms, carry, 0, 1_000);
+                        condition.charge_permille = Some(next as u16);
+                        (next, remainder)
+                    }
+                    PassiveEffect::Temperature {
+                        active_target_millicelsius,
+                        active_change_per_hour_millicelsius,
+                        inactive_target_millicelsius,
+                        inactive_change_per_hour_millicelsius,
+                        ..
+                    } => {
+                        let current = i128::from(condition.temperature_millicelsius?);
+                        let (target, change) = if active {
+                            (
+                                i128::from(*active_target_millicelsius),
+                                *active_change_per_hour_millicelsius,
+                            )
+                        } else {
+                            (
+                                i128::from(*inactive_target_millicelsius),
+                                *inactive_change_per_hour_millicelsius,
+                            )
+                        };
+                        let rate = match target.cmp(&current) {
+                            std::cmp::Ordering::Less => -change,
+                            std::cmp::Ordering::Equal => 0,
+                            std::cmp::Ordering::Greater => change,
+                        };
+                        let (next, remainder) = advance_linear(
+                            current,
+                            rate,
+                            elapsed_ms,
+                            carry,
+                            current.min(target),
+                            current.max(target),
+                        );
+                        condition.temperature_millicelsius = Some(next as i32);
+                        (next, remainder)
+                    }
+                    PassiveEffect::QuantityConsumption {
+                        active_amount_per_hour,
+                        inactive_amount_per_hour,
+                        ..
+                    } => {
+                        let quantity = condition.quantity.as_mut()?;
+                        let current = i128::from(quantity.amount);
+                        let amount_per_hour = if active {
+                            *active_amount_per_hour
+                        } else {
+                            *inactive_amount_per_hour
+                        };
+                        let rate = -(amount_per_hour as i64);
+                        let (next, remainder) =
+                            advance_linear(current, rate, elapsed_ms, carry, 0, current);
+                        quantity.amount = next as u64;
+                        (next, remainder)
+                    }
+                };
+                if remainder == 0 {
+                    remainders.remove(&key);
+                } else {
+                    remainders.insert(key, remainder);
+                }
+            }
+            if condition != original {
+                updates.push(PassiveConditionUpdate {
+                    object_id: object_id.to_owned(),
+                    condition,
+                });
+            }
+        }
+
+        if !has_effects {
+            return None;
+        }
+        let remainder_changed = remainders != *self.state.passive_remainders();
+        if !force && updates.is_empty() && !remainder_changed {
+            return None;
+        }
+        Some(DomainEvent::PassiveConditionsAdvanced {
+            from_utc_ms,
+            to_utc_ms,
+            updates,
+            remainders,
+        })
+    }
+
+    fn passive_is_active(&self, object_id: &str, effect: &PassiveEffect) -> bool {
+        let activation = effect.activation();
+        activation
+            .power
+            .is_none_or(|expected| self.state.object_power(object_id, &self.definition) == expected)
+            && activation.open.is_none_or(|expected| {
+                self.state.object_open(object_id, &self.definition) == expected
+            })
+            && activation.powered_placement.is_none_or(|expected| {
+                let placement = self.state.object_placement(object_id, &self.definition);
+                self.definition
+                    .object_receives_placement_power(placement.as_ref())
+                    == expected
+            })
     }
 }
 
+fn advance_linear(
+    current: i128,
+    rate_per_hour: i64,
+    elapsed_ms: i64,
+    previous_remainder: i64,
+    minimum: i128,
+    maximum: i128,
+) -> (i128, i64) {
+    if rate_per_hour == 0
+        || (rate_per_hour > 0 && current >= maximum)
+        || (rate_per_hour < 0 && current <= minimum)
+    {
+        return (current.clamp(minimum, maximum), 0);
+    }
+
+    let mut carry = i128::from(previous_remainder);
+    if carry != 0 && carry.signum() != i128::from(rate_per_hour).signum() {
+        carry = 0;
+    }
+    let numerator = i128::from(rate_per_hour) * i128::from(elapsed_ms) + carry;
+    let raw = current + numerator / MILLIS_PER_HOUR;
+    let next = raw.clamp(minimum, maximum);
+    let remainder = if next == raw {
+        (numerator % MILLIS_PER_HOUR) as i64
+    } else {
+        0
+    };
+    (next, remainder)
+}
 fn validate_external_id(kind: &str, value: &str) -> Result<()> {
     if value.is_empty()
         || value.len() > 128
