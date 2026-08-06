@@ -115,6 +115,20 @@ Gate:
 
 ## 7. Этап 5: тело, действия и внутренняя динамика
 
+Детальный исполняемый план: [STAGE_5.md](STAGE_5.md).
+
+Подэтапы:
+
+- 5A: типизированные resource claims, перенос предметов между anchors и исполняемые прерывания;
+- 5B: мягкое виртуальное тело и детерминированная пассивная физиология;
+- 5C: durable-сон 1:1 и свободно меняющийся циркадный режим;
+- 5D: причинный Affect Engine с provenance, инерцией и regulation;
+- 5E: динамические motivation candidates, commitments и goal inertia;
+- 5F: навыки, data-defined рецепты и персистентный гардероб;
+- 5G: адаптивный world-side scheduler для decision opportunities без самостоятельного выбора действий.
+
+Каждый подэтап проходит replay/restart/downtime/tick-partition gates, получает отдельный коммит и отправляется в `main`.
+
 Результат:
 
 - resource-based parallel activities;
