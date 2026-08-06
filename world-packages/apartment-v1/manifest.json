@@ -7,7 +7,15 @@
     "timezone": "Asia/Novosibirsk",
     "floor": 7,
     "area_m2": 48,
-    "weather_fallback": "Последнее подтверждённое состояние Новосибирска; при отсутствии данных — сезонная безопасная оценка с низкой уверенностью"
+    "weather_fallback": "Последнее подтверждённое состояние Новосибирска; при отсутствии данных — сезонная безопасная оценка с низкой уверенностью",
+    "weather": {
+      "provider": "open_meteo",
+      "latitude_e6": 55041500,
+      "longitude_e6": 82934600,
+      "poll_interval_ms": 900000,
+      "stale_after_ms": 2700000,
+      "fallback_after_ms": 21600000
+    }
   },
   "map": { "asset": "map.svg", "width": 1200, "height": 760 },
   "topology": { "require_strong_connectivity": true },

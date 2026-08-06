@@ -6,7 +6,7 @@ use crate::definition_stage4::PassiveEffect;
 use crate::domain::{
     Activity, ActivityCompletion, COMMAND_SCHEMA_VERSION, ClockSample, CommandEnvelope,
     CommandPayload, CommandResult, CommandStatus, DomainEvent, PassiveConditionUpdate,
-    PerceptionWindow, PersistedEvent, Resource, TimeStatus, WorldState,
+    PerceptionWindow, PersistedEvent, Resource, TimeStatus, WeatherObservation, WorldState,
 };
 use crate::store::{EventStore, digest};
 use crate::{ObjectPlacement, PathGuard, PlacementRelation, Result, WorldError};
@@ -94,6 +94,27 @@ impl WorldEngine {
 
     pub fn events_after(&self, after_seq: u64) -> Result<Vec<PersistedEvent>> {
         self.store.events_after(after_seq)
+    }
+
+    pub fn observe_weather(
+        &mut self,
+        observation: WeatherObservation,
+        received_at_ms: i64,
+    ) -> Result<bool> {
+        observation.validate(received_at_ms)?;
+        if self
+            .state
+            .weather_observation()
+            .is_some_and(|current| current.observed_at_ms >= observation.observed_at_ms)
+        {
+            return Ok(false);
+        }
+        self.state = self.store.commit_system_events(
+            &self.state,
+            received_at_ms,
+            vec![DomainEvent::WeatherObserved { observation }],
+        )?;
+        Ok(true)
     }
 
     pub fn execute_command(
@@ -1052,6 +1073,68 @@ mod tests {
         assert_eq!(result.status, CommandStatus::InvalidArgument);
         assert_eq!(result.error_code.as_deref(), Some("COMMAND_ID_COLLISION"));
     }
+    fn weather_observation(observed_at_ms: i64) -> WeatherObservation {
+        WeatherObservation {
+            source: "open_meteo".into(),
+            observed_at_ms,
+            temperature_millicelsius: 21_500,
+            relative_humidity_permille: 620,
+            precipitation_micrometers: 200,
+            snowfall_micrometers: 0,
+            weather_code: 61,
+            cloud_cover_permille: 750,
+            wind_speed_mm_per_s: 3_400,
+            wind_direction_degrees: 240,
+            is_day: true,
+        }
+    }
+
+    #[test]
+    fn weather_observation_is_durable_and_deduplicated() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut engine = open(&temp, 8_000_000);
+        let observation = weather_observation(8_000_010);
+
+        assert!(
+            engine
+                .observe_weather(observation.clone(), 8_000_020)
+                .unwrap()
+        );
+        let version = engine.state().world_version();
+        let state_hash = engine.state().state_hash().unwrap();
+        assert!(
+            !engine
+                .observe_weather(observation.clone(), 8_000_030)
+                .unwrap()
+        );
+        assert_eq!(engine.state().world_version(), version);
+        assert_eq!(
+            engine.events_after(0).unwrap().last().unwrap().event_type(),
+            "weather_observed"
+        );
+        drop(engine);
+
+        let recovered = open(&temp, 8_000_040);
+        assert_eq!(recovered.state().weather_observation(), Some(&observation));
+        assert_eq!(recovered.state().state_hash().unwrap(), state_hash);
+    }
+
+    #[test]
+    fn invalid_weather_observation_is_rejected_without_state_change() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut engine = open(&temp, 9_000_000);
+        let version = engine.state().world_version();
+        let mut observation = weather_observation(9_000_010);
+        observation.relative_humidity_permille = 1_001;
+
+        assert!(matches!(
+            engine.observe_weather(observation, 9_000_020),
+            Err(WorldError::InvalidWeatherObservation(_))
+        ));
+        assert_eq!(engine.state().world_version(), version);
+        assert!(engine.state().weather_observation().is_none());
+    }
+
     #[test]
     fn clock_checkpoint_distinguishes_idle_runtime_from_real_downtime() {
         let temp = tempfile::tempdir().unwrap();

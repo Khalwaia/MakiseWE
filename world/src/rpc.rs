@@ -86,6 +86,7 @@ impl WorldService for WorldRpc {
                 "dynamic-object-placement".into(),
                 "causal-object-condition-v1".into(),
                 "passive-object-evolution-v1".into(),
+                "durable-live-weather-v1".into(),
             ],
         }))
     }

@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, bail};
-use makise_world::{
-    PathGuard, WorldActorConfig, WorldActorHandle, WorldDefinition, WorldEngine, WorldRpc,
-};
+use makise_world::{PathGuard, WorldDefinition, WorldEngine};
+#[cfg(unix)]
+use makise_world::{WorldActorConfig, WorldActorHandle, WorldRpc, spawn_weather_poller};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -61,6 +61,7 @@ async fn serve(mut arguments: impl Iterator<Item = std::ffi::OsString>) -> anyho
     let now_ms = unix_time_ms()?;
     let guard = PathGuard::default();
     let definition = WorldDefinition::load(manifest, &guard)?;
+    let weather_site = definition.weather_site().cloned();
     let engine = WorldEngine::open(
         database,
         &identity,
@@ -70,6 +71,9 @@ async fn serve(mut arguments: impl Iterator<Item = std::ffi::OsString>) -> anyho
         &guard,
     )?;
     let actor = WorldActorHandle::spawn(engine, WorldActorConfig::default())?;
+    let _weather_task = weather_site
+        .map(|site| spawn_weather_poller(actor.clone(), site))
+        .transpose()?;
     let rpc = WorldRpc::new(actor);
     makise_world::serve_uds(socket, rpc, async {
         let _ = tokio::signal::ctrl_c().await;

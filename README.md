@@ -11,6 +11,7 @@
 - Bounded actor и gRPC WorldService по Unix Domain Socket.
 - C++20 WorldClient с generated protobuf/gRPC bindings для будущего Brain.
 - SQLite WAL event log, command deduplication, snapshots и deterministic replay.
+- Неблокирующая погода Open-Meteo: типизированные снимки проходят физическую проверку, сохраняются как события и переживают replay/offline.
 - Durable activities с реальным временем и восстановлением после downtime.
 - Ресурсные конфликты вместо глобального BUSY.
 - Частичное восприятие: скрытые свойства package не попадают в PerceptionWindow.
@@ -53,6 +54,8 @@ Telegram, LLM, новой памяти или /home/artem/makise_run.
       /tmp/makise-dev/world.db \
       /home/artem/makise/world-packages/test-room-v1/manifest.json \
       test-makise bed
+
+Для `apartment-v1` сервис сразу запускает фоновый опрос Open-Meteo. При сетевом сбое последнее подтверждённое состояние остаётся в БД; `MAKISE_WEATHER_ENDPOINT` можно задать только для локального proxy или тестового сервера.
 
 Socket получает права `0600` и удаляется владельцем после штатной остановки. Уже
 существующий путь сервис не перезаписывает.

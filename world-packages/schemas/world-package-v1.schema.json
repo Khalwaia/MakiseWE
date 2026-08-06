@@ -57,7 +57,21 @@
         "timezone": { "$ref": "#/$defs/bounded_text" },
         "floor": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
         "area_m2": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
-        "weather_fallback": { "$ref": "#/$defs/bounded_text" }
+        "weather_fallback": { "$ref": "#/$defs/bounded_text" },
+        "weather": { "$ref": "#/$defs/weather" }
+      }
+    },
+    "weather": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "latitude_e6", "longitude_e6", "poll_interval_ms", "stale_after_ms", "fallback_after_ms"],
+      "properties": {
+        "provider": { "const": "open_meteo" },
+        "latitude_e6": { "type": "integer", "minimum": -90000000, "maximum": 90000000 },
+        "longitude_e6": { "type": "integer", "minimum": -180000000, "maximum": 180000000 },
+        "poll_interval_ms": { "type": "integer", "minimum": 60000, "maximum": 3600000 },
+        "stale_after_ms": { "type": "integer", "minimum": 60000, "maximum": 21600000 },
+        "fallback_after_ms": { "type": "integer", "minimum": 60000, "maximum": 172800000 }
       }
     },
     "map": {

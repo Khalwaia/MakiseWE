@@ -9,6 +9,7 @@ rust-version.workspace = true
 anyhow.workspace = true
 makise-proto = { path = "../proto" }
 prost-types.workspace = true
+reqwest.workspace = true
 rusqlite.workspace = true
 serde.workspace = true
 serde_json.workspace = true

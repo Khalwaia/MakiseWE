@@ -108,6 +108,46 @@ pub(crate) struct PassiveConditionUpdate {
     pub condition: ObjectCondition,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WeatherObservation {
+    pub source: String,
+    pub observed_at_ms: i64,
+    pub temperature_millicelsius: i32,
+    pub relative_humidity_permille: u16,
+    pub precipitation_micrometers: u32,
+    pub snowfall_micrometers: u32,
+    pub weather_code: u16,
+    pub cloud_cover_permille: u16,
+    pub wind_speed_mm_per_s: u32,
+    pub wind_direction_degrees: u16,
+    pub is_day: bool,
+}
+
+impl WeatherObservation {
+    pub(crate) fn validate(&self, received_at_ms: i64) -> Result<()> {
+        let invalid = |reason: &str| WorldError::InvalidWeatherObservation(reason.into());
+        if self.source != "open_meteo" {
+            return Err(invalid("unsupported weather source"));
+        }
+        if self.observed_at_ms <= 0 || self.observed_at_ms > received_at_ms.saturating_add(900_000)
+        {
+            return Err(invalid("observation timestamp is invalid"));
+        }
+        if !(-100_000..=70_000).contains(&self.temperature_millicelsius)
+            || self.relative_humidity_permille > 1_000
+            || self.cloud_cover_permille > 1_000
+            || self.precipitation_micrometers > 5_000_000
+            || self.snowfall_micrometers > 5_000_000
+            || self.wind_speed_mm_per_s > 150_000
+            || self.wind_direction_degrees > 360
+            || self.weather_code > 99
+        {
+            return Err(invalid("observation values are outside physical bounds"));
+        }
+        Ok(())
+    }
+}
+
 fn is_zero_i64(value: &i64) -> bool {
     *value == 0
 }
@@ -134,6 +174,8 @@ pub struct WorldState {
     passive_updated_at_ms: i64,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     passive_remainders: BTreeMap<String, i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    weather_observation: Option<WeatherObservation>,
 }
 
 impl WorldState {
@@ -154,6 +196,7 @@ impl WorldState {
             object_conditions: BTreeMap::new(),
             passive_updated_at_ms: 0,
             passive_remainders: BTreeMap::new(),
+            weather_observation: None,
         }
     }
 
@@ -183,6 +226,10 @@ impl WorldState {
 
     pub fn agent_anchor_id(&self) -> &str {
         &self.agent_anchor_id
+    }
+
+    pub fn weather_observation(&self) -> Option<&WeatherObservation> {
+        self.weather_observation.as_ref()
     }
 
     pub fn activities(&self) -> impl Iterator<Item = &Activity> {
@@ -345,6 +392,19 @@ impl WorldState {
                 }
                 self.passive_remainders = remainders.clone();
                 self.passive_updated_at_ms = *to_utc_ms;
+            }
+            DomainEvent::WeatherObserved { observation } => {
+                observation.validate(envelope.occurred_at_ms)?;
+                if self
+                    .weather_observation
+                    .as_ref()
+                    .is_some_and(|current| current.observed_at_ms >= observation.observed_at_ms)
+                {
+                    return Err(WorldError::StateInvariant(
+                        "weather observations must advance in time".into(),
+                    ));
+                }
+                self.weather_observation = Some(observation.clone());
             }
             DomainEvent::DowntimeObserved { .. } => {}
             DomainEvent::TimeAnomalyDetected { .. } => {
@@ -583,6 +643,9 @@ pub(crate) enum DomainEvent {
         updates: Vec<PassiveConditionUpdate>,
         remainders: BTreeMap<String, i64>,
     },
+    WeatherObserved {
+        observation: WeatherObservation,
+    },
     DowntimeObserved {
         from_utc_ms: i64,
         to_utc_ms: i64,
@@ -601,6 +664,7 @@ impl DomainEvent {
             Self::ActivityScheduled { .. } => "activity_scheduled",
             Self::ActivityCompleted { .. } => "activity_completed",
             Self::PassiveConditionsAdvanced { .. } => "passive_conditions_advanced",
+            Self::WeatherObserved { .. } => "weather_observed",
             Self::DowntimeObserved { .. } => "downtime_observed",
             Self::TimeAnomalyDetected { .. } => "time_anomaly_detected",
         }
@@ -830,6 +894,7 @@ mod tests {
         let serialized = serde_json::to_value(&state).unwrap();
         assert!(serialized.get("passive_updated_at_ms").is_none());
         assert!(serialized.get("passive_remainders").is_none());
+        assert!(serialized.get("weather_observation").is_none());
         assert_eq!(state.passive_updated_at_ms(), 1_000_000);
     }
 }

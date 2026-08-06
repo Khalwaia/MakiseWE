@@ -22,6 +22,8 @@ pub enum WorldError {
     InvalidPersistedEvent(String),
     #[error("state invariant failed: {0}")]
     StateInvariant(String),
+    #[error("invalid weather observation: {0}")]
+    InvalidWeatherObservation(String),
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]

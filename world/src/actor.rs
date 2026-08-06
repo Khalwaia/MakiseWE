@@ -5,7 +5,7 @@ use tokio::sync::{broadcast, oneshot};
 
 use crate::{
     ClockSample, CommandEnvelope, CommandResult, PerceptionWindow, PersistedEvent, TimeStatus,
-    WorldEngine, WorldError,
+    WeatherObservation, WorldEngine, WorldError,
 };
 
 #[derive(Clone, Debug)]
@@ -68,6 +68,10 @@ enum ActorRequest {
         command_id: String,
         respond: oneshot::Sender<Result<Option<CommandResult>, ActorError>>,
     },
+    ObserveWeather {
+        observation: WeatherObservation,
+        respond: oneshot::Sender<Result<bool, ActorError>>,
+    },
     Perception {
         respond: oneshot::Sender<Result<PerceptionWindow, ActorError>>,
     },
@@ -120,6 +124,18 @@ impl WorldActorHandle {
         let (respond, response) = oneshot::channel();
         self.enqueue(ActorRequest::CommandResult {
             command_id,
+            respond,
+        })?;
+        response.await.map_err(|_| ActorError::Stopped)?
+    }
+
+    pub async fn observe_weather(
+        &self,
+        observation: WeatherObservation,
+    ) -> Result<bool, ActorError> {
+        let (respond, response) = oneshot::channel();
+        self.enqueue(ActorRequest::ObserveWeather {
+            observation,
             respond,
         })?;
         response.await.map_err(|_| ActorError::Stopped)?
@@ -232,6 +248,22 @@ fn handle_request(
             respond,
         } => {
             let result = clock.and_then(|_| Ok(engine.command_result(&command_id)?));
+            if let Err(error) = &result {
+                *last_error = Some(error.to_string());
+            }
+            let _ = respond.send(result);
+        }
+        ActorRequest::ObserveWeather {
+            observation,
+            respond,
+        } => {
+            let result = clock.and_then(|now_ms| {
+                let changed = engine.observe_weather(observation, now_ms)?;
+                if changed {
+                    publish_new_events(engine, event_sender, published_seq)?;
+                }
+                Ok(changed)
+            });
             if let Err(error) = &result {
                 *last_error = Some(error.to_string());
             }

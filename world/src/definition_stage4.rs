@@ -34,6 +34,30 @@ struct WorldMetadataDefinition {
     floor: i32,
     area_m2: u32,
     weather_fallback: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    weather: Option<WeatherDefinition>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct WeatherDefinition {
+    provider: String,
+    latitude_e6: i32,
+    longitude_e6: i32,
+    poll_interval_ms: i64,
+    stale_after_ms: i64,
+    fallback_after_ms: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WeatherSite {
+    pub provider: String,
+    pub latitude_e6: i32,
+    pub longitude_e6: i32,
+    pub timezone: String,
+    pub poll_interval_ms: i64,
+    pub stale_after_ms: i64,
+    pub fallback_after_ms: i64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -539,6 +563,7 @@ pub struct WorldDefinition {
     objects: BTreeMap<String, ObjectRecord>,
     objects_by_anchor: BTreeMap<String, Vec<ObservedObjectDefinition>>,
     sensory_by_anchor: BTreeMap<String, Vec<String>>,
+    weather_site: Option<WeatherSite>,
 }
 
 impl WorldDefinition {
@@ -573,6 +598,17 @@ impl WorldDefinition {
         let mut anchors = BTreeMap::new();
         let mut anchor_locations = BTreeMap::new();
         let mut sensory_by_anchor = BTreeMap::new();
+        let weather_site = package.metadata.as_ref().and_then(|metadata| {
+            metadata.weather.as_ref().map(|weather| WeatherSite {
+                provider: weather.provider.clone(),
+                latitude_e6: weather.latitude_e6,
+                longitude_e6: weather.longitude_e6,
+                timezone: metadata.timezone.clone(),
+                poll_interval_ms: weather.poll_interval_ms,
+                stale_after_ms: weather.stale_after_ms,
+                fallback_after_ms: weather.fallback_after_ms,
+            })
+        });
         let weather_fallback = package
             .metadata
             .as_ref()
@@ -681,6 +717,7 @@ impl WorldDefinition {
             objects,
             objects_by_anchor,
             sensory_by_anchor,
+            weather_site,
         })
     }
 
@@ -778,6 +815,10 @@ impl WorldDefinition {
             .get(anchor_id)
             .map(Vec::as_slice)
             .unwrap_or_default()
+    }
+
+    pub fn weather_site(&self) -> Option<&WeatherSite> {
+        self.weather_site.as_ref()
     }
 
     pub(crate) fn initial_object_placement(&self, object_id: &str) -> Option<ObjectPlacement> {
@@ -1689,6 +1730,22 @@ fn validate_metadata(metadata: Option<&WorldMetadataDefinition>) -> Result<()> {
     require_name("metadata.weather_fallback", &metadata.weather_fallback)?;
     if metadata.area_m2 == 0 || metadata.floor < 0 {
         return invalid("metadata area or floor is invalid");
+    }
+    if let Some(weather) = &metadata.weather {
+        if weather.provider != "open_meteo" {
+            return invalid("metadata weather provider must be open_meteo");
+        }
+        if !(-90_000_000..=90_000_000).contains(&weather.latitude_e6)
+            || !(-180_000_000..=180_000_000).contains(&weather.longitude_e6)
+        {
+            return invalid("metadata weather coordinates are invalid");
+        }
+        if !(60_000..=3_600_000).contains(&weather.poll_interval_ms)
+            || !(weather.poll_interval_ms..=21_600_000).contains(&weather.stale_after_ms)
+            || !(weather.stale_after_ms..=172_800_000).contains(&weather.fallback_after_ms)
+        {
+            return invalid("metadata weather intervals must satisfy poll <= stale <= fallback");
+        }
     }
     Ok(())
 }
