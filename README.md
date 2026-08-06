@@ -12,6 +12,7 @@
 - C++20 WorldClient с generated protobuf/gRPC bindings для будущего Brain.
 - SQLite WAL event log, command deduplication, snapshots и deterministic replay.
 - Неблокирующая погода Open-Meteo: типизированные снимки проходят физическую проверку, сохраняются как события и переживают replay/offline.
+- Динамическое окно среды: свет, звук, температура, влажность и запахи вычисляются из времени, погоды и состояния комнаты; live/cache/seasonal fallback указаны явно, а 5-минутный bucket сохраняет стабильность контекста.
 - Durable activities с реальным временем и восстановлением после downtime.
 - Ресурсные конфликты вместо глобального BUSY.
 - Частичное восприятие: скрытые свойства package не попадают в PerceptionWindow.

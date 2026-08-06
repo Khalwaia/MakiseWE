@@ -155,6 +155,42 @@ message ActivityView {
   repeated string reserved_resources = 4;
 }
 
+enum EnvironmentReliability {
+  ENVIRONMENT_RELIABILITY_UNSPECIFIED = 0;
+  ENVIRONMENT_RELIABILITY_LIVE = 1;
+  ENVIRONMENT_RELIABILITY_CACHED = 2;
+  ENVIRONMENT_RELIABILITY_SEASONAL_FALLBACK = 3;
+}
+
+enum LightLevel {
+  LIGHT_LEVEL_UNSPECIFIED = 0;
+  LIGHT_LEVEL_DARK = 1;
+  LIGHT_LEVEL_DIM = 2;
+  LIGHT_LEVEL_COMFORTABLE = 3;
+  LIGHT_LEVEL_BRIGHT = 4;
+}
+
+message EnvironmentState {
+  EnvironmentReliability reliability = 1;
+  google.protobuf.Timestamp weather_observed_at = 2;
+  google.protobuf.Timestamp computed_at = 3;
+  sint32 outdoor_temperature_millicelsius = 4;
+  sint32 perceived_temperature_millicelsius = 5;
+  uint32 outdoor_relative_humidity_permille = 6;
+  uint32 perceived_relative_humidity_permille = 7;
+  uint32 precipitation_micrometers = 8;
+  uint32 snowfall_micrometers = 9;
+  uint32 weather_code = 10;
+  uint32 cloud_cover_permille = 11;
+  uint32 wind_speed_mm_per_s = 12;
+  uint32 wind_direction_degrees = 13;
+  bool is_day = 14;
+  LightLevel light_level = 15;
+  repeated string light_sources = 16;
+  repeated string sounds = 17;
+  repeated string smells = 18;
+}
+
 message PerceptionWindow {
   string perception_id = 1;
   uint64 world_version = 2;
@@ -167,6 +203,7 @@ message PerceptionWindow {
   uint32 unread_notification_count = 9;
   repeated string significant_changes = 10;
   repeated string environment_cues = 11;
+  EnvironmentState environment = 12;
 }
 
 enum HealthStatus {

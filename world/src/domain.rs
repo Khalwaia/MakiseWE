@@ -677,6 +677,45 @@ pub struct ClockSample {
     pub monotonic_elapsed_ms: i64,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EnvironmentReliability {
+    Live,
+    Cached,
+    SeasonalFallback,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LightLevel {
+    Dark,
+    Dim,
+    Comfortable,
+    Bright,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EnvironmentState {
+    pub reliability: EnvironmentReliability,
+    pub weather_observed_at_ms: Option<i64>,
+    pub computed_at_ms: i64,
+    pub outdoor_temperature_millicelsius: i32,
+    pub perceived_temperature_millicelsius: i32,
+    pub outdoor_relative_humidity_permille: u16,
+    pub perceived_relative_humidity_permille: u16,
+    pub precipitation_micrometers: u32,
+    pub snowfall_micrometers: u32,
+    pub weather_code: u16,
+    pub cloud_cover_permille: u16,
+    pub wind_speed_mm_per_s: u32,
+    pub wind_direction_degrees: u16,
+    pub is_day: bool,
+    pub light_level: LightLevel,
+    pub light_sources: Vec<String>,
+    pub sounds: Vec<String>,
+    pub smells: Vec<String>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ObservedObject {
     pub object_id: String,
@@ -701,6 +740,7 @@ pub struct PerceptionWindow {
     pub location_name: String,
     pub anchor_id: String,
     pub environment_cues: Vec<String>,
+    pub environment: EnvironmentState,
     pub observed_objects: Vec<ObservedObject>,
     pub affordances: Vec<Affordance>,
     pub activities: Vec<ActivityView>,
@@ -708,7 +748,11 @@ pub struct PerceptionWindow {
 }
 
 impl PerceptionWindow {
-    pub(crate) fn build(state: &WorldState, definition: &WorldDefinition) -> Result<Self> {
+    pub(crate) fn build(
+        state: &WorldState,
+        definition: &WorldDefinition,
+        now_ms: i64,
+    ) -> Result<Self> {
         let (location_id, location_name) = definition
             .location_for_anchor(state.agent_anchor_id())
             .ok_or_else(|| WorldError::StateInvariant("agent is at an unknown anchor".into()))?;
@@ -816,32 +860,12 @@ impl PerceptionWindow {
             })
             .collect::<Vec<_>>();
         observed_objects.sort_by(|left, right| left.object_id.cmp(&right.object_id));
-        let mut environment_cues = definition.sensory_cues(state.agent_anchor_id()).to_vec();
-        for object in &observed_objects {
-            let powered = object
-                .observed_properties
-                .get("power")
-                .is_some_and(|value| value == "on");
-            let open = object
-                .observed_properties
-                .get("open")
-                .is_some_and(|value| value == "open");
-            if powered && definition.object_has_template(&object.object_id, "template.light") {
-                environment_cues.push(format!("Свет: {} включён.", object.name));
-            }
-            if powered && definition.object_has_component(&object.object_id, "sound_emitter") {
-                environment_cues.push(format!("Звук: слышно, как работает {}.", object.name));
-            }
-            if open && definition.object_has_template(&object.object_id, "template.window") {
-                environment_cues.push("Звук: открытое окно пропускает звуки снаружи.".into());
-                environment_cues
-                    .push("Температура: через открытое окно поступает наружный воздух.".into());
-            }
-            if open && definition.object_has_template(&object.object_id, "template.refrigerator") {
-                environment_cues
-                    .push("Температура: из открытого холодильника идёт холодный воздух.".into());
-            }
-        }
+        let environment =
+            crate::environment::project_environment(state, definition, location_id, now_ms);
+        let environment_cues = crate::environment::render_environment_cues(
+            &environment,
+            definition.weather_fallback_description(),
+        );
         let activities = state
             .activities()
             .map(|activity| ActivityView {
@@ -857,12 +881,17 @@ impl PerceptionWindow {
             .collect();
 
         Ok(Self {
-            perception_id: format!("perception-{}", state.world_version()),
+            perception_id: format!(
+                "perception-{}-{}",
+                state.world_version(),
+                environment.computed_at_ms
+            ),
             world_version: state.world_version(),
             location_id: location_id.into(),
             location_name: location_name.into(),
             anchor_id: state.agent_anchor_id().into(),
             environment_cues,
+            environment,
             observed_objects,
             affordances: definition.movement_affordances(state.agent_anchor_id()),
             activities,

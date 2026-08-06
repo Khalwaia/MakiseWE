@@ -1,4 +1,6 @@
-use makise_proto::v1::{CommandEnvelope, CommandStatus, MoveTo, command_envelope};
+use makise_proto::v1::{
+    CommandEnvelope, CommandStatus, EnvironmentReliability, LightLevel, MoveTo, command_envelope,
+};
 use prost::Message;
 
 fn command() -> CommandEnvelope {
@@ -47,4 +49,12 @@ fn command_status_numbers_remain_stable() {
     assert_eq!(CommandStatus::AlreadyCommitted as i32, 2);
     assert_eq!(CommandStatus::StaleWorld as i32, 5);
     assert_eq!(CommandStatus::ExpiredDecision as i32, 6);
+}
+#[test]
+fn environment_enum_numbers_remain_stable() {
+    assert_eq!(EnvironmentReliability::Live as i32, 1);
+    assert_eq!(EnvironmentReliability::Cached as i32, 2);
+    assert_eq!(EnvironmentReliability::SeasonalFallback as i32, 3);
+    assert_eq!(LightLevel::Dark as i32, 1);
+    assert_eq!(LightLevel::Bright as i32, 4);
 }

@@ -3,8 +3,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use makise_world::{
-    ClockSample, CommandEnvelope, CommandPayload, CommandStatus, PathGuard, WorldDefinition,
-    WorldEngine,
+    ClockSample, CommandEnvelope, CommandPayload, CommandStatus, EnvironmentReliability,
+    LightLevel, PathGuard, WeatherObservation, WorldDefinition, WorldEngine,
 };
 
 fn package_dir() -> PathBuf {
@@ -132,7 +132,7 @@ fn perception_covers_every_anchor_without_hidden_canaries() {
     }
 
     assert!(perceptions.contains("metal_and_wood"));
-    assert!(perceptions.contains("Погода (локальный fallback)"));
+    assert!(perceptions.contains("Погода (seasonal_fallback)"));
     assert!(!perceptions.contains("hidden-"));
     assert!(!perceptions.contains("canary_"));
 }
@@ -256,10 +256,15 @@ fn closed_container_hides_contents_until_open_action_completes() {
             .any(|object| object.object_id == "object.refrigerated_food")
     );
     assert!(
+        opened.environment.perceived_temperature_millicelsius
+            < initial.environment.perceived_temperature_millicelsius
+    );
+    assert!(
         opened
-            .environment_cues
+            .environment
+            .smells
             .iter()
-            .any(|cue| cue.contains("холодный воздух"))
+            .any(|smell| smell.contains("холодильника"))
     );
     drop(engine);
     let recovered = WorldEngine::open(
@@ -971,5 +976,171 @@ fn passive_timeline_splits_at_action_completion() {
     assert_eq!(
         observed_property(&engine, "object.refrigerator", "power"),
         "off"
+    );
+}
+
+#[test]
+fn weather_reliability_transitions_live_cached_and_seasonal() {
+    let temp = tempfile::tempdir().unwrap();
+    let start = 1_786_060_800_000_i64;
+    let mut engine = WorldEngine::open(
+        temp.path().join("weather-reliability.db"),
+        "test-makise-weather-reliability",
+        definition(),
+        "bed",
+        start,
+        &PathGuard::default(),
+    )
+    .unwrap();
+    let observation = WeatherObservation {
+        source: "open_meteo".into(),
+        observed_at_ms: start,
+        temperature_millicelsius: 18_000,
+        relative_humidity_permille: 600,
+        precipitation_micrometers: 0,
+        snowfall_micrometers: 0,
+        weather_code: 0,
+        cloud_cover_permille: 100,
+        wind_speed_mm_per_s: 2_000,
+        wind_direction_degrees: 180,
+        is_day: true,
+    };
+    engine.observe_weather(observation, start + 1).unwrap();
+    assert_eq!(
+        engine.perception().unwrap().environment.reliability,
+        EnvironmentReliability::Live
+    );
+
+    engine
+        .tick(ClockSample {
+            utc_ms: start + 3_000_000,
+            monotonic_elapsed_ms: 3_000_000,
+        })
+        .unwrap();
+    let cached = engine.perception().unwrap().environment;
+    assert_eq!(cached.reliability, EnvironmentReliability::Cached);
+    assert_eq!(cached.outdoor_temperature_millicelsius, 18_000);
+    assert!(cached.weather_observed_at_ms.is_some());
+
+    engine
+        .tick(ClockSample {
+            utc_ms: start + 21_900_000,
+            monotonic_elapsed_ms: 18_900_000,
+        })
+        .unwrap();
+    let fallback = engine.perception().unwrap().environment;
+    assert_eq!(
+        fallback.reliability,
+        EnvironmentReliability::SeasonalFallback
+    );
+    assert!(fallback.weather_observed_at_ms.is_none());
+}
+
+#[test]
+fn light_level_changes_only_after_a_durable_object_action() {
+    let temp = tempfile::tempdir().unwrap();
+    let start = 1_000_000_i64;
+    let identity = "test-makise-light-level";
+    let mut engine = WorldEngine::open(
+        temp.path().join("light-level.db"),
+        identity,
+        definition(),
+        "bed",
+        start,
+        &PathGuard::default(),
+    )
+    .unwrap();
+    assert_eq!(
+        engine.perception().unwrap().environment.light_level,
+        LightLevel::Dark
+    );
+    let command = perform_command(
+        &engine,
+        identity,
+        "cmd-bedroom-light",
+        start + 10,
+        "object.toggle_power",
+        "object.bedroom_light",
+        &[],
+    );
+    assert_eq!(
+        engine.execute_command(&command, start + 10).unwrap().status,
+        CommandStatus::Committed
+    );
+    engine
+        .tick(ClockSample {
+            utc_ms: start + 360,
+            monotonic_elapsed_ms: 360,
+        })
+        .unwrap();
+    let perception = engine.perception().unwrap();
+    assert_eq!(perception.environment.light_level, LightLevel::Bright);
+    assert!(
+        perception
+            .environment
+            .light_sources
+            .iter()
+            .any(|source| source == "electric:object.bedroom_light")
+    );
+}
+
+#[test]
+fn open_window_affects_the_whole_room_after_moving_away() {
+    let temp = tempfile::tempdir().unwrap();
+    let start = 1_000_000_i64;
+    let identity = "test-makise-room-environment";
+    let mut engine = WorldEngine::open(
+        temp.path().join("room-environment.db"),
+        identity,
+        definition(),
+        "kitchen_window",
+        start,
+        &PathGuard::default(),
+    )
+    .unwrap();
+    let closed = engine.perception().unwrap().environment;
+    let open_window = perform_command(
+        &engine,
+        identity,
+        "cmd-open-kitchen-window",
+        start + 10,
+        "object.toggle_open",
+        "object.kitchen_window",
+        &[],
+    );
+    engine.execute_command(&open_window, start + 10).unwrap();
+    engine
+        .tick(ClockSample {
+            utc_ms: start + 510,
+            monotonic_elapsed_ms: 510,
+        })
+        .unwrap();
+    let move_command = CommandEnvelope {
+        command_id: "cmd-move-from-window".into(),
+        identity_id: identity.into(),
+        agent_id: "makise".into(),
+        expected_world_version: engine.state().world_version(),
+        schema_version: 1,
+        decision_id: "decision-move-from-window".into(),
+        issued_at_ms: start + 520,
+        ttl_ms: 30_000,
+        payload: CommandPayload::MoveTo {
+            target_anchor_id: "dining_table".into(),
+        },
+    };
+    engine.execute_command(&move_command, start + 520).unwrap();
+    engine
+        .tick(ClockSample {
+            utc_ms: start + 2_220,
+            monotonic_elapsed_ms: 1_710,
+        })
+        .unwrap();
+    let opened = engine.perception().unwrap().environment;
+    assert!(opened.perceived_temperature_millicelsius < closed.perceived_temperature_millicelsius);
+    assert!(
+        opened
+            .sounds
+            .iter()
+            .any(|sound| sound.contains("городской фон"))
     );
 }

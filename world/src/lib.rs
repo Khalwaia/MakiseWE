@@ -4,6 +4,7 @@ mod actor;
 mod definition_stage4;
 mod domain;
 mod engine;
+mod environment;
 mod error;
 mod path_guard;
 mod rpc;
@@ -15,11 +16,12 @@ mod weather;
 pub use actor::{ActorError, EventBatch, HealthSnapshot, WorldActorConfig, WorldActorHandle};
 pub use definition_stage4::{
     Affordance, ConnectionView, ObjectCondition, ObjectPlacement, ObjectQuantity, ObjectView,
-    PlacementRelation, QuantityUnit, WeatherSite, WorldDefinition,
+    PlacementRelation, QuantityUnit, SensoryProfile, WeatherSite, WorldDefinition,
 };
 pub use domain::{
-    ClockSample, CommandEnvelope, CommandPayload, CommandResult, CommandStatus, PerceptionWindow,
-    PersistedEvent, TimeStatus, WeatherObservation, WorldState,
+    ClockSample, CommandEnvelope, CommandPayload, CommandResult, CommandStatus,
+    EnvironmentReliability, EnvironmentState, LightLevel, PerceptionWindow, PersistedEvent,
+    TimeStatus, WeatherObservation, WorldState,
 };
 pub use engine::WorldEngine;
 pub use error::{Result, WorldError};

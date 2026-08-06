@@ -5,10 +5,12 @@ use makise_proto::v1::world_service_server::WorldService;
 use makise_proto::v1::{
     ActivityView as ProtoActivityView, Affordance as ProtoAffordance,
     CommandEnvelope as ProtoCommandEnvelope, CommandResult as ProtoCommandResult,
-    CommandStatus as ProtoCommandStatus, ErrorDetail, EventEnvelope as ProtoEventEnvelope,
+    CommandStatus as ProtoCommandStatus, EnvironmentReliability as ProtoEnvironmentReliability,
+    EnvironmentState as ProtoEnvironmentState, ErrorDetail, EventEnvelope as ProtoEventEnvelope,
     GetCommandResultRequest, GetPerceptionRequest, HandshakeRequest, HandshakeResponse,
-    HealthResponse, HealthStatus as ProtoHealthStatus, ObservedObject as ProtoObservedObject,
-    PerceptionWindow as ProtoPerceptionWindow, SubscribeEventsRequest, command_envelope,
+    HealthResponse, HealthStatus as ProtoHealthStatus, LightLevel as ProtoLightLevel,
+    ObservedObject as ProtoObservedObject, PerceptionWindow as ProtoPerceptionWindow,
+    SubscribeEventsRequest, command_envelope,
 };
 use prost_types::{Duration as ProtoDuration, Timestamp, value::Kind};
 use tokio::sync::mpsc;
@@ -17,7 +19,8 @@ use tonic::{Request, Response, Status};
 
 use crate::{
     ActorError, Affordance, CommandEnvelope, CommandPayload, CommandResult, CommandStatus,
-    EventBatch, HealthSnapshot, PerceptionWindow, PersistedEvent, TimeStatus, WorldActorHandle,
+    EnvironmentReliability, EnvironmentState, EventBatch, HealthSnapshot, LightLevel,
+    PerceptionWindow, PersistedEvent, TimeStatus, WorldActorHandle,
 };
 
 const PROTOCOL_VERSION: u32 = 1;
@@ -87,6 +90,7 @@ impl WorldService for WorldRpc {
                 "causal-object-condition-v1".into(),
                 "passive-object-evolution-v1".into(),
                 "durable-live-weather-v1".into(),
+                "dynamic-environment-v1".into(),
             ],
         }))
     }
@@ -414,6 +418,45 @@ fn perception_to_proto(perception: PerceptionWindow) -> ProtoPerceptionWindow {
         unread_notification_count: 0,
         significant_changes: perception.significant_changes,
         environment_cues: perception.environment_cues,
+        environment: Some(environment_to_proto(perception.environment)),
+    }
+}
+
+fn environment_to_proto(environment: EnvironmentState) -> ProtoEnvironmentState {
+    ProtoEnvironmentState {
+        reliability: match environment.reliability {
+            EnvironmentReliability::Live => ProtoEnvironmentReliability::Live,
+            EnvironmentReliability::Cached => ProtoEnvironmentReliability::Cached,
+            EnvironmentReliability::SeasonalFallback => {
+                ProtoEnvironmentReliability::SeasonalFallback
+            }
+        } as i32,
+        weather_observed_at: environment.weather_observed_at_ms.map(ms_to_timestamp),
+        computed_at: Some(ms_to_timestamp(environment.computed_at_ms)),
+        outdoor_temperature_millicelsius: environment.outdoor_temperature_millicelsius,
+        perceived_temperature_millicelsius: environment.perceived_temperature_millicelsius,
+        outdoor_relative_humidity_permille: u32::from(
+            environment.outdoor_relative_humidity_permille,
+        ),
+        perceived_relative_humidity_permille: u32::from(
+            environment.perceived_relative_humidity_permille,
+        ),
+        precipitation_micrometers: environment.precipitation_micrometers,
+        snowfall_micrometers: environment.snowfall_micrometers,
+        weather_code: u32::from(environment.weather_code),
+        cloud_cover_permille: u32::from(environment.cloud_cover_permille),
+        wind_speed_mm_per_s: environment.wind_speed_mm_per_s,
+        wind_direction_degrees: u32::from(environment.wind_direction_degrees),
+        is_day: environment.is_day,
+        light_level: match environment.light_level {
+            LightLevel::Dark => ProtoLightLevel::Dark,
+            LightLevel::Dim => ProtoLightLevel::Dim,
+            LightLevel::Comfortable => ProtoLightLevel::Comfortable,
+            LightLevel::Bright => ProtoLightLevel::Bright,
+        } as i32,
+        light_sources: environment.light_sources,
+        sounds: environment.sounds,
+        smells: environment.smells,
     }
 }
 

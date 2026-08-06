@@ -115,6 +115,45 @@ struct SensoryDefinition {
     smell: Vec<String>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SensoryProfile {
+    pub light: Vec<String>,
+    pub sound: Vec<String>,
+    pub temperature: Vec<String>,
+    pub smell: Vec<String>,
+}
+
+impl SensoryProfile {
+    fn merged(location: &SensoryDefinition, anchor: &SensoryDefinition) -> Self {
+        Self {
+            light: location
+                .light
+                .iter()
+                .chain(&anchor.light)
+                .cloned()
+                .collect(),
+            sound: location
+                .sound
+                .iter()
+                .chain(&anchor.sound)
+                .cloned()
+                .collect(),
+            temperature: location
+                .temperature
+                .iter()
+                .chain(&anchor.temperature)
+                .cloned()
+                .collect(),
+            smell: location
+                .smell
+                .iter()
+                .chain(&anchor.smell)
+                .cloned()
+                .collect(),
+        }
+    }
+}
+
 impl SensoryDefinition {
     fn is_empty(&self) -> bool {
         self.light.is_empty()
@@ -563,7 +602,9 @@ pub struct WorldDefinition {
     objects: BTreeMap<String, ObjectRecord>,
     objects_by_anchor: BTreeMap<String, Vec<ObservedObjectDefinition>>,
     sensory_by_anchor: BTreeMap<String, Vec<String>>,
+    sensory_profiles_by_anchor: BTreeMap<String, SensoryProfile>,
     weather_site: Option<WeatherSite>,
+    weather_fallback: Option<String>,
 }
 
 impl WorldDefinition {
@@ -598,6 +639,7 @@ impl WorldDefinition {
         let mut anchors = BTreeMap::new();
         let mut anchor_locations = BTreeMap::new();
         let mut sensory_by_anchor = BTreeMap::new();
+        let mut sensory_profiles_by_anchor = BTreeMap::new();
         let weather_site = package.metadata.as_ref().and_then(|metadata| {
             metadata.weather.as_ref().map(|weather| WeatherSite {
                 provider: weather.provider.clone(),
@@ -612,7 +654,7 @@ impl WorldDefinition {
         let weather_fallback = package
             .metadata
             .as_ref()
-            .map(|metadata| format!("Погода (локальный fallback): {}", metadata.weather_fallback));
+            .map(|metadata| metadata.weather_fallback.clone());
 
         for location in &package.locations {
             require_id("location.id", &location.id)?;
@@ -646,9 +688,12 @@ impl WorldDefinition {
                     .sensory
                     .descriptions()
                     .chain(anchor.sensory.descriptions())
-                    .chain(weather_fallback.iter().cloned())
                     .collect();
                 sensory_by_anchor.insert(anchor.id.clone(), cues);
+                sensory_profiles_by_anchor.insert(
+                    anchor.id.clone(),
+                    SensoryProfile::merged(&location.sensory, &anchor.sensory),
+                );
             }
         }
         if anchors.is_empty() {
@@ -717,7 +762,9 @@ impl WorldDefinition {
             objects,
             objects_by_anchor,
             sensory_by_anchor,
+            sensory_profiles_by_anchor,
             weather_site,
+            weather_fallback,
         })
     }
 
@@ -819,6 +866,14 @@ impl WorldDefinition {
 
     pub fn weather_site(&self) -> Option<&WeatherSite> {
         self.weather_site.as_ref()
+    }
+
+    pub fn sensory_profile(&self, anchor_id: &str) -> Option<&SensoryProfile> {
+        self.sensory_profiles_by_anchor.get(anchor_id)
+    }
+
+    pub fn weather_fallback_description(&self) -> Option<&str> {
+        self.weather_fallback.as_deref()
     }
 
     pub(crate) fn initial_object_placement(&self, object_id: &str) -> Option<ObjectPlacement> {

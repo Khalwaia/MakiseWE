@@ -82,7 +82,7 @@ impl WorldEngine {
     }
 
     pub fn perception(&self) -> Result<PerceptionWindow> {
-        PerceptionWindow::build(&self.state, &self.definition)
+        PerceptionWindow::build(&self.state, &self.definition, self.last_clock_utc_ms)
     }
 
     pub fn command_result(&self, command_id: &str) -> Result<Option<CommandResult>> {
@@ -1039,6 +1039,27 @@ mod tests {
             })
             .unwrap();
         assert_eq!(engine.state().time_status(), &TimeStatus::TimeAnomaly);
+    }
+
+    #[test]
+    fn perception_id_changes_only_at_the_time_bucket_boundary() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut engine = open(&temp, 299_000);
+        let first = engine.perception().unwrap();
+
+        engine
+            .tick(ClockSample {
+                utc_ms: 301_000,
+                monotonic_elapsed_ms: 2_000,
+            })
+            .unwrap();
+        let second = engine.perception().unwrap();
+        let repeated = engine.perception().unwrap();
+
+        assert_eq!(first.world_version, second.world_version);
+        assert_ne!(first.perception_id, second.perception_id);
+        assert_eq!(second.perception_id, repeated.perception_id);
+        assert_eq!(second.environment.computed_at_ms, 300_000);
     }
 
     #[test]
