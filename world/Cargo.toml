@@ -21,6 +21,6 @@ tonic.workspace = true
 
 [dev-dependencies]
 hyper-util.workspace = true
+jsonschema = { version = "0.33", default-features = false }
 tempfile.workspace = true
 tower.workspace = true
-

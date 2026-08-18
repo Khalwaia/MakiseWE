@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://makise.local/contracts/mechanism-contract-v1.schema.json",
+  "title": "MechanismContract V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "mechanism_id", "version", "content_digest",
+    "causal_inputs", "causal_outputs", "read_set", "write_set",
+    "authoritative_state_variables", "resolution", "scales",
+    "canonical_scheduling", "observable_projections", "parameters",
+    "provenance_category", "uncertainty_model", "validity_range",
+    "conservation_rules", "failure_policy", "resolution_upgrade_paths",
+    "validation_scenarios"
+  ],
+  "properties": {
+    "schema_version": { "const": "makise.mechanism-contract.v1" },
+    "mechanism_id": { "$ref": "#/$defs/id" },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "content_digest": { "$ref": "#/$defs/digest" },
+    "causal_inputs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/port" } },
+    "causal_outputs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/port" } },
+    "read_set": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/statePath" } },
+    "write_set": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/statePath" } },
+    "authoritative_state_variables": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/stateVariable" } },
+    "resolution": {
+      "type": "object", "additionalProperties": false,
+      "required": ["supported_resolution_ids", "representation"],
+      "properties": {
+        "supported_resolution_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "representation": { "type": "string", "minLength": 1 }
+      }
+    },
+    "scales": {
+      "type": "object", "additionalProperties": false,
+      "required": ["spatial", "temporal"],
+      "properties": {
+        "spatial": { "$ref": "#/$defs/quantityRange" },
+        "temporal": { "$ref": "#/$defs/quantityRange" }
+      }
+    },
+    "canonical_scheduling": {
+      "type": "object", "additionalProperties": false,
+      "required": ["boundary_rule", "partition_invariant", "reduction_order"],
+      "properties": {
+        "boundary_rule": { "type": "string", "minLength": 1 },
+        "partition_invariant": { "const": true },
+        "reduction_order": { "type": "string", "minLength": 1 }
+      }
+    },
+    "observable_projections": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/observable" } },
+    "parameters": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/parameter" } },
+    "provenance_category": { "$ref": "#/$defs/provenance" },
+    "uncertainty_model": { "$ref": "#/$defs/uncertainty" },
+    "validity_range": { "$ref": "#/$defs/validity" },
+    "conservation_rules": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/conservation" } },
+    "failure_policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["non_convergence", "invalid_input", "missing_artifact"],
+      "properties": {
+        "non_convergence": { "enum": ["safe_stop", "reject_transition"] },
+        "invalid_input": { "enum": ["safe_stop", "reject_transition"] },
+        "missing_artifact": { "const": "safe_stop" }
+      }
+    },
+    "resolution_upgrade_paths": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["from_resolution_id", "to_resolution_id", "contract_digest"],
+        "properties": {
+          "from_resolution_id": { "$ref": "#/$defs/id" },
+          "to_resolution_id": { "$ref": "#/$defs/id" },
+          "contract_digest": { "$ref": "#/$defs/digest" }
+        }
+      }
+    },
+    "validation_scenarios": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["scenario_id", "evidence_kind", "acceptance"],
+        "properties": {
+          "scenario_id": { "$ref": "#/$defs/id" },
+          "evidence_kind": { "enum": ["measured", "peer_reviewed", "calibrated", "expert_estimate", "schema_only"] },
+          "acceptance": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9._-]*$" },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "statePath": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]*$" },
+    "provenance": { "enum": ["measured", "peer_reviewed", "calibrated", "expert_estimate", "synthetic_fixture"] },
+    "dimensionKind": { "enum": ["physical_quantity", "counter", "probability", "fraction", "receptor_occupancy", "strain"] },
+    "port": {
+      "type": "object", "additionalProperties": false,
+      "required": ["port_id", "variable", "unit", "dimension_kind"],
+      "properties": {
+        "port_id": { "$ref": "#/$defs/id" },
+        "variable": { "$ref": "#/$defs/statePath" },
+        "unit": { "type": "string", "minLength": 1 },
+        "dimension_kind": { "$ref": "#/$defs/dimensionKind" }
+      }
+    },
+    "stateVariable": {
+      "type": "object", "additionalProperties": false,
+      "required": ["variable", "unit", "dimension_kind", "validity_range"],
+      "properties": {
+        "variable": { "$ref": "#/$defs/statePath" },
+        "unit": { "type": "string", "minLength": 1 },
+        "dimension_kind": { "$ref": "#/$defs/dimensionKind" },
+        "validity_range": { "$ref": "#/$defs/quantityRange" }
+      }
+    },
+    "quantity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["value", "unit"],
+      "properties": { "value": { "type": "number" }, "unit": { "type": "string", "minLength": 1 } }
+    },
+    "quantityRange": {
+      "type": "object", "additionalProperties": false,
+      "required": ["min", "max", "unit"],
+      "properties": {
+        "min": { "type": "number" }, "max": { "type": "number" }, "unit": { "type": "string", "minLength": 1 }
+      }
+    },
+    "uncertainty": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "bound", "unit", "confidence"],
+      "properties": {
+        "kind": { "enum": ["absolute", "relative", "distribution", "interval"] },
+        "bound": { "type": "number", "minimum": 0 },
+        "unit": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+      }
+    },
+    "validity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["conditions", "exclusions"],
+      "properties": {
+        "conditions": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "exclusions": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "observable": {
+      "type": "object", "additionalProperties": false,
+      "required": ["observable_id", "source_variables", "unit", "error_bound"],
+      "properties": {
+        "observable_id": { "$ref": "#/$defs/id" },
+        "source_variables": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/statePath" } },
+        "unit": { "type": "string", "minLength": 1 },
+        "error_bound": { "$ref": "#/$defs/uncertainty" }
+      }
+    },
+    "parameter": {
+      "type": "object", "additionalProperties": false,
+      "required": ["parameter_id", "value", "unit", "provenance_category", "uncertainty", "validity_range"],
+      "properties": {
+        "parameter_id": { "$ref": "#/$defs/id" },
+        "value": { "type": "number" },
+        "unit": { "type": "string", "minLength": 1 },
+        "provenance_category": { "$ref": "#/$defs/provenance" },
+        "uncertainty": { "$ref": "#/$defs/uncertainty" },
+        "validity_range": { "$ref": "#/$defs/quantityRange" }
+      }
+    },
+    "conservation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["quantity", "unit", "tolerance"],
+      "properties": {
+        "quantity": { "$ref": "#/$defs/statePath" },
+        "unit": { "type": "string", "minLength": 1 },
+        "tolerance": { "$ref": "#/$defs/quantity" }
+      }
+    }
+  }
+}

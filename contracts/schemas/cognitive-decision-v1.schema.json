@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://makise.local/contracts/cognitive-decision-v1.schema.json",
+  "title": "Cognitive proposal/disposition transaction V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "proposal", "disposition", "applied_state_transition"],
+  "properties": {
+    "schema_version": { "const": "makise.cognitive-decision.v1" },
+    "proposal": { "$ref": "#/$defs/proposal" },
+    "disposition": { "$ref": "#/$defs/disposition" },
+    "applied_state_transition": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/cognitiveTransition" }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "disposition": { "properties": { "status": { "const": "accepted" } }, "required": ["status"] } } },
+      "then": { "properties": { "applied_state_transition": { "$ref": "#/$defs/cognitiveTransition" } } },
+      "else": { "properties": { "applied_state_transition": { "type": "null" } } }
+    }
+  ],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9._-]*$" },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "candidate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["candidate_id", "description", "evidence_refs"],
+      "properties": {
+        "candidate_id": { "$ref": "#/$defs/id" },
+        "description": { "type": "string", "minLength": 1 },
+        "evidence_refs": { "type": "array", "items": { "$ref": "#/$defs/id" } }
+      }
+    },
+    "proposal": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "proposal_id", "consciousness_id", "cortex_frame_id", "frame_state_hash", "model_artifact_digest", "semantic_appraisals", "goal_candidates", "intention_candidates", "plan_steps", "memory_interpretations", "communications"],
+      "properties": {
+        "schema_version": { "const": "makise.cortex-proposal.v1" },
+        "proposal_id": { "$ref": "#/$defs/id" },
+        "consciousness_id": { "$ref": "#/$defs/id" },
+        "cortex_frame_id": { "$ref": "#/$defs/id" },
+        "frame_state_hash": { "$ref": "#/$defs/digest" },
+        "model_artifact_digest": { "$ref": "#/$defs/digest" },
+        "semantic_appraisals": { "type": "array", "items": { "$ref": "#/$defs/candidate" } },
+        "goal_candidates": { "type": "array", "items": { "$ref": "#/$defs/candidate" } },
+        "intention_candidates": { "type": "array", "items": { "$ref": "#/$defs/candidate" } },
+        "plan_steps": { "type": "array", "items": { "$ref": "#/$defs/candidate" } },
+        "memory_interpretations": { "type": "array", "items": { "$ref": "#/$defs/candidate" } },
+        "communications": { "type": "array", "items": { "$ref": "#/$defs/candidate" } }
+      }
+    },
+    "disposition": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "disposition_id", "proposal_id", "status", "reason_codes", "evidence_refs", "decided_by_gate_digest"],
+      "properties": {
+        "schema_version": { "const": "makise.cognitive-disposition.v1" },
+        "disposition_id": { "$ref": "#/$defs/id" },
+        "proposal_id": { "$ref": "#/$defs/id" },
+        "status": { "enum": ["accepted", "rejected", "deferred", "needs_revision"] },
+        "reason_codes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/id" } },
+        "evidence_refs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/id" } },
+        "decided_by_gate_digest": { "$ref": "#/$defs/digest" },
+        "reconsideration_trigger": { "type": ["string", "null"] }
+      }
+    },
+    "cognitiveTransition": {
+      "type": "object", "additionalProperties": false,
+      "required": ["transition_kind", "caused_by_disposition_id", "adopted_goal_candidate_id", "adopted_intention_candidate_id"],
+      "properties": {
+        "transition_kind": { "const": "cognitive_adoption" },
+        "caused_by_disposition_id": { "$ref": "#/$defs/id" },
+        "adopted_goal_candidate_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9._-]*$" },
+        "adopted_intention_candidate_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9._-]*$" }
+      }
+    }
+  }
+}

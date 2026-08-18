@@ -1,0 +1,63 @@
+{
+  "schema_version": "makise.morphotype-definition.v1",
+  "morphotype_id": "human-v1",
+  "version": "0.1.0",
+  "content_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+  "root_definition": true,
+  "anatomy_graph": {
+    "nodes": [
+      { "node_id": "body", "kind": "mammalian-body", "count": 1 },
+      { "node_id": "external-auricles", "kind": "human-auricle-pair", "count": 1 },
+      { "node_id": "circulation", "kind": "closed-circulatory-system", "count": 1 }
+    ],
+    "edges": [
+      { "from": "external-auricles", "to": "body", "relation": "anatomical-part-of" },
+      { "from": "circulation", "to": "body", "relation": "anatomical-part-of" }
+    ]
+  },
+  "development": {
+    "program_id": "human-development-v1",
+    "artifact_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+    "validity_range": "Schema-only placeholder; development kinetics are not implemented in Phase 0"
+  },
+  "organ_bindings": [
+    {
+      "anatomy_node_id": "circulation",
+      "mechanism_id": "mammalian.oxygen-transport",
+      "mechanism_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "resolution_id": "cell-cohort-v1"
+    }
+  ],
+  "physiological_parameters": [
+    {
+      "parameter_id": "reference-core-temperature",
+      "value": 310.15,
+      "unit": "K",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 1.0,
+      "validity_range": "Adult resting schema fixture only"
+    }
+  ],
+  "phenotypes": [
+    {
+      "phenotype_id": "female-makise-v1",
+      "sex": "female",
+      "parameter_overrides": [
+        {
+          "parameter_id": "initial-body-mass",
+          "value": 55.0,
+          "unit": "kg",
+          "provenance_category": "expert_estimate",
+          "uncertainty": 5.0,
+          "validity_range": "Initial adult phenotype fixture, not a population reference"
+        }
+      ]
+    }
+  ],
+  "shared_mechanism_refs": [
+    "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  ],
+  "validation_fixtures": [
+    { "fixture_id": "human-root-isolation", "evidence_kind": "schema_only", "acceptance": "Definition is a root and contains no inheritance field" }
+  ]
+}

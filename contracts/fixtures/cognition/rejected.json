@@ -1,0 +1,32 @@
+{
+  "schema_version": "makise.cognitive-decision.v1",
+  "proposal": {
+    "schema_version": "makise.cortex-proposal.v1",
+    "proposal_id": "proposal-direct-temperature-mutation",
+    "consciousness_id": "consciousness-neko",
+    "cortex_frame_id": "frame-cold-001",
+    "frame_state_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+    "model_artifact_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "semantic_appraisals": [
+      { "candidate_id": "appraisal-cold", "description": "The room is perceived as cold", "evidence_refs": ["perception-room-temperature"] }
+    ],
+    "goal_candidates": [
+      { "candidate_id": "goal-set-body-temperature", "description": "Directly assign a warmer biological state without an action", "evidence_refs": ["interoception-cold"] }
+    ],
+    "intention_candidates": [],
+    "plan_steps": [],
+    "memory_interpretations": [],
+    "communications": []
+  },
+  "disposition": {
+    "schema_version": "makise.cognitive-disposition.v1",
+    "disposition_id": "disposition-direct-temperature-mutation",
+    "proposal_id": "proposal-direct-temperature-mutation",
+    "status": "rejected",
+    "reason_codes": ["forbidden-biological-authority"],
+    "evidence_refs": ["policy-llm-no-state-mutation"],
+    "decided_by_gate_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "reconsideration_trigger": null
+  },
+  "applied_state_transition": null
+}

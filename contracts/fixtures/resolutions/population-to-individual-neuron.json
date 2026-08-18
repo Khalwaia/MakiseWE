@@ -1,0 +1,94 @@
+{
+  "schema_version": "makise.resolution-contract.v1",
+  "resolution_id": "neural-population-to-individual-neuron-v1",
+  "content_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "represented_entities": {
+    "coarse_kind": "neural-population",
+    "fine_kind": "individual-neuron-network"
+  },
+  "aggregation_rules": [
+    "Group neurons by region, cell class and stable causal ports",
+    "Preserve count, transmitter total and declared firing-rate moments"
+  ],
+  "refinement_rules": [
+    "Generate neurons and connections from a recorded seed",
+    "Adjust deterministic samples to reproduce declared population moments"
+  ],
+  "state_lift": {
+    "algorithm": "seeded-moment-preserving-neuron-sampling-v1",
+    "deterministic_seed_required": true,
+    "preserves_lineage": true
+  },
+  "state_projection": {
+    "algorithm": "region-class-moment-projection-v1",
+    "stores_refinement_provenance": true,
+    "preserves_lineage": true
+  },
+  "conserved_quantities": [
+    { "quantity_id": "neuron-count", "unit": "1", "tolerance": 0 },
+    { "quantity_id": "total-mass", "unit": "kg", "tolerance": 0.000000001 },
+    { "quantity_id": "transmitter-amount", "unit": "mol", "tolerance": 0.000000001 },
+    { "quantity_id": "mean-firing-rate", "unit": "Hz", "tolerance": 0.01 }
+  ],
+  "observable_continuity_rules": [
+    { "observable_id": "neuron-count", "unit": "1", "absolute_error_bound": 0 },
+    { "observable_id": "mean-firing-rate", "unit": "Hz", "absolute_error_bound": 0.01 }
+  ],
+  "uncertainty_transformation": {
+    "lift": "Allocate population uncertainty to seeded neuron parameters without narrowing it",
+    "projection": "Combine individual variance and numerical error into population bounds"
+  },
+  "trigger": ["A brain-region mechanism requests spike-level interactions"],
+  "preconditions": ["All model and solver artifacts are present", "Compute admission succeeds", "Population moments are finite"],
+  "required_compute_estimate": {
+    "cpu_core_milliseconds": 25,
+    "ram_bytes": 65536,
+    "storage_bytes": 131072
+  },
+  "rollback_path": {
+    "target_representation": "neural-population",
+    "requires_projection": true,
+    "safe_stop_on_failure": true
+  },
+  "artifact_model_compatibility": {
+    "mechanism_digests": ["sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"],
+    "solver_digests": ["sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"],
+    "missing_artifact_policy": "safe_stop"
+  },
+  "validation_example": {
+    "seed": 2042,
+    "coarse_state": {
+      "neuron-count": 4,
+      "total-mass": 0.0001,
+      "transmitter-amount": 0.00001,
+      "mean-firing-rate": 12.5
+    },
+    "fine_state": {
+      "neuron-count": 4,
+      "total-mass": 0.0001,
+      "transmitter-amount": 0.00001,
+      "mean-firing-rate": 12.5
+    },
+    "projected_state": {
+      "neuron-count": 4,
+      "total-mass": 0.0001,
+      "transmitter-amount": 0.00001,
+      "mean-firing-rate": 12.5
+    },
+    "lineage": {
+      "coarse_entity_id": "population-a",
+      "fine_entity_ids": ["neuron-a1", "neuron-a2", "neuron-a3", "neuron-a4"],
+      "projection_provenance_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    "conservation_checks": [
+      { "quantity_id": "neuron-count", "unit": "1", "coarse_value": 4, "fine_value": 4, "projected_value": 4, "absolute_error_bound": 0 },
+      { "quantity_id": "total-mass", "unit": "kg", "coarse_value": 0.0001, "fine_value": 0.0001, "projected_value": 0.0001, "absolute_error_bound": 0.000000001 },
+      { "quantity_id": "transmitter-amount", "unit": "mol", "coarse_value": 0.00001, "fine_value": 0.00001, "projected_value": 0.00001, "absolute_error_bound": 0.000000001 },
+      { "quantity_id": "mean-firing-rate", "unit": "Hz", "coarse_value": 12.5, "fine_value": 12.5, "projected_value": 12.5, "absolute_error_bound": 0.01 }
+    ],
+    "observable_checks": [
+      { "quantity_id": "neuron-count", "unit": "1", "coarse_value": 4, "fine_value": 4, "projected_value": 4, "absolute_error_bound": 0 },
+      { "quantity_id": "mean-firing-rate", "unit": "Hz", "coarse_value": 12.5, "fine_value": 12.5, "projected_value": 12.5, "absolute_error_bound": 0.01 }
+    ]
+  }
+}

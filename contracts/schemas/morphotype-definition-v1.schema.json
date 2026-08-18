@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://makise.local/contracts/morphotype-definition-v1.schema.json",
+  "title": "MorphotypeDefinition V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "morphotype_id", "version", "content_digest",
+    "root_definition", "anatomy_graph", "development", "organ_bindings",
+    "physiological_parameters", "phenotypes", "shared_mechanism_refs",
+    "validation_fixtures"
+  ],
+  "properties": {
+    "schema_version": { "const": "makise.morphotype-definition.v1" },
+    "morphotype_id": { "$ref": "#/$defs/id" },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "content_digest": { "$ref": "#/$defs/digest" },
+    "root_definition": { "const": true },
+    "anatomy_graph": {
+      "type": "object", "additionalProperties": false,
+      "required": ["nodes", "edges"],
+      "properties": {
+        "nodes": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["node_id", "kind", "count"],
+            "properties": {
+              "node_id": { "$ref": "#/$defs/id" },
+              "kind": { "$ref": "#/$defs/id" },
+              "count": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["from", "to", "relation"],
+            "properties": {
+              "from": { "$ref": "#/$defs/id" },
+              "to": { "$ref": "#/$defs/id" },
+              "relation": { "$ref": "#/$defs/id" }
+            }
+          }
+        }
+      }
+    },
+    "development": {
+      "type": "object", "additionalProperties": false,
+      "required": ["program_id", "artifact_digest", "validity_range"],
+      "properties": {
+        "program_id": { "$ref": "#/$defs/id" },
+        "artifact_digest": { "$ref": "#/$defs/digest" },
+        "validity_range": { "type": "string", "minLength": 1 }
+      }
+    },
+    "organ_bindings": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["anatomy_node_id", "mechanism_id", "mechanism_digest", "resolution_id"],
+        "properties": {
+          "anatomy_node_id": { "$ref": "#/$defs/id" },
+          "mechanism_id": { "$ref": "#/$defs/id" },
+          "mechanism_digest": { "$ref": "#/$defs/digest" },
+          "resolution_id": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "physiological_parameters": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["parameter_id", "value", "unit", "provenance_category", "uncertainty", "validity_range"],
+        "properties": {
+          "parameter_id": { "$ref": "#/$defs/id" },
+          "value": { "type": "number" },
+          "unit": { "type": "string", "minLength": 1 },
+          "provenance_category": { "enum": ["measured", "peer_reviewed", "calibrated", "expert_estimate", "synthetic_fixture"] },
+          "uncertainty": { "type": "number", "minimum": 0 },
+          "validity_range": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "phenotypes": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["phenotype_id", "sex", "parameter_overrides"],
+        "properties": {
+          "phenotype_id": { "$ref": "#/$defs/id" },
+          "sex": { "enum": ["female", "male", "intersex", "not_applicable"] },
+          "parameter_overrides": {
+            "type": "array",
+            "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["parameter_id", "value", "unit", "provenance_category", "uncertainty", "validity_range"],
+              "properties": {
+                "parameter_id": { "$ref": "#/$defs/id" },
+                "value": { "type": "number" },
+                "unit": { "type": "string", "minLength": 1 },
+                "provenance_category": { "enum": ["measured", "peer_reviewed", "calibrated", "expert_estimate", "synthetic_fixture"] },
+                "uncertainty": { "type": "number", "minimum": 0 },
+                "validity_range": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "shared_mechanism_refs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/digest" } },
+    "validation_fixtures": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["fixture_id", "evidence_kind", "acceptance"],
+        "properties": {
+          "fixture_id": { "$ref": "#/$defs/id" },
+          "evidence_kind": { "enum": ["measured", "peer_reviewed", "calibrated", "expert_estimate", "schema_only"] },
+          "acceptance": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9._-]*$" },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

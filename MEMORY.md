@@ -1,8 +1,13 @@
 # Память Makise
 
-Статус: зафиксированная архитектурная база V1  
+Статус: исторический companion document; когнитивные переходы superseded контрактами Phase 0
 Дата: 2026-08-05  
 Связанные документы: [VISION.md](VISION.md), [ARCHITECTURE.md](ARCHITECTURE.md), [SECURITY.md](SECURITY.md), [INVARIANTS.md](INVARIANTS.md)
+
+При конфликте с `CortexProposal`/`CognitiveDisposition`, запретом arbitrary
+normalized scores или моделью нескольких Consciousness нормативны
+[ARCHITECTURE.md](ARCHITECTURE.md), [PROTO.md](PROTO.md) и
+[INVARIANTS.md](INVARIANTS.md). Этот файл сохраняет прежнюю историю дизайна памяти.
 
 ## 1. Назначение
 
@@ -164,4 +169,3 @@ Makise может честно отказаться раскрывать све�
 Memory DB, working memory и diary входят в согласованный checkpoint личности. Резервные копии шифруются. Восстановление сначала выполняется без Telegram и проверяется совместно с соответствующим snapshot мира.
 
 Одновременный запуск двух writable-экземпляров с одним `identity_id` запрещён.
-

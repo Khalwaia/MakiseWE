@@ -4,6 +4,14 @@
 обновлением работающей Мины и не использует её runtime, память, Telegram-сессию или
 дневник.
 
+## Текущая архитектурная фаза
+
+Новая многомасштабная V1 находится в Phase 0: определены causal/resolution/
+morphotype/cognitive contracts, schemas и fixtures, но runtime biology и solvers ещё
+не реализованы. Существующий executable world slice остаётся legacy-compatible
+основанием миграции, а не доказательством новой физиологии. Phase 1 заранее ограничен
+[24-часовым Human/Neko сценарием](docs/scenarios/phase1-24h-human-neko.md).
+
 ## Текущий исполнимый срез
 
 - Protobuf V1: handshake, commands, results, events, perception и health.
@@ -86,5 +94,6 @@ Socket получает права `0600` и удаляется владельц
 - tests — межсервисные, replay и fault-сценарии.
 - docs/adr — принятые необратимые технические решения.
 
-Нормативные требования находятся в INVARIANTS.md; дорожная карта — в ROADMAP.md; подробный исполняемый план Stage 5 — в STAGE_5.md.
-
+Нормативные требования находятся в [INVARIANTS.md](INVARIANTS.md), дорожная карта —
+в [ROADMAP.md](ROADMAP.md), а ubiquitous language — в [CONTEXT.md](CONTEXT.md).
+[STAGE_5.md](STAGE_5.md) сохранён только как superseded history.

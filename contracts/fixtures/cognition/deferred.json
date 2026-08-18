@@ -1,0 +1,34 @@
+{
+  "schema_version": "makise.cognitive-decision.v1",
+  "proposal": {
+    "schema_version": "makise.cortex-proposal.v1",
+    "proposal_id": "proposal-balance-task",
+    "consciousness_id": "consciousness-neko",
+    "cortex_frame_id": "frame-fatigue-001",
+    "frame_state_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+    "model_artifact_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "semantic_appraisals": [
+      { "candidate_id": "appraisal-task-interesting", "description": "The balance task is interesting but not urgent", "evidence_refs": ["affordance-balance-task"] }
+    ],
+    "goal_candidates": [
+      { "candidate_id": "goal-practice-balance", "description": "Practice the balance task", "evidence_refs": ["affordance-balance-task"] }
+    ],
+    "intention_candidates": [
+      { "candidate_id": "intention-start-balance", "description": "Attempt the task after physical validation", "evidence_refs": ["affordance-balance-task"] }
+    ],
+    "plan_steps": [],
+    "memory_interpretations": [],
+    "communications": []
+  },
+  "disposition": {
+    "schema_version": "makise.cognitive-disposition.v1",
+    "disposition_id": "disposition-balance-task",
+    "proposal_id": "proposal-balance-task",
+    "status": "deferred",
+    "reason_codes": ["physical-validity-range-unmet", "recovery-pending"],
+    "evidence_refs": ["interoception-fatigue", "mechanism-balance-validity"],
+    "decided_by_gate_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "reconsideration_trigger": "When modeled recovery preconditions enter the balance mechanism validity range"
+  },
+  "applied_state_transition": null
+}

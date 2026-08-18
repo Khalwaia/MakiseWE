@@ -1,0 +1,77 @@
+{
+  "schema_version": "makise.morphotype-definition.v1",
+  "morphotype_id": "neko-v1",
+  "version": "0.1.0",
+  "content_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+  "root_definition": true,
+  "anatomy_graph": {
+    "nodes": [
+      { "node_id": "body", "kind": "mammalian-body", "count": 1 },
+      { "node_id": "external-auricles", "kind": "cat-auricle-pair", "count": 1 },
+      { "node_id": "tail-vertebrae", "kind": "caudal-vertebral-chain", "count": 1 },
+      { "node_id": "tail-muscles", "kind": "caudal-muscle-group", "count": 1 },
+      { "node_id": "tail-vessels", "kind": "caudal-vasculature", "count": 1 },
+      { "node_id": "tail-nerves", "kind": "caudal-innervation", "count": 1 },
+      { "node_id": "circulation", "kind": "closed-circulatory-system", "count": 1 }
+    ],
+    "edges": [
+      { "from": "external-auricles", "to": "body", "relation": "anatomical-part-of" },
+      { "from": "tail-vertebrae", "to": "body", "relation": "anatomical-part-of" },
+      { "from": "tail-muscles", "to": "tail-vertebrae", "relation": "actuates" },
+      { "from": "tail-vessels", "to": "tail-vertebrae", "relation": "perfuses" },
+      { "from": "tail-nerves", "to": "tail-muscles", "relation": "innervates" },
+      { "from": "circulation", "to": "body", "relation": "anatomical-part-of" }
+    ]
+  },
+  "development": {
+    "program_id": "neko-development-v1",
+    "artifact_digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+    "validity_range": "Schema-only placeholder; independent Neko development requires future evidence"
+  },
+  "organ_bindings": [
+    {
+      "anatomy_node_id": "circulation",
+      "mechanism_id": "mammalian.oxygen-transport",
+      "mechanism_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "resolution_id": "cell-cohort-v1"
+    },
+    {
+      "anatomy_node_id": "external-auricles",
+      "mechanism_id": "neko.hearing-transfer",
+      "mechanism_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+      "resolution_id": "organ-lumped-v1"
+    },
+    {
+      "anatomy_node_id": "tail-nerves",
+      "mechanism_id": "neko.balance-tail-coupling",
+      "mechanism_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "resolution_id": "organ-lumped-v1"
+    },
+    {
+      "anatomy_node_id": "external-auricles",
+      "mechanism_id": "neko.auricle-thermoregulation",
+      "mechanism_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "resolution_id": "organ-lumped-v1"
+    }
+  ],
+  "physiological_parameters": [
+    {
+      "parameter_id": "auricle-convective-area",
+      "value": 0.018,
+      "unit": "m2",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 0.006,
+      "validity_range": "Adult Neko schema fixture; uncalibrated"
+    }
+  ],
+  "phenotypes": [
+    { "phenotype_id": "female-neko-v1", "sex": "female", "parameter_overrides": [] }
+  ],
+  "shared_mechanism_refs": [
+    "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  ],
+  "validation_fixtures": [
+    { "fixture_id": "neko-root-isolation", "evidence_kind": "schema_only", "acceptance": "Definition is an independent root with cat ears and tail anatomy" },
+    { "fixture_id": "neko-hearing-balance-thermal", "evidence_kind": "expert_estimate", "acceptance": "Bindings explicitly cover hearing, balance and thermoregulatory surface" }
+  ]
+}

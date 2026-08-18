@@ -1,0 +1,99 @@
+{
+  "schema_version": "makise.resolution-contract.v1",
+  "resolution_id": "cell-cohort-to-individual-cell-v1",
+  "content_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "represented_entities": {
+    "coarse_kind": "cell-cohort",
+    "fine_kind": "individual-cell-set"
+  },
+  "aggregation_rules": [
+    "Sum mass, charge and substance amounts by lineage-compatible cohort",
+    "Store count and declared first moments"
+  ],
+  "refinement_rules": [
+    "Create exactly cell-count entities using deterministic seeded sampling",
+    "Correct the final entity residuals so all conserved totals match"
+  ],
+  "state_lift": {
+    "algorithm": "seeded-stratified-sampling-with-residual-correction-v1",
+    "deterministic_seed_required": true,
+    "preserves_lineage": true
+  },
+  "state_projection": {
+    "algorithm": "lineage-grouped-deterministic-sum-v1",
+    "stores_refinement_provenance": true,
+    "preserves_lineage": true
+  },
+  "conserved_quantities": [
+    { "quantity_id": "cell-count", "unit": "1", "tolerance": 0 },
+    { "quantity_id": "total-mass", "unit": "kg", "tolerance": 0.000000000000001 },
+    { "quantity_id": "total-charge", "unit": "C", "tolerance": 0.000000000000001 },
+    { "quantity_id": "oxygen-amount", "unit": "mol", "tolerance": 0.000000000001 },
+    { "quantity_id": "mean-cell-mass", "unit": "kg", "tolerance": 0.000000000000001 }
+  ],
+  "observable_continuity_rules": [
+    { "observable_id": "cell-count", "unit": "1", "absolute_error_bound": 0 },
+    { "observable_id": "oxygen-amount", "unit": "mol", "absolute_error_bound": 0.000000000001 }
+  ],
+  "uncertainty_transformation": {
+    "lift": "Sample within cohort uncertainty then retain cohort bounds as lineage metadata",
+    "projection": "Combine sampling and numeric error without narrowing source uncertainty"
+  },
+  "trigger": ["Focused mechanism requests individual-cell interactions"],
+  "preconditions": ["All required artifacts are present", "Compute admission succeeds", "Cohort state passes conservation checks"],
+  "required_compute_estimate": {
+    "cpu_core_milliseconds": 2,
+    "ram_bytes": 4096,
+    "storage_bytes": 8192
+  },
+  "rollback_path": {
+    "target_representation": "cell-cohort",
+    "requires_projection": true,
+    "safe_stop_on_failure": true
+  },
+  "artifact_model_compatibility": {
+    "mechanism_digests": ["sha256:1111111111111111111111111111111111111111111111111111111111111111"],
+    "solver_digests": ["sha256:9999999999999999999999999999999999999999999999999999999999999999"],
+    "missing_artifact_policy": "safe_stop"
+  },
+  "validation_example": {
+    "seed": 1701,
+    "coarse_state": {
+      "cell-count": 4,
+      "total-mass": 0.000000004,
+      "total-charge": 0.0,
+      "oxygen-amount": 0.000004,
+      "mean-cell-mass": 0.000000001
+    },
+    "fine_state": {
+      "cell-count": 4,
+      "total-mass": 0.000000004,
+      "total-charge": 0.0,
+      "oxygen-amount": 0.000004,
+      "mean-cell-mass": 0.000000001
+    },
+    "projected_state": {
+      "cell-count": 4,
+      "total-mass": 0.000000004,
+      "total-charge": 0.0,
+      "oxygen-amount": 0.000004,
+      "mean-cell-mass": 0.000000001
+    },
+    "lineage": {
+      "coarse_entity_id": "cohort-a",
+      "fine_entity_ids": ["cell-a1", "cell-a2", "cell-a3", "cell-a4"],
+      "projection_provenance_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "conservation_checks": [
+      { "quantity_id": "cell-count", "unit": "1", "coarse_value": 4, "fine_value": 4, "projected_value": 4, "absolute_error_bound": 0 },
+      { "quantity_id": "total-mass", "unit": "kg", "coarse_value": 0.000000004, "fine_value": 0.000000004, "projected_value": 0.000000004, "absolute_error_bound": 0.000000000000001 },
+      { "quantity_id": "total-charge", "unit": "C", "coarse_value": 0, "fine_value": 0, "projected_value": 0, "absolute_error_bound": 0.000000000000001 },
+      { "quantity_id": "oxygen-amount", "unit": "mol", "coarse_value": 0.000004, "fine_value": 0.000004, "projected_value": 0.000004, "absolute_error_bound": 0.000000000001 },
+      { "quantity_id": "mean-cell-mass", "unit": "kg", "coarse_value": 0.000000001, "fine_value": 0.000000001, "projected_value": 0.000000001, "absolute_error_bound": 0.000000000000001 }
+    ],
+    "observable_checks": [
+      { "quantity_id": "cell-count", "unit": "1", "coarse_value": 4, "fine_value": 4, "projected_value": 4, "absolute_error_bound": 0 },
+      { "quantity_id": "oxygen-amount", "unit": "mol", "coarse_value": 0.000004, "fine_value": 0.000004, "projected_value": 0.000004, "absolute_error_bound": 0.000000000001 }
+    ]
+  }
+}

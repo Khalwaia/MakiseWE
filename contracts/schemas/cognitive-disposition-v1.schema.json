@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://makise.local/contracts/cognitive-disposition-v1.schema.json",
+  "title": "CognitiveDisposition V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "disposition_id", "proposal_id", "status", "reason_codes", "evidence_refs", "decided_by_gate_digest"],
+  "properties": {
+    "schema_version": { "const": "makise.cognitive-disposition.v1" },
+    "disposition_id": { "$ref": "#/$defs/id" },
+    "proposal_id": { "$ref": "#/$defs/id" },
+    "status": { "enum": ["accepted", "rejected", "deferred", "needs_revision"] },
+    "reason_codes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/id" } },
+    "evidence_refs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/id" } },
+    "decided_by_gate_digest": { "$ref": "#/$defs/digest" },
+    "reconsideration_trigger": { "type": ["string", "null"] }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9._-]*$" },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

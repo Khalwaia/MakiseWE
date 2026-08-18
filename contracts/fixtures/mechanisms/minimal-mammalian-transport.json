@@ -1,0 +1,73 @@
+{
+  "schema_version": "makise.mechanism-contract.v1",
+  "mechanism_id": "mammalian.oxygen-transport",
+  "version": "0.1.0",
+  "content_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "causal_inputs": [
+    { "port_id": "blood-oxygen-input", "variable": "circulation.oxygen-amount", "unit": "mol", "dimension_kind": "physical_quantity" }
+  ],
+  "causal_outputs": [
+    { "port_id": "tissue-oxygen-output", "variable": "tissue.oxygen-amount", "unit": "mol", "dimension_kind": "physical_quantity" }
+  ],
+  "read_set": ["circulation.oxygen-amount", "tissue.cell-count"],
+  "write_set": ["circulation.oxygen-amount", "tissue.oxygen-amount"],
+  "authoritative_state_variables": [
+    { "variable": "circulation.oxygen-amount", "unit": "mol", "dimension_kind": "physical_quantity", "validity_range": { "min": 0.0, "max": 10.0, "unit": "mol" } },
+    { "variable": "tissue.cell-count", "unit": "1", "dimension_kind": "counter", "validity_range": { "min": 0, "max": 100000000000000, "unit": "1" } }
+  ],
+  "resolution": {
+    "supported_resolution_ids": ["cell-cohort-v1", "individual-cell-set-v1"],
+    "representation": "Stable amount-flow ports independent of cohort or individual cell storage"
+  },
+  "scales": {
+    "spatial": { "min": 0.000001, "max": 1.0, "unit": "m" },
+    "temporal": { "min": 0.001, "max": 60.0, "unit": "s" }
+  },
+  "canonical_scheduling": {
+    "boundary_rule": "Advance at declared input discontinuities and canonical interval end",
+    "partition_invariant": true,
+    "reduction_order": "Sort tissue compartment IDs lexicographically"
+  },
+  "observable_projections": [
+    {
+      "observable_id": "tissue-oxygen-amount",
+      "source_variables": ["tissue.oxygen-amount"],
+      "unit": "mol",
+      "error_bound": { "kind": "absolute", "bound": 0.000001, "unit": "mol", "confidence": 0.95 }
+    }
+  ],
+  "parameters": [
+    {
+      "parameter_id": "fixture-transfer-rate",
+      "value": 0.001,
+      "unit": "mol/s",
+      "provenance_category": "synthetic_fixture",
+      "uncertainty": { "kind": "relative", "bound": 0.1, "unit": "1", "confidence": 0.95 },
+      "validity_range": { "min": 0.0, "max": 0.01, "unit": "mol/s" }
+    }
+  ],
+  "provenance_category": "synthetic_fixture",
+  "uncertainty_model": { "kind": "absolute", "bound": 0.000001, "unit": "mol", "confidence": 0.95 },
+  "validity_range": {
+    "conditions": ["Schema-only transport example with nonnegative oxygen amounts"],
+    "exclusions": ["No clinical or biological realism claim"]
+  },
+  "conservation_rules": [
+    { "quantity": "oxygen.total-amount", "unit": "mol", "tolerance": { "value": 0.000000001, "unit": "mol" } }
+  ],
+  "failure_policy": {
+    "non_convergence": "safe_stop",
+    "invalid_input": "reject_transition",
+    "missing_artifact": "safe_stop"
+  },
+  "resolution_upgrade_paths": [
+    {
+      "from_resolution_id": "cell-cohort-v1",
+      "to_resolution_id": "individual-cell-set-v1",
+      "contract_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ],
+  "validation_scenarios": [
+    { "scenario_id": "schema-conservation-example", "evidence_kind": "schema_only", "acceptance": "Input and output oxygen amounts balance inside declared tolerance" }
+  ]
+}

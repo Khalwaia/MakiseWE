@@ -1,245 +1,91 @@
-# Протоколы Makise V1
+# Protocol and persistence design Makise V1
 
-Статус: зафиксированная архитектурная база V1  
-Дата: 2026-08-05  
-Связанные документы: [ARCHITECTURE.md](ARCHITECTURE.md), [SECURITY.md](SECURITY.md), [INVARIANTS.md](INVARIANTS.md)
+Статус: нормативный Phase 0 design; wire implementation следует отдельной migration
+Дата: 2026-08-19
+Связанные документы: [ARCHITECTURE.md](ARCHITECTURE.md), [INVARIANTS.md](INVARIANTS.md), [ADR-0010](docs/adr/0010-content-addressed-artifacts.md)
 
-## 1. Цели протокола
+## 1. Module boundary
 
-- высокая скорость локального контура;
-- строгие типы и совместимость Rust/C++;
-- идемпотентные команды;
-- восстановление после разрыва соединения;
-- явная защита от устаревших решений;
-- эволюция схем без переписывания истории;
-- наблюдаемость без утечки содержимого.
+Public domain API состоит из `open`, `commit`, `project` и `events`, определённых в [ARCHITECTURE.md](ARCHITECTURE.md). RPC/HTTP/CLI являются adapters этих операций и не добавляют mutation endpoints.
 
-## 2. Транспорт
+`CommitRequest` envelope содержит:
 
-Внутренний контур `makise-brain <-> makise-world` использует Protobuf RPC и server-streaming events по постоянному Unix Domain Socket. Реализация может использовать gRPC/HTTP2, но нижеприведённая семантика обязательна независимо от библиотеки.
+- `request_id`, schema version и expected world/timeline version;
+- caller identity/authority и target timeline;
+- canonical simulation interval либо внешний cause timestamp;
+- ровно один typed intent: advance time, stimulus, cortex response, action, resolution change или admin intent;
+- referenced artifact digests и deterministic seed material, если оно требуется;
+- causation/correlation IDs.
 
-Панель использует HTTPS/JSON и WebSocket через gateway. Внешний JSON не является альтернативным путём изменения мира: gateway преобразует разрешённое действие в ту же внутреннюю команду.
+`CommitReceipt` возвращает committed event range, transition IDs, resulting version/state hash, simulation time и idempotent replay marker. Validation failure не создаёт частичный state.
 
-## 3. Идентификаторы
+`ProjectionRequest` задаёт observer/Consciousness, projection kind, simulation point и privacy scope. Projection включает units, uncertainty, provenance и active resolution, но не выдаёт недоступный raw state.
 
-Все идентификаторы непрозрачны, стабильны и типизированы:
+`EventQuery` использует timeline ID, `after_seq`, bounds, event families и page limit. Pagination имеет стабильный ordering по monotonically increasing event sequence.
 
-- `identity_id` — личность Makise;
-- `agent_id` — действующий субъект;
-- `command_id` — UUID/ULID команды;
-- `event_id` — уникальное событие;
-- `event_seq` — монотонная последовательность журнала;
-- `world_version` — версия состояния после последнего commit;
-- `schema_version` — версия сообщения;
-- `world_definition_hash` — канонический hash package мира;
-- `decision_id` — один осознанный цикл Brain;
-- `perception_id` — snapshot доступного восприятия.
+## 2. Canonical transition record
 
-## 4. CommandEnvelope
-
-Нормативные поля:
-
-```proto
-message CommandEnvelope {
-  string command_id = 1;
-  string identity_id = 2;
-  string agent_id = 3;
-  uint64 expected_world_version = 4;
-  uint32 schema_version = 5;
-  string decision_id = 6;
-  google.protobuf.Timestamp issued_at = 7;
-  google.protobuf.Duration ttl = 8;
-  CommandPayload payload = 9;
-}
-```
-
-Правила:
-
-- `command_id` создаётся клиентом один раз и сохраняется при retry.
-- Несовпадение `expected_world_version` возвращает `STALE_WORLD` без выполнения.
-- Истёкший TTL возвращает `EXPIRED_DECISION`.
-- Команда подтверждается только после durable commit результата.
-- Повтор известного `command_id` возвращает сохранённый результат.
-
-## 5. CommandResult
-
-```proto
-message CommandResult {
-  string command_id = 1;
-  CommandStatus status = 2;
-  uint64 committed_world_version = 3;
-  uint64 first_event_seq = 4;
-  uint64 last_event_seq = 5;
-  ErrorDetail error = 6;
-  repeated Affordance suggested_recovery = 7;
-}
-```
-
-Статусы минимум:
-
-- `COMMITTED`;
-- `ALREADY_COMMITTED`;
-- `REJECTED_PRECONDITION`;
-- `RESOURCE_CONFLICT`;
-- `STALE_WORLD`;
-- `EXPIRED_DECISION`;
-- `UNAUTHORIZED`;
-- `INVALID_ARGUMENT`;
-- `RATE_LIMITED`;
-- `TEMPORARILY_UNAVAILABLE`;
-- `INTERNAL_ERROR`.
-
-Сетевой timeout не означает, что команда не выполнена. Клиент обязан запросить результат по `command_id` перед созданием новой команды.
-
-## 6. EventEnvelope
-
-```proto
-message EventEnvelope {
-  string event_id = 1;
-  uint64 event_seq = 2;
-  uint64 world_version = 3;
-  uint32 event_schema_version = 4;
-  google.protobuf.Timestamp occurred_at = 5;
-  optional string causation_command_id = 6;
-  optional string correlation_id = 7;
-  EventPayload payload = 8;
-}
-```
-
-События публикуются только после commit и всегда в порядке `event_seq`. Клиент подтверждает последний устойчиво обработанный номер. После reconnect запрашивается `SubscribeEvents(after_seq)`.
-
-Пропуск последовательности является ошибкой синхронизации; клиент не продолжает на неполной истории.
-
-## 7. PerceptionWindow
-
-Brain получает не полный JSON мира, а компактное типизированное восприятие:
-
-- текущая локация и anchor;
-- качественные телесные ощущения;
-- замеченные объекты и их наблюдаемые свойства;
-- доступные affordances;
-- слышимые/видимые/ощущаемые события с уверенностью;
-- текущие занятия и занятые ресурсы;
-- обзор уведомлений без скрытого текста;
-- значимые изменения после предыдущего perception;
-- `world_version` и `perception_id`.
-
-Скрытые свойства не сериализуются. Административный snapshot использует отдельную схему и никогда не входит в Brain prompt.
-
-## 8. Стабильный набор команд Brain
-
-Нормативные пространства имён:
+Каждая transition хранит:
 
 ```text
-world.move_to
-world.perform
-world.inspect
-planning.manage
-planning.wait_until
-phone.execute
+transition_id, event_seq, timeline_id
+causes[] and correlation_id
+canonical_simulation_interval { start, end }
+mechanism/model/resolution/solver content digests
+unit_typed_deltas[]
+uncertainty_and_error_bounds
+conservation_report
+representation_lineage_refs[]
+deterministic_seed_ref (when used)
+previous_state_hash, resulting_state_hash
+schema_version, committed_at
 ```
 
-`world.perform` принимает `action_id`, `target_id` и типизированные параметры из action registry. Добавление нового предмета или рецепта не меняет tool schema.
+Physical quantities сериализуются как `{value, unit}` с contract-defined numeric encoding. Dimensionless values дополнительно несут semantic kind; голое число не становится authoritative quantity. Event payload хранит facts и reasons, не художественный summary.
 
-В protocol V1 значения `PerformAction.parameters` передаются строками и проверяются по `parameters_schema_json`. Числа кодируются десятичной строкой; схема обязана объявлять `type: string` и точный `pattern`, чтобы Brain не отправлял несовместимый JSON number.
+## 3. Required event families
 
-Stage 4B.3 регистрирует `object.clean` и `object.consume_quantity`. Наблюдаемые причинные состояния имеют явные целочисленные единицы: `charge_permille`, `cleanliness_permille`, `quantity_amount` + `quantity_unit`, `temperature_millicelsius`. Handshake объявляет capability `causal-object-condition-v1`.
-Stage 4B.4 добавляет data-defined пассивную эволюцию. Событие `passive_conditions_advanced` хранит точный UTC-интервал, обновлённые состояния объектов и дробные остатки целочисленной интеграции. Границы завершения действий обрабатываются до смены power/open/placement, поэтому replay и разные частоты tick дают одинаковое причинное состояние.
+- `ExternalStimulusCommitted`;
+- `CanonicalIntervalAdvanced`;
+- `MechanismTransitionCommitted`;
+- `ResolutionChangeRequested`, `ResolutionChanged`, `ResolutionChangeRolledBack`;
+- `CortexFrameProjected`, `CortexProposalRecorded`, `CognitiveDispositionRecorded`, `CognitiveStateAdopted`;
+- `MotorPlanValidated`, `PhysicalActionTransitioned`;
+- `OrganismCreated`, `ConsciousnessAttached`/`Detached`;
+- `CapacityExceeded`, `ConservationViolation`, `NonConvergence`, `SafeStopEntered`;
+- `ArtifactRegistered` and migration/recovery evidence.
 
-Perception публикует `receiving_power` для chargeable-предметов. Handshake объявляет capability `passive-object-evolution-v1`.
+`CortexProposalRecorded` не содержит state delta. `CognitiveStateAdopted` обязан причинно ссылаться на disposition `Accepted`. `ResolutionChanged` содержит old/new contract digests, seed, lift/projection evidence, conserved quantities, observable comparison, lineage и rollback handle.
 
+## 4. Replay modes
 
-Admin-команды находятся в отдельном сервисе и не публикуются Brain.
+Fast replay проверяет hash-chain и применяет committed unit-typed deltas. Audit replay загружает artifacts по digest, повторно запускает canonical mechanisms и сравнивает deltas, uncertainty, conservation и resulting hash.
 
-## 9. BrainDecision
+Partitioning, worker count и wall-clock mode не являются event semantics. Canonical reduction ordering входит в mechanism scheduling contract. Missing artifact, digest mismatch или расхождение audit replay создаёт `SafeStop`; replay не выбирает «похожую» текущую model version.
 
-Один decision cycle содержит:
+## 5. Storage and timelines
 
-- `decision_id`;
-- triggering events;
-- `perception_id` и `world_version`;
-- версии identity/context/retrieval blocks;
-- model profile и request fingerprint;
-- выбранную команду;
-- краткое структурированное explanation summary;
-- расход токенов, cache hit и latency;
-- итог `applied`, `discarded_stale`, `rejected` или `failed`.
+Новая многомасштабная V1 использует отдельную timeline и DB. Прежняя DB монтируется immutable archive; никакой migration step не меняет её in place. Snapshots — content-addressed acceleration artifacts и всегда проверяются against event hash-chain.
 
-Raw chain-of-thought не требуется и не хранится как explanation. Debug mode может временно сохранять технический request/response в защищённом хранилище.
+Timeline metadata связывает world specification, package manifest, artifact roots, schema versions и parent/fork provenance. Schema не ограничивает entity count. Storage admission возвращает явный `CapacityExceeded` до partial commit.
 
-## 10. While-thinking buffer
+## 6. Compatibility migration
 
-Пока Brain думает:
+Migration выполняется четырьмя обратимыми стадиями:
 
-- World Engine продолжает timer/background events;
-- новые события добавляются в ограниченный buffer;
-- критическое событие помечает decision как invalidated;
-- обычные события ждут следующего perception;
-- по возврате ответа Brain сверяет `world_version`;
-- устаревшая команда не адаптируется автоматически и не применяется частично.
+1. **Expand** — добавить V2 protocol envelopes, artifact store, новые event/state schemas и dual readers, сохранив текущий `makise.v1` wire API.
+2. **Migrate** — скомпилировать legacy world/package в immutable `legacy-makise` bundle; назначить прежнему single agent явные `organism_id` и `consciousness_id`; записывать только новую timeline.
+3. **Verify** — доказать чтение старых protobuf wire fixtures, world packages, SQLite DB/snapshots и event logs; сравнить legacy projections и archive hashes.
+4. **Contract** — удалить только dual-write/temporary migration tooling после release evidence. V1 reader и immutable archive в этой работе не удаляются.
 
-## 11. Phone protocol
+Rollback переключает запуск на legacy executable/archive либо на предыдущий new-V1 release. Он не downcast-ит и не переписывает новые biological events.
 
-Входящее сообщение создаёт notification event. В perception попадают только разрешённые preview-данные. Полный текст выдаётся после валидного `phone.read_message`, затем отправляется Telegram read acknowledgement.
+## 7. Failure and idempotency
 
-Исходящий ответ требует:
+Повтор `request_id` с тем же canonical payload возвращает исходный receipt; тот же ID с другим payload отклоняется. Optimistic version mismatch, invalid units, missing preconditions, privacy violation, non-convergence, capacity failure и conservation failure имеют разные typed errors.
 
-- прочитанного или явно выбранного контекста;
-- privacy check;
-- доступного телефона и сети;
-- ресурсов внимания/рук/речи по формату;
-- отдельного durable outbox event до отправки;
-- идемпотентного reconciliation с Telegram после timeout.
+Timeout транспорта не означает failure commit. Client сначала запрашивает receipt/events по ID. Subscriber после lag продолжает с durable `after_seq`. Recovery report перечисляет verified snapshot, replayed range, required artifacts, pending safe stops и никаким образом не запускает cognition.
 
-## 12. Memory protocol
+## 8. Phase 0 schemas versus wire protocol
 
-Memory ingest использует `subjective_event_id` как idempotency key. Retrieval-запрос содержит identity, текущую аудиторию, цели, темы, сущности, временную область и token budget.
-
-Ошибки 400/422 означают ошибку контракта и не повторяются бесконечно. 429/5xx используют ограниченный exponential backoff с jitter. Невручённые события остаются в durable outbox.
-
-## 13. Provider adapter protocol
-
-Профиль модели объявляет:
-
-- native tools;
-- structured output/JSON schema;
-- streaming;
-- cache hints и метрики cache tokens;
-- context/output limits;
-- поддерживаемые роли и мультимодальность;
-- правила интерпретации HTTP/status ошибок.
-
-При отсутствии надёжного function calling используется строгий JSON envelope, локальная валидация и не более одной попытки исправления формата. Три неуспеха не создают бесконечный цикл: Brain переходит в контролируемую паузу.
-
-## 14. Backpressure и лимиты
-
-- Все очереди ограничены и имеют метрики заполнения.
-- Критические технические события не вытесняются пользовательским спамом.
-- Массовые уведомления агрегируются без автоматического чтения текста.
-- Медленный subscriber восстанавливается по event log, а не удерживает writer thread.
-- Oversized payload отклоняется до десериализации вложенных данных, насколько позволяет transport.
-
-## 15. Эволюция схем
-
-- Поля Protobuf не переиспользуются после удаления.
-- Breaking change создаёт новый service/package version.
-- Event types имеют собственную версию и upcaster chain.
-- Старые события не переписываются.
-- Unknown event блокирует replay с диагностикой.
-- Handshake проверяет protocol range, identity, world definition hash и client capabilities.
-
-## 16. Health и наблюдаемость
-
-Каждый сервис предоставляет локальные `liveness`, `readiness` и version info. Метрики не содержат текстов сообщений или памяти.
-
-Обязательные показатели:
-
-- RPC latency и error rate;
-- command deduplication;
-- stale decision count;
-- event lag и queue depth;
-- DB commit latency;
-- provider latency, tokens, cost и cache hit;
-- memory retrieval hits/latency;
-- backup/replay status.
-
+JSON Schemas в [contracts/schemas](contracts/schemas) определяют artifact contracts и fixtures до runtime. Они не являются разрешением менять существующий protobuf в Phase 0. Wire evolution начинается только по migration sequence после contract gate и сохраняет нынешние field numbers/readers.

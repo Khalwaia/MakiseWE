@@ -1,0 +1,18 @@
+{
+  "makise.mechanism-contract.v1": [
+    "contracts/fixtures/mechanisms/minimal-mammalian-transport.json"
+  ],
+  "makise.resolution-contract.v1": [
+    "contracts/fixtures/resolutions/cohort-to-individual-cell.json",
+    "contracts/fixtures/resolutions/population-to-individual-neuron.json"
+  ],
+  "makise.morphotype-definition.v1": [
+    "contracts/fixtures/morphotypes/human-minimal.json",
+    "contracts/fixtures/morphotypes/neko-minimal.json"
+  ],
+  "makise.cognitive-decision.v1": [
+    "contracts/fixtures/cognition/accepted.json",
+    "contracts/fixtures/cognition/rejected.json",
+    "contracts/fixtures/cognition/deferred.json"
+  ]
+}

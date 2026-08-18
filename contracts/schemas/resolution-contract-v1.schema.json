@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://makise.local/contracts/resolution-contract-v1.schema.json",
+  "title": "ResolutionContract V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "resolution_id", "content_digest", "represented_entities",
+    "aggregation_rules", "refinement_rules", "state_lift", "state_projection",
+    "conserved_quantities", "observable_continuity_rules",
+    "uncertainty_transformation", "trigger", "preconditions",
+    "required_compute_estimate", "rollback_path", "artifact_model_compatibility",
+    "validation_example"
+  ],
+  "properties": {
+    "schema_version": { "const": "makise.resolution-contract.v1" },
+    "resolution_id": { "$ref": "#/$defs/id" },
+    "content_digest": { "$ref": "#/$defs/digest" },
+    "represented_entities": {
+      "type": "object", "additionalProperties": false,
+      "required": ["coarse_kind", "fine_kind"],
+      "properties": {
+        "coarse_kind": { "$ref": "#/$defs/id" },
+        "fine_kind": { "$ref": "#/$defs/id" }
+      }
+    },
+    "aggregation_rules": { "$ref": "#/$defs/rules" },
+    "refinement_rules": { "$ref": "#/$defs/rules" },
+    "state_lift": {
+      "type": "object", "additionalProperties": false,
+      "required": ["algorithm", "deterministic_seed_required", "preserves_lineage"],
+      "properties": {
+        "algorithm": { "type": "string", "minLength": 1 },
+        "deterministic_seed_required": { "const": true },
+        "preserves_lineage": { "const": true }
+      }
+    },
+    "state_projection": {
+      "type": "object", "additionalProperties": false,
+      "required": ["algorithm", "stores_refinement_provenance", "preserves_lineage"],
+      "properties": {
+        "algorithm": { "type": "string", "minLength": 1 },
+        "stores_refinement_provenance": { "const": true },
+        "preserves_lineage": { "const": true }
+      }
+    },
+    "conserved_quantities": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["quantity_id", "unit", "tolerance"],
+        "properties": {
+          "quantity_id": { "$ref": "#/$defs/id" },
+          "unit": { "type": "string", "minLength": 1 },
+          "tolerance": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "observable_continuity_rules": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["observable_id", "unit", "absolute_error_bound"],
+        "properties": {
+          "observable_id": { "$ref": "#/$defs/id" },
+          "unit": { "type": "string", "minLength": 1 },
+          "absolute_error_bound": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "uncertainty_transformation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["lift", "projection"],
+      "properties": {
+        "lift": { "type": "string", "minLength": 1 },
+        "projection": { "type": "string", "minLength": 1 }
+      }
+    },
+    "trigger": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "preconditions": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "required_compute_estimate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["cpu_core_milliseconds", "ram_bytes", "storage_bytes"],
+      "properties": {
+        "cpu_core_milliseconds": { "type": "integer", "minimum": 0 },
+        "ram_bytes": { "type": "integer", "minimum": 0 },
+        "storage_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "rollback_path": {
+      "type": "object", "additionalProperties": false,
+      "required": ["target_representation", "requires_projection", "safe_stop_on_failure"],
+      "properties": {
+        "target_representation": { "$ref": "#/$defs/id" },
+        "requires_projection": { "const": true },
+        "safe_stop_on_failure": { "const": true }
+      }
+    },
+    "artifact_model_compatibility": {
+      "type": "object", "additionalProperties": false,
+      "required": ["mechanism_digests", "solver_digests", "missing_artifact_policy"],
+      "properties": {
+        "mechanism_digests": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/digest" } },
+        "solver_digests": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/digest" } },
+        "missing_artifact_policy": { "const": "safe_stop" }
+      }
+    },
+    "validation_example": {
+      "type": "object", "additionalProperties": false,
+      "required": ["seed", "coarse_state", "fine_state", "projected_state", "lineage", "conservation_checks", "observable_checks"],
+      "properties": {
+        "seed": { "type": "integer", "minimum": 0 },
+        "coarse_state": { "$ref": "#/$defs/numericState" },
+        "fine_state": { "$ref": "#/$defs/numericState" },
+        "projected_state": { "$ref": "#/$defs/numericState" },
+        "lineage": {
+          "type": "object", "additionalProperties": false,
+          "required": ["coarse_entity_id", "fine_entity_ids", "projection_provenance_digest"],
+          "properties": {
+            "coarse_entity_id": { "$ref": "#/$defs/id" },
+            "fine_entity_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+            "projection_provenance_digest": { "$ref": "#/$defs/digest" }
+          }
+        },
+        "conservation_checks": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/check" } },
+        "observable_checks": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/check" } }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9._-]*$" },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "rules": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "numericState": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "type": "number" },
+      "propertyNames": { "$ref": "#/$defs/id" }
+    },
+    "check": {
+      "type": "object", "additionalProperties": false,
+      "required": ["quantity_id", "unit", "coarse_value", "fine_value", "projected_value", "absolute_error_bound"],
+      "properties": {
+        "quantity_id": { "$ref": "#/$defs/id" },
+        "unit": { "type": "string", "minLength": 1 },
+        "coarse_value": { "type": "number" },
+        "fine_value": { "type": "number" },
+        "projected_value": { "type": "number" },
+        "absolute_error_bound": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}
