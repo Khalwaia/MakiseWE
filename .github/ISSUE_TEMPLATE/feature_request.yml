@@ -1,0 +1,51 @@
+name: Feature proposal
+description: Propose a scoped capability aligned with the current roadmap
+title: "[Proposal]: "
+labels: [proposal]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Observable outcome
+      description: What new behavior should a user or caller observe?
+    validations:
+      required: true
+  - type: textarea
+    id: seam
+    attributes:
+      label: Public seam
+      description: Which stable interface exposes and validates the behavior?
+    validations:
+      required: true
+  - type: textarea
+    id: causal
+    attributes:
+      label: Causal impact
+      description: Inputs, outputs, authoritative quantities, conservation, provenance, uncertainty, and failure behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and non-goals
+      description: Identify roadmap phase, required gate, and explicit exclusions.
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation evidence
+      description: Reference data, fixture, worked example, and proposed red/green test.
+    validations:
+      required: true
+  - type: checkboxes
+    id: invariants
+    attributes:
+      label: Invariants
+      options:
+        - label: This proposal does not add an arbitrary normalized authoritative score.
+          required: true
+        - label: This proposal does not add morphotype-specific runtime branching.
+          required: true
+        - label: This proposal does not let LLM output mutate authoritative state directly.
+          required: true

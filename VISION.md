@@ -8,13 +8,15 @@
 
 Makise — персистентная многомасштабная причинная симуляция мира, организмов и отдельных сознаний. Её цель — непрерывная жизнь, где физические, биологические и когнитивные последствия возникают из проверяемых механизмов, а не из художественного описания LLM или набора игровых шкал.
 
+Simulation образует единый causal graph с обратными связями и mixed resolution. Physical world, organism, tissue/cellular, molecular/biochemical, neural/brain, consciousness, motor control и physical action являются causal domains, а не последовательными стадиями tick или независимыми engines. Durable causal timeline хранит переходы всех domains и сама не является `WORLD EVENTS` layer.
+
 World Engine остаётся единственным автором объективного physical/biological state. Сознание воспринимает только доступные observables, может ошибаться, предлагает appraisal, goals и intentions, но не назначает исходы мира или тела.
 
 ## 2. V1 задаёт стартовое разрешение, а не предел
 
 `CellCohort` и `NeuralPopulation` — начальные adapters. Будущие `IndividualCellSet` и `IndividualNeuronNetwork` подключаются к тем же causal contracts. Органы, ткани и brain regions могут одновременно работать в разных разрешениях.
 
-Смена представления всегда является durable `ResolutionChanged` с deterministic lift/projection, conservation proof, uncertainty transformation, lineage и rollback path. LOD, sleeping и offloading допустимы только как такие transitions; вычислительная нагрузка не разрешает ослабить causal model.
+Смена представления всегда является explicit causally triggered durable `ResolutionChanged` с deterministic trigger, lift/projection, conservation proof, uncertainty transformation, lineage и rollback path. Trigger следует из contract validity, uncertainty, divergent lineage или требований взаимодействия, а не из субъективной «важности». LOD, sleeping и offloading допустимы только как такие transitions; вычислительная нагрузка не разрешает ослабить causal model.
 
 Каждый механизм содержит provenance, uncertainty, validity range и upgrade path. `expert_estimate` допустим как честно маркированный источник. Формулировка «максимально реалистично» без области применимости и данных запрещена.
 

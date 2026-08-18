@@ -10,7 +10,13 @@ World Engine является единственным автором геоме
 
 V1 начинается в квартире, но apartment boundary не является границей causal model. Семантические rooms/anchors текущего runtime сохраняются как compatibility projection. Phase 2 вводит метрическую 3D geometry, materials, mass, inertia, articulated bodies и active physics islands; authoritative действия перестают зависеть от `duration_ms`, cleanliness/charge/resource scores.
 
-## 2. Среда
+## 2. Causal domains и события
+
+Мир, organisms и consciousnesses образуют единый causal graph, а не линейный L0–L7 pipeline. Physical world, organism, tissue/cellular, molecular/biochemical, neural/brain, consciousness, motor control и physical action — пересекающиеся causal domains. Mechanisms могут соединять несколько domains через stable causal ports; scheduler не обязан посещать каждый domain на каждом interval.
+
+Durable causal timeline не является слоем `WORLD EVENTS`. Дождь создают environment/physical mechanisms; открытие двери — cognitive, motor, contact и articulated-object mechanisms; падение — gravity/contact mechanisms. Их committed transitions попадают в общую timeline вместе с causes, artifact digests, unit deltas, uncertainty, conservation и state hash.
+
+## 3. Среда
 
 Целевая квартира моделирует только механизмы, нужные проверяемым сценариям:
 
@@ -22,7 +28,7 @@ V1 начинается в квартире, но apartment boundary не явл
 
 Каждая величина имеет units, provenance, uncertainty и validity range. Упрощённая модель допустима, если её causal ports стабильны и определён upgrade path. Новая комната или предмет не требует нового engine branch.
 
-## 3. Organism composition
+## 4. Organism composition
 
 Organism собирается из `MorphotypeDefinition`, phenotype parameters и набора mechanisms. Anatomy graph связывает organs, tissues, compartments, vasculature, innervation и development. Разные узлы графа могут иметь разные active resolutions.
 
@@ -34,7 +40,9 @@ Organism собирается из `MorphotypeDefinition`, phenotype parameters 
 
 Состояние organism не является одной health/energy шкалой. Используются unitful mass, amounts, concentrations, pressures, flows, temperatures, energies, counts и определённые безразмерные quantities.
 
-## 4. Human и Neko
+Resolution повышается или понижается только через explicit causally triggered `ResolutionChanged`. Trigger задаётся contract validity/uncertainty, divergent lineage, требованиями causal interaction или validation policy, а не расстоянием до камеры или произвольной важностью. Lift/projection сохраняют declared quantities, moments, lineage и observables внутри error bounds.
+
+## 5. Human и Neko
 
 Human и Neko — самостоятельные root packages, а не варианты runtime type.
 
@@ -49,7 +57,7 @@ Neko V1 самостоятельно задаёт mammalian anatomy и отли�
 
 Общие mammalian mechanisms переиспользуются по contract/digest. Compatibility reproduction задаётся morphotype data, не условием в engine.
 
-## 5. Жизненный охват V1
+## 6. Жизненный охват V1
 
 Фазы последовательно вводят:
 
@@ -63,25 +71,25 @@ Neko V1 самостоятельно задаёт mammalian anatomy и отли�
 
 Механизм добавляется только когда нужен вертикальному сценарию и приходит вместе с contract, observables, validation data и upgrade path.
 
-## 6. Время и движение причин
+## 7. Время и движение причин
 
 Simulation time представляется каноническими интервалами. Event boundaries, mechanism scheduling и deterministic random streams одинаковы для 1:1, acceleration, restart, recovery и audit replay. Wall clock управляет скоростью production, но не меняет переходы.
 
 Действие начинается с принятого intention и validated motor plan. Оно развивается closed-loop через sensors, contacts и body dynamics; World Engine определяет успех и побочные последствия. Downtime не создаёт решений или восприятий от имени Consciousness.
 
-## 7. Несколько сознаний
+## 8. Несколько сознаний
 
 Каждое Consciousness имеет отдельные perception, cognitive decision, memory и privacy streams. Несколько сознаний видят один objective world с разных тел и точек доступа. Shared world event не становится одинаковым субъективным опытом автоматически.
 
 Commitments принимаются только CognitiveGate соответствующего сознания. Интимные и репродуктивные действия требуют принятых intentions всех участников и физической допустимости; administrative authority не заменяет consent.
 
-## 8. Capacity и fidelity
+## 9. Capacity и fidelity
 
 Schema не ограничивает число organisms, cells, neurons или consciousnesses. Admission control сравнивает declared compute estimate с доступными ресурсами. Workstation release target: Human + Neko, два активных Consciousness, production 1:1 на 16 CPU cores/32 GB RAM, World Engine не более 24 GB.
 
 При исчерпании capacity система сообщает `CapacityExceeded`. Она не пропускает mechanisms, не меняет resolution и не переводит active entities в sleeping/offloaded representation без явного transition и conservation proof.
 
-## 9. Validation horizons
+## 10. Validation horizons
 
 24-часовой Human/Neko slice — первый end-to-end contract. 365 accelerated days проверяют seasons, sleep, metabolism, reproductive cycles, infections, multiple organisms и replay integration, но не служат доказательством realism.
 

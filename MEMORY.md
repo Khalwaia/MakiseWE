@@ -1,171 +1,123 @@
-# Память Makise
+# Память и субъективная история Makise V1
 
-Статус: исторический companion document; когнитивные переходы superseded контрактами Phase 0
-Дата: 2026-08-05  
-Связанные документы: [VISION.md](VISION.md), [ARCHITECTURE.md](ARCHITECTURE.md), [SECURITY.md](SECURITY.md), [INVARIANTS.md](INVARIANTS.md)
-
-При конфликте с `CortexProposal`/`CognitiveDisposition`, запретом arbitrary
-normalized scores или моделью нескольких Consciousness нормативны
-[ARCHITECTURE.md](ARCHITECTURE.md), [PROTO.md](PROTO.md) и
-[INVARIANTS.md](INVARIANTS.md). Этот файл сохраняет прежнюю историю дизайна памяти.
+Статус: нормативный Phase 0 design; runtime memory появляется по roadmap
+Дата: 2026-08-19
+Связанные документы: [CONTEXT.md](CONTEXT.md), [ARCHITECTURE.md](ARCHITECTURE.md), [PROTO.md](PROTO.md), [SECURITY.md](SECURITY.md), [INVARIANTS.md](INVARIANTS.md)
 
 ## 1. Назначение
 
-`makise-memory` является отдельным экземпляром новой системы памяти. Он хранит субъективный опыт Makise и помогает вспоминать, но не является источником объективного состояния квартиры.
+Память хранит субъективную историю отдельного Consciousness: что было доступно восприятию, как это было интерпретировано, какие commitments были приняты и откуда получено знание. Она не является копией objective world state и не исправляет его.
 
-Память Мины не импортируется. Доступ к каталогам runtime Мины запрещён на уровне конфигурации, прав ОС и тестов.
+Каждое Consciousness имеет собственные perception, cognition, memory и privacy streams. Несколько сознаний могут наблюдать один world event по-разному или не наблюдать его вовсе. Organism может существовать без подключённого Consciousness; его physical/biological history при этом продолжается в World Engine.
 
-## 2. Разделение данных
+## 2. Границы authority
 
-| Слой | Содержание | Источник истины |
-|---|---|---|
-| Objective event log | фактически выполненные команды и изменения мира | `makise-world` |
-| Perception record | что было доступно чувствам Makise | `makise-world` |
-| Subjective event | что Makise заметила и как оценила | `makise-memory` |
-| Episodic memory | конкретные пережитые эпизоды | `makise-memory` |
-| Semantic memory | обобщённые знания и выводы | `makise-memory` |
-| Entity/relationship graph | люди, предметы, связи, доверие и происхождение данных | `makise-memory` |
-| Working memory | намерения, обещания, открытые темы и активный контекст | `makise-memory` + goal state мира |
-| Diary/self-reflection | авторские записи и изменения self-model | append-only diary + `makise-memory` |
+World Engine остаётся единственным автором objective physical, biological и neural state. Внешний stimulus, LLM response и cognitive decision входят в причинную историю через `WorldEngine::commit`.
 
-Поток:
+Memory service владеет только subjective records и derived retrieval indexes. Он не может:
 
-```text
-WorldEvent -> Perception -> SubjectiveEvent -> Memory ingest
-```
+- менять world, organism, neural или hormone state;
+- создавать perception без соответствующей доступности;
+- принимать goal, intention или commitment;
+- превращать model interpretation в факт;
+- назначать action outcome;
+- скрыто редактировать уже записанную историю.
 
-Событие, которое произошло вне восприятия, существует в objective log, но не становится воспоминанием до обнаружения или сообщения о нём.
+Objective event становится кандидатом subjective memory только после observer-specific projection. Память может содержать ошибочное убеждение, но обязана хранить source, confidence kind и связь с доступным evidence.
 
-## 3. Запись событий
-
-Каждый subjective event содержит как минимум:
-
-- стабильный `subjective_event_id`;
-- ссылку на один или несколько `world_event_id`;
-- время события и время восприятия;
-- источник/чувство;
-- канонический `content_text`;
-- значимость, эмоциональную оценку и уверенность;
-- сущности, темы и связанные цели;
-- provenance и privacy audience;
-- версию схемы.
-
-Текст и структурированная нагрузка должны описывать один и тот же факт. Сервис отклоняет противоречивый payload, но клиент обязан корректно передавать переносы строк и Unicode без изменения содержимого.
-
-Идемпотентный ingest предотвращает повторную запись при сетевом retry.
-
-## 4. Retrieval
-
-Retrieval объединяет:
-
-- векторную близость;
-- полнотекстовый поиск;
-- граф сущностей и отношений;
-- временную релевантность;
-- значимость и эмоциональную связь;
-- текущие цели и незавершённые обязательства;
-- использование и подтверждение воспоминания.
-
-Результаты проходят reranking и возвращаются с причиной попадания, уверенностью и provenance. Пустой результат является нормальным состоянием и диагностируется отдельно от ошибки сервиса.
-
-Memory service никогда не возвращает записи, которые нарушают аудиторию текущего действия.
-
-## 5. Забывание и консолидация
-
-- Сырые субъективные события сохраняются в архиве и не удаляются автоматически.
-- Доступность обычных воспоминаний постепенно уменьшается без повторения и связи с целями.
-- Эмоциональные, идентично значимые и часто вспоминаемые события затухают медленнее.
-- Похожие эпизоды периодически консолидируются в обобщённое знание или привычку.
-- Забывание означает снижение вероятности извлечения, а не уничтожение архива.
-- Противоречия хранят версии, источник и уверенность.
-- Повторное напоминание может увеличить доступность, не гарантируя абсолютную точность.
-
-Затухание вычисляется при ранжировании; система не переписывает ежедневно тексты и embeddings.
-
-## 6. Рабочая память и цели
-
-Рабочая память персистентна и не равна временному LLM transcript. Она хранит:
-
-- активные планы;
-- обещания и дедлайны;
-- незавершённые разговоры;
-- выбранные личные проекты;
-- блокирующие условия;
-- время следующего пересмотра;
-- актуальные сведения, необходимые дольше одного запроса.
-
-Цель становится обязательством только после явного `commit_goal`. Статусы:
+## 3. Causal flow
 
 ```text
-proposed -> active -> completed
-                   -> snoozed
-                   -> blocked
-                   -> abandoned
-                   -> expired
+Committed world transition
+  -> observer-specific Projection
+  -> perceived subjective event
+  -> CortexFrame and retrieval
+  -> CortexProposal
+  -> CognitiveDisposition
+  -> accepted interpretation or commitment event
+  -> append-only memory ingest
 ```
 
-Кандидаты имеют стабильный ID, причину, срочность, условия и deadline. World Engine фильтрует физически невозможное, а Makise выбирает среди жизнеспособного.
+`CortexProposal` может предложить memory interpretation. Только `CognitiveDisposition::Accepted` разрешает отдельную cognitive transition, после которой interpretation становится принятым belief или memory annotation. `Rejected`, `Deferred` и `NeedsRevision` сохраняются как decision evidence, но не меняют adopted memory state.
 
-## 7. Дневник
+## 4. Subjective record contract
 
-Дневник Makise:
+Каждая запись содержит как минимум:
 
-- создаётся только её собственным решением во время рефлексии;
-- описывает реально воспринятые события от первого лица;
-- может писаться после значимых событий, перед сном или не писаться в конкретный день;
+- стабильные `subjective_event_id` и `consciousness_id`;
+- ссылки на perception, cognitive disposition и доступные world transition IDs;
+- canonical simulation time и время записи;
+- modality/source и observer position;
+- structured subject/predicate/object либо versioned content payload;
+- provenance chain и artifact content digests;
+- privacy owner, audience и citation rules;
+- uncertainty model или определённую probability, если она нужна;
+- schema version и append hash.
+
+Текстовый summary является projection structured record. Он не заменяет source facts и не содержит скрытый chain-of-thought. Generic importance, valence, urgency или memory-strength scores не становятся authoritative state.
+
+## 5. Working cognition
+
+Рабочее состояние Consciousness хранит только принятые cognitive transitions:
+
+- active goals и intentions;
+- commitments и deadlines;
+- unresolved questions и conversations;
+- adopted plans и blocking conditions;
+- reconsideration triggers для deferred proposals;
+- identity-relevant beliefs с provenance.
+
+Proposal не равен commitment. LLM transcript не равен working memory. Истёкший provider request, restart или повторная доставка не создаёт новое принятое решение.
+
+## 6. Retrieval
+
+Retrieval является observer- и audience-aware projection. Он может комбинировать exact identifiers, full-text search, embeddings, entity relations, canonical time, active commitments и source reliability. Результат возвращает причины выбора, provenance и uncertainty; пустой результат является нормальным outcome.
+
+Retrieval не выдаёт:
+
+- records другого Consciousness без явного права;
+- скрытый objective state, которого наблюдатель не воспринимал;
+- сведения вне privacy audience;
+- debug/admin context как личное воспоминание;
+- model interpretation как подтверждённый внешний факт.
+
+Timeout или provider failure не заменяется выдуманной памятью. Решение без retrieval возможно только по явной policy и фиксируется в cognitive trace.
+
+## 7. Consolidation, learning and forgetting
+
+Raw subjective events и dispositions остаются append-only evidence. Consolidation создаёт новые derived records со ссылками на источники и mechanism/model digests. Она не переписывает прошлые записи.
+
+Forgetting означает изменение доступности retrieval или uncertainty, а не скрытое удаление evidence. Любая будущая модель consolidation/decay обязана иметь `MechanismContract`, validity range, validation data и resolution-upgrade path. Phase 0 не задаёт численную psychology model; Phase 6 добавляет нейробиологическую связь.
+
+## 8. Diary and self-reflection
+
+Diary entry создаётся только принятым intention соответствующего Consciousness. Она:
+
+- ссылается на реально доступные perceptions и memories;
+- написана от субъективного лица и может ошибаться;
 - является append-only;
-- исправление добавляется новой записью и не переписывает прошлое;
-- не содержит embeddings, технические payload и полный event log;
-- участвует в retrieval как важный субъективный источник;
-- не считается безошибочной объективной истиной.
+- исправляется новой записью;
+- не создаётся администратором или recovery process;
+- не считается objective truth.
 
-Ни World Engine, ни администратор не создают дневниковую запись за Makise.
+## 9. Privacy и изоляция нескольких сознаний
 
-## 8. Приватность и происхождение
+Privacy policy применяется до retrieval, context assembly и outgoing communication. Знание может влиять на внутреннее решение без права раскрыть его. Shared Organism или shared room не дают автоматический доступ к memory stream другого Consciousness.
 
-Каждое пользовательское сведение хранит:
+При attachment/detachment Consciousness World Engine фиксирует objective event, а memory service сохраняет continuity собственного stream. Перенос Consciousness между organisms требует отдельного post-Phase design и не подразумевается обычным restart.
 
-- источник;
-- владельца;
-- уровень конфиденциальности;
-- разрешённую аудиторию;
-- условия цитирования;
-- уверенность и время получения.
+## 10. Persistence, replay and recovery
 
-Личные сообщения по умолчанию приватны. Знание может влиять на внутреннее состояние Makise, не давая права пересказать его. Перед отправкой действует детерминированная проверка утечки.
+Subjective stream хранит causation links, schema versions и content digests. Fast recovery проверяет append chain и восстанавливает indexes из records. Audit связывает memory record с archived world projection, cognitive artifacts и dispositions.
 
-Makise может честно отказаться раскрывать сведения, не притворяясь, что ничего не знает.
+Downtime не создаёт perceptions, interpretations, diary entries или commitments. Недоставленные уже committed subjective events остаются в durable outbox и ingest-ятся идемпотентно после recovery.
 
-## 9. Cache-aware контекст
+Snapshot ускоряет загрузку, но не является единственным источником истории. Corruption, missing artifact или broken causation link вызывает diagnostic `SafeStop` соответствующего consumer; система не синтезирует правдоподобную замену.
 
-Порядок LLM-контекста:
+## 11. Migration
 
-1. стабильное ядро идентичности, политики и tool schemas;
-2. стабильный блок текущей сессии;
-3. динамический снимок восприятия и состояния;
-4. retrieval фиксированного бюджета и формата;
-5. последние события и текущая задача.
+Legacy single-agent memory компилируется в отдельный archive bundle с явными `organism_id` и `consciousness_id`. Новая V1 использует отдельные streams и dual readers. Legacy records не переписываются in place; rollback не downcast-ит новые cognitive events.
 
-История диалога использует блочную ротацию:
+## 12. Validation roadmap
 
-- закреплённый блок примерно 1500–2500 токенов;
-- отдельный растущий хвост;
-- ротация и summary только после достижения порога;
-- важные обещания до ротации переносятся в память;
-- каждый чат имеет своё окно, но сознание и память едины.
-
-Изменение retrieval создаёт miss только в динамическом хвосте и не должно ломать cache стабильного префикса.
-
-## 10. Доступность и ошибки
-
-- Таймаут retrieval не подменяется выдуманным воспоминанием.
-- Некорректный payload не приводит к потере события: он остаётся в durable outbox клиента до исправления или явного dead-letter решения.
-- Brain может продолжить только если политика разрешает решение без памяти; это отмечается в decision trace.
-- При длительной недоступности memory service новые subjective events сохраняются в durable очереди и доставляются по восстановлении.
-- Сервис имеет health/readiness endpoints и отдельные метрики ingest/retrieval.
-
-## 11. Резервирование
-
-Memory DB, working memory и diary входят в согласованный checkpoint личности. Резервные копии шифруются. Восстановление сначала выполняется без Telegram и проверяется совместно с соответствующим snapshot мира.
-
-Одновременный запуск двух writable-экземпляров с одним `identity_id` запрещён.
+Phase 0 проверяет schemas и cognitive fixtures. Phase 1 использует scripted cortex и accepted/rejected/deferred scenario. Phase 6 вводит causal consolidation, learning и decay mechanisms. Phase 7 проверяет privacy, relationships и несколько сознаний. Shadow launch с real LLM проверяет restart, downtime, provider failures и отсутствие прямой state mutation.

@@ -1,5 +1,6 @@
 ---
 status: accepted
+date: 2026-08-19
 ---
 
 # Canonical simulation time across execution modes

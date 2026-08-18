@@ -1,21 +1,13 @@
-# ADR-0002: World Engine — единственный автор истины
+---
+status: accepted
+date: 2026-08-05
+updated: 2026-08-19
+---
 
-- Статус: принято
-- Дата: 2026-08-05
+# World Engine is the sole objective-state authority
 
-## Решение
+World Engine остаётся единственным автором objective physical, biological и neural state. `WorldEngine::commit` — единственный mutation path для time, stimuli, model responses, actions, resolution changes и admin intents; transport-specific commands прежнего runtime становятся compatibility inputs этого глубокого module boundary.
 
-Объективное состояние изменяет только Rust makise-world. Brain, memory, panel
-и provider adapters отправляют типизированные команды с command_id,
-expected_world_version и TTL.
+Authoritative writer валидирует authority, expected version, canonical interval, contracts, units, conservation, artifact digests и capacity, затем атомарно фиксирует transition и state hash. Retry request идемпотентен; collision одного ID с другим payload отклоняется.
 
-Состоянием владеет один writer. Команда и её результат фиксируются в одной
-SQLite-транзакции вместе с событиями. Повтор той же команды возвращает прежний
-результат, а повтор ID с другим payload отклоняется.
-
-## Последствия
-
-- Сетевой timeout не означает, что команду можно создать заново.
-- LLM не может напрямую менять JSON/SQLite мира.
-- Replay является нормативным способом восстановления и проверки состояния.
-
+Следствия: Brain, memory, panel, providers и workers только предлагают input или читают projections; timeout не разрешает повторить действие под новым ID; replay остаётся нормативным восстановлением и audit mechanism.

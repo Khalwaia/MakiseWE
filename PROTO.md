@@ -53,9 +53,11 @@ Physical quantities сериализуются как `{value, unit}` с contrac
 - `MotorPlanValidated`, `PhysicalActionTransitioned`;
 - `OrganismCreated`, `ConsciousnessAttached`/`Detached`;
 - `CapacityExceeded`, `ConservationViolation`, `NonConvergence`, `SafeStopEntered`;
-- `ArtifactRegistered` and migration/recovery evidence.
+- `ArtifactRegistered`, `ArtifactActivationCommitted` and migration/recovery evidence.
 
 `CortexProposalRecorded` не содержит state delta. `CognitiveStateAdopted` обязан причинно ссылаться на disposition `Accepted`. `ResolutionChanged` содержит old/new contract digests, seed, lift/projection evidence, conserved quantities, observable comparison, lineage и rollback handle.
+
+`ArtifactActivationCommitted` возникает только из авторизованного admin intent и содержит old/new content digests, validation/shadow evidence, compatibility decision, canonical activation boundary и rollback target. Регистрация candidate не активирует его; audit replay до activation продолжает загружать прежний digest.
 
 ## 4. Replay modes
 

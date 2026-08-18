@@ -1,21 +1,13 @@
-# ADR-0001: отдельная система Makise
+---
+status: accepted
+date: 2026-08-05
+updated: 2026-08-19
+---
 
-- Статус: принято
-- Дата: 2026-08-05
+# Separate source, runtime and protected systems
 
-## Решение
+MakiseWE разрабатывается и запускается отдельно от любых других digital-person systems. Source checkout, development state, production runtime, secrets и denied external roots задаются deployment configuration, а не личными paths в коде или документации.
 
-Makise разрабатывается в /home/artem/makise, будущий runtime размещается в
-/home/artem/makise_run. Код, тесты и deployment не используют runtime Мины.
+До открытия DB, socket или external connection общий path guard проверяет absolute normalized path, traversal, symlink и mount aliases против denied roots. Production дополнительно использует отдельного OS principal и filesystem permissions. Неоднозначность заканчивается отказом запуска, не fallback.
 
-В каждом процессе до открытия БД и внешнего соединения действует общий path
-guard. Запрещённый корень сравнивается лексически без чтения его метаданных.
-Разрешённый кандидат отдельно канонизируется, чтобы обнаруживать symlink-обход.
-Дополнительную границу в production обеспечивает отдельный OS user.
-
-## Последствия
-
-- Нельзя импортировать дневник, память, TDLib session или конфигурацию Мины.
-- Test/simulation получают отдельные identity ID и временные каталоги.
-- Любая неоднозначность пути приводит к отказу запуска, а не к fallback.
-
+Следствия: legacy data, diary, memory, messaging sessions и secrets не импортируются неявно; tests используют temporary roots и synthetic identities; repository fixtures не содержат production paths или personal data.

@@ -26,9 +26,25 @@ _Avoid_: morphotype, skin
 Версионированное причинное правило с объявленными входами, выходами, областью применимости, неопределённостью и отказами.
 _Avoid_: subsystem score, hidden rule
 
+**CausalGraph**:
+Единая сеть authoritative state и Mechanism, в которой последствия могут пересекать масштабы и возвращаться обратной связью.
+_Avoid_: linear pipeline, stack of engines
+
+**CausalDomain**:
+Область карты CausalGraph, группирующая state и Mechanism по масштабу или причинной роли без задания порядка исполнения или владельца.
+_Avoid_: execution stage, isolated engine
+
+**DurableCausalTimeline**:
+Упорядоченная сохраняемая история CausalTransition всех CausalDomain; сама не является уровнем симуляции.
+_Avoid_: world-events layer, event subsystem
+
 **Resolution**:
 Явный способ представления одних и тех же причинных сущностей и величин с заданными правилами refinement, projection и сохранения.
 _Avoid_: quality setting, detail level
+
+**ResolutionTransition**:
+Явное причинно вызванное изменение Resolution с детерминированным trigger, conservation proof, uncertainty transformation, lineage и rollback.
+_Avoid_: automatic LOD, importance boost
 
 **Compartment**:
 Ограниченная область, внутри которой состояние вещества или поля считается однородным в пределах заявленной неопределённости.

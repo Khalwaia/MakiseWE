@@ -10,6 +10,12 @@ version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-only"
 rust-version = "1.97"
+description = "Persistent multi-scale causal simulation of worlds, organisms, and consciousnesses"
+homepage = "https://github.com/Khalwaia/MakiseWE"
+repository = "https://github.com/Khalwaia/MakiseWE"
+readme = "README.md"
+keywords = ["simulation", "causal-model", "artificial-life", "event-sourcing"]
+categories = ["simulation"]
 
 [workspace.dependencies]
 anyhow = "1.0"
@@ -28,4 +34,3 @@ tokio-stream = { version = "0.1", features = ["net"] }
 tonic = { version = "0.14", features = ["transport"] }
 tonic-prost = "0.14"
 tower = { version = "0.5", features = ["util"] }
-

@@ -13,3 +13,11 @@
 /secrets/
 /.env
 
+# Local agent tooling is not part of public source distribution.
+/.agents/
+/skills-lock.json
+
+# Common local artifacts.
+.DS_Store
+*.log
+/coverage/

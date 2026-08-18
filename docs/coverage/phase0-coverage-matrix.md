@@ -4,6 +4,7 @@
 
 | Area/mechanism | Phase 0 resolution/representation | Contract observables | Validation data in Phase 0 | Unknown or invalid outside range | Planned upgrade |
 |---|---|---|---|---|---|
+| causal topology | one feedback graph; L0–L7 as domains; timeline cross-cutting | causes, interval, digests, deltas, uncertainty, conservation, state hash | normative ADR/invariants + public-doc contract test | runtime dependency graph and scheduling | Phase 1 minimal graph; Phase 8 optimized scheduler |
 | mammalian mass accounting example | `CellCohort` ports only | total cell count/mass, oxygen amount | schema fixture + dimensional/conservation assertions | no tissue kinetics or clinical calibration | Phase 1 minimal mechanism, Phase 3 organ systems |
 | cell representation | cohort → `IndividualCellSet` example | count, mass, charge, O₂ amount, mean cell mass | deterministic lift/projection fixture, lineage and continuity assertions | cell cycle, mutation, spatial contacts | Phase 4 adaptive cohorts/individual lineages |
 | neural representation | `NeuralPopulation` → `IndividualNeuronNetwork` example | neuron count, mean firing rate, total transmitter amount | deterministic lift/projection fixture and declared error bound | spikes, synapses, plasticity, regional calibration | Phase 6 replaceable neural implementations |
@@ -11,6 +12,7 @@
 | Neko morphotype | independent schema root | ear/tail anatomy and hearing/balance/thermal bindings | minimal fixture and isolation assertions | feline-human hybrid empirical reference ranges | focused expert estimates, then measured/calibrated replacements |
 | cognition | proposal + disposition envelope | decision status/reasons and optional adopted goal/intention | accepted/rejected/deferred fixtures | neural gate dynamics and real provider behavior | Phase 1 scripted cortex; Phase 6 neurobiology; shadow launch real LLM |
 | canonical time/replay | contract/document design | transition stream, state hash, conservation report | link/schema gates only | runtime scheduler equivalence not yet implemented | Phase 1 execution matrix |
+| model improvement | external control-plane design only | candidate digest, evidence, activation old/new digests, rollback | ADR/protocol/invariant contract only | candidate generation, evaluation automation, operational approval | post-V1 research; no autonomous production activation in V1 |
 | physical apartment | legacy anchors only, non-normative for new state | none in Phase 0 | scenario definition | geometry/material/physics fidelity | Phase 2 metric embodiment |
 | disease/injury/drugs/death | not implemented | contract families named only | long-horizon/rare-event plan | all biological parameters and solvers | Phase 4 |
 | reproduction/development/aging | not implemented | lifecycle events named only | horizon definitions | compatibility, fetal and lifespan calibration | Phase 5 |

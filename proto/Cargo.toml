@@ -4,6 +4,12 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
+description.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 build = "build.rs"
 
 [dependencies]
@@ -15,4 +21,3 @@ tonic-prost.workspace = true
 [build-dependencies]
 protoc-bin-vendored = "3.2"
 tonic-prost-build = "0.14"
-

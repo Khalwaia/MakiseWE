@@ -11,7 +11,7 @@ Deliverables:
 - определить ubiquitous language в [CONTEXT.md](CONTEXT.md);
 - согласовать VISION, ARCHITECTURE, WORLD, ROADMAP, INVARIANTS и protocol design;
 - сохранить старый [STAGE_5.md](STAGE_5.md) с пометкой superseded;
-- зафиксировать ADR stable causal interfaces/resolution upgrades, unitful state, independent morphotypes, cognitive acceptance, canonical time и content-addressed artifacts;
+- зафиксировать ADR stable causal interfaces/resolution upgrades, unitful state, independent morphotypes, cognitive acceptance, canonical time, content-addressed artifacts и unified causal graph;
 - добавить JSON Schemas для `MechanismContract`, `ResolutionContract`, `MorphotypeDefinition`, `CortexProposal`, `CognitiveDisposition` и decision envelope;
 - добавить fixtures Human, Neko, двух resolution upgrades и accepted/rejected/deferred proposals;
 - определить [24-часовой Phase 1 scenario](docs/scenarios/phase1-24h-human-neko.md) и [coverage matrix](docs/coverage/phase0-coverage-matrix.md).
@@ -21,9 +21,11 @@ Deliverables:
 Gate:
 
 - нормативные документы называют V1 resolution начальным, не постоянным;
+- durable timeline отделена от L0–L7 causal domains; domains образуют единый feedback graph, не последовательный pipeline;
 - все fixtures валидируются schemas;
 - Human/Neko — independent roots, runtime design не содержит morphotype-specific branches;
 - оба upgrade examples сохраняют quantities, lineage и observables в error bounds;
+- каждый resolution transition имеет deterministic contract trigger; hidden LOD и субъективная «важность» запрещены;
 - rejected/deferred proposal не становится cognitive state, accepted требует отдельной transition;
 - arbitrary normalized scores запрещены;
 - diff содержит только docs, schemas, fixtures, schema-validation tests и необходимую test dependency metadata;
@@ -72,6 +74,10 @@ Gate: `NeuralPopulation` и будущий `IndividualNeuronNetwork` имеют 
 Добавить sparse SoA, dependency graph, batching/SIMD, deterministic reduction, resolution-aware scheduling, explicit sleeping/offloading и stateless compute workers. Entity schema-cap запрещён; capacity sweep продолжается до честного `CapacityExceeded`.
 
 Workstation gate: Human + Neko, два active Consciousness, 1:1 на 16 cores/32 GB, World Engine ≤24 GB. Distributed authoritative state требует отдельного post-V1 ADR и parity с single-node reference.
+
+## Post-V1 research — validated model improvement
+
+Внешний control plane может анализировать validation/shadow evidence и создавать immutable candidate physics, biology или brain artifacts. Candidate не меняет authoritative state и не активируется сам: contract suites, shadow run и explicit approval предшествуют авторизованному admin intent через `WorldEngine::commit`. Автономное изменение production-кода и production activation без approval не входят в V1.
 
 ## Release gates
 

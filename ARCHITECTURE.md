@@ -50,7 +50,43 @@ Phase 0 описывает этот интерфейс, но не заменяе
 
 Память не исправляет objective state. Objective event не становится субъективной памятью без доступного perception. Администратор отправляет intent через `commit`, а не пишет DB.
 
-## 3. MechanismContract
+## 3. Единый causal graph
+
+MakiseWE моделирует один causal graph с обратными связями и mixed resolution. Уровни L0–L7 являются causal domains — картой состояния и mechanisms, — но не последовательными стадиями tick, независимыми engines или владельцами отдельных DB:
+
+```text
+L0  PHYSICAL WORLD
+    geometry, matter, mass, energy, temperature, air, light, sound, fluids
+
+L1  ORGANISM
+    anatomy, organs, compartments, circulation, respiration, metabolism
+
+L2  TISSUE / CELLULAR
+    tissues, CellCohort, individual cells, immune cells, receptors, targets
+
+L3  MOLECULAR / BIOCHEMICAL
+    substances, amounts, concentrations, reactions, transport, signaling, PK/PD
+
+L4  NEURAL / BRAIN
+    brain regions, NeuralPopulation, neurotransmitters, autonomic control
+
+L5  CONSCIOUSNESS
+    perception, interoception, memory, CortexFrame, proposal disposition
+
+L6  MOTOR CONTROL
+    accepted intention, motor plan, physical validation, neural/muscular control
+
+L7  PHYSICAL ACTION
+    muscles, articulated body, contacts, object interaction, physical outcome
+```
+
+Связи L0–L5 двусторонние; принятая intention проходит L6/L7 и изменяет L0, после чего новые physical observables могут снова войти в perception. Один mechanism может связывать несколько domains через stable causal ports: thermoregulation пересекает environment, circulation, endocrine и neural control; tissue damage связывает material mechanics, nociception, neural processing и perception. `L7 PHYSICAL ACTION` описывает область причинных переходов, но не дублирует владение muscles из Organism или contacts из Physical World.
+
+`WORLD EVENTS` не является simulation layer. Дождь, открытие двери, падение объекта, решение и движение руки — committed `CausalTransition` соответствующих mechanisms. Durable causal timeline поперечно записывает transitions всех domains: causes, canonical interval, artifact digests, unit-typed deltas, uncertainty, conservation report и state hash. Она не исполняет physics и не является нижним L0.
+
+Общий tick не обязан проходить L0–L7 по порядку. Canonical scheduler запускает только причинно готовые mechanisms по их scheduling rules; authoritative writer проверяет и фиксирует результаты.
+
+## 4. MechanismContract
 
 Механизм загружается только при наличии всех полей:
 
@@ -70,15 +106,17 @@ Phase 0 описывает этот интерфейс, но не заменяе
 
 Schema: [mechanism-contract-v1.schema.json](contracts/schemas/mechanism-contract-v1.schema.json). Неизвестное, отсутствующее или несовместимое поле является load error; runtime не дополняет неполный контракт эвристикой.
 
-## 4. ResolutionContract
+## 5. ResolutionContract
 
 Разрешение объявляет represented entities, aggregation/refinement, coarse-to-fine state lift, fine-to-coarse projection, conserved quantities, observable continuity, uncertainty transformation, triggers/preconditions, compute estimate, rollback и artifact compatibility.
+
+Каноническая операция называется **Explicit Causally Triggered Resolution Transition**. Она не является скрытым LOD или произвольным повышением «важности». Deterministic trigger возникает только из объявленного contract condition: выход за validity range, превышение uncertainty bound, появление divergent lineage, необходимость fine variables для causal interaction либо обязательная validation policy. Admission по CPU/RAM/storage проверяется до transition; недостаток capacity возвращает `CapacityExceeded`, но не разрешает silent downgrade.
 
 Lift может детерминированно создавать individual entities из seed, зафиксированного в `ResolutionChanged`. Он сохраняет mass, charge, substance amounts, entity counts и объявленные moments. Projection сохраняет lineage/provenance, поэтому повторный refinement продолжает причинную историю, а не создаёт новую популяцию. Mixed-resolution interaction идёт только через causal ports.
 
 Schema: [resolution-contract-v1.schema.json](contracts/schemas/resolution-contract-v1.schema.json).
 
-## 5. MorphotypeDefinition
+## 6. MorphotypeDefinition
 
 Morphotype package содержит собственные anatomy graph, development program, organ bindings, physiological parameters и validation fixtures. Общие mechanisms подключаются ссылками по digest, но package не наследует другой morphotype.
 
@@ -86,7 +124,7 @@ Runtime registry индексирует packages произвольными IDs 
 
 Schema: [morphotype-definition-v1.schema.json](contracts/schemas/morphotype-definition-v1.schema.json).
 
-## 6. Cognitive pipeline
+## 7. Cognitive pipeline
 
 ```text
 Perception + interoception + memory + affordances
@@ -104,7 +142,7 @@ Perception + interoception + memory + affordances
 
 Schemas: [cortex-proposal-v1.schema.json](contracts/schemas/cortex-proposal-v1.schema.json), [cognitive-disposition-v1.schema.json](contracts/schemas/cognitive-disposition-v1.schema.json) и их transaction envelope [cognitive-decision-v1.schema.json](contracts/schemas/cognitive-decision-v1.schema.json).
 
-## 7. Canonical transitions и scheduling
+## 8. Canonical transitions и scheduling
 
 Механизмы строят proposed deltas для точного simulation interval. Authoritative writer проверяет preconditions, units, conservation, uncertainty и artifact compatibility, затем атомарно фиксирует transition и новый state hash. Детерминированный scheduler использует одну и ту же boundary ordering во всех режимах.
 
@@ -112,18 +150,24 @@ Production привязывает продвижение к wall clock; accelera
 
 Параллельные workers могут только предлагать результаты. Writer сортирует independent reductions по каноническим ключам. Distributed authoritative state отложен до post-V1 ADR и обязан совпасть с single-node reference.
 
-## 8. Representation lifecycle и failure modes
+## 9. Representation lifecycle и failure modes
 
 LOD, sleeping и offloading являются representation transitions с сохранённым полным state, error bound и durable evidence. Runtime admission оценивает требуемые CPU/RAM/storage до refinement. Недостаток capacity возвращает `CapacityExceeded`; отсутствующий artifact, non-convergence или нарушение conservation приводит к `SafeStop` с diagnostic event.
 
 Rollback возвращает предыдущее representation без downcast новых biological events. Recovery никогда не угадывает отсутствующий state и не переключается на менее точную модель скрыто.
 
-## 9. Package и artifact boundary
+## 10. Package и artifact boundary
 
 Механизмы, resolutions, morphotypes, solver coefficients и models являются immutable content-addressed artifacts. Человекочитаемая версия помогает управлению, но transition идентифицирует точные bytes digest-ом. Package manifest связывает совместимые artifacts и подписанные validation evidence.
 
 Human и Neko могут одновременно использовать разные tissue/brain resolutions. World Engine знает contracts и registry, но не каталог органов или видов.
 
-## 10. Phase 0 boundary
+## 11. Model improvement control plane
+
+Self-improvement находится вне simulation causal graph и не получает write access к authoritative state. Evidence может породить immutable candidate mechanism/model/solver artifact, но candidate проходит contract validation, focused suites и shadow run до допуска.
+
+Активация принятого artifact выполняется только как авторизованный admin intent через `WorldEngine::commit` на canonical boundary. Transition фиксирует прежний и новый content digest, compatibility evidence и rollback target. Старые transitions навсегда ссылаются на прежние bytes; audit replay не пересчитывает историю новой моделью. Автономное изменение production-кода или активация candidate без approval не входит в V1.
+
+## 12. Phase 0 boundary
 
 В Phase 0 отсутствуют runtime organism state, `BiologicalEngine`, ODE/reaction/physics solvers и полный anatomy catalog. Его deliverables ограничены документами, schemas, fixtures и schema-validation tests. Первый исполнимый biology slice определён заранее в [24-часовом сценарии](docs/scenarios/phase1-24h-human-neko.md).

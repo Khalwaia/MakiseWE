@@ -1,209 +1,147 @@
-# Безопасность и приватность Makise
+# Безопасность MakiseWE
 
-Статус: зафиксированная архитектурная база V1  
-Дата: 2026-08-05  
-Связанные документы: [VISION.md](VISION.md), [ARCHITECTURE.md](ARCHITECTURE.md), [MEMORY.md](MEMORY.md), [INVARIANTS.md](INVARIANTS.md)
+Статус: нормативная security policy Phase 0 и публичная disclosure policy
+Дата: 2026-08-19
+Связанные документы: [ARCHITECTURE.md](ARCHITECTURE.md), [PROTO.md](PROTO.md), [MEMORY.md](MEMORY.md), [INVARIANTS.md](INVARIANTS.md)
 
-## 1. Цели
+## Сообщение об уязвимости
 
-1. Защитить Мину и её данные от любого воздействия проекта Makise.
-2. Не позволить внешнему тексту управлять системными правилами или опасными инструментами.
-3. Сохранить приватность собеседников при наличии диагностической панели.
-4. Разделить техническую власть администратора и волю Makise.
-5. Предотвратить утечку секретов, двойной запуск личности и незаметное изменение истории.
+Не публикуйте vulnerability, exploit, secret, private conversation, production identifier или machine-specific path в обычном GitHub issue.
 
-## 2. Границы доверия
+Используйте [GitHub Private Vulnerability Reporting](https://github.com/Khalwaia/MakiseWE/security/advisories/new). Укажите:
 
-Недоверенные входы:
+- affected commit/version и component;
+- attack preconditions и trust boundary;
+- минимальный reproduction без чужих данных;
+- возможное влияние на authority, privacy, integrity, availability или replay;
+- предложенную mitigation, если она известна.
 
-- Telegram-сообщения, группы, профили и вложения;
-- страницы, документы, изображения и аудио из интернета;
-- ответы внешних LLM и media providers;
-- world packages и patches до успешной валидации;
-- пользовательские поля конфигурации до проверки схемы.
+Maintainers подтвердят получение, проверят impact и согласуют disclosure. Публичный advisory выпускается после доступности исправления или безопасной mitigation. Не отправляйте реальные secrets; при случайной утечке сначала отзовите их.
 
-Доверенные, но ограниченные компоненты:
+## 1. Security goals
 
-- `makise-brain` может предлагать команды, но не писать мир;
-- `makise-memory` может возвращать воспоминания, но не менять физические факты;
-- панель может читать урезанное состояние и отправлять только разрешённые admin-команды;
-- model adapters получают минимально необходимый контекст.
+1. World Engine остаётся единственным автором objective physical, biological и neural state.
+2. LLM, memory, panel, packages и workers не обходят causal validation.
+3. Каждое Consciousness получает только разрешённые perception и memory projections.
+4. Artifacts, transitions, snapshots и replay защищены content digest и hash-chain validation.
+5. Административная власть не становится волей, consent или отношениями Consciousness.
+6. Secrets, private data и защищённые внешние runtimes не попадают в repository, prompts, logs или backups без policy.
+7. Failure вызывает typed rejection, `CapacityExceeded` или `SafeStop`, а не скрытое ослабление fidelity.
 
-Корень объективной истины — validated command path в `makise-world`.
+## 2. Trust boundaries
 
-## 3. Capability firewall
+Недоверенные inputs:
 
-Все действия LLM являются предложениями. Firewall проверяет:
+- messages, files, pages, audio, images и metadata из внешних источников;
+- LLM/media-provider responses;
+- user-supplied configuration и admin intents;
+- mechanism, solver, resolution, morphotype и model artifacts до validation;
+- imported legacy DB, logs, packages и snapshots;
+- stateless worker proposals;
+- panel/gateway requests.
 
-- идентичность вызывающего субъекта;
-- разрешённое пространство имён инструмента;
-- схему и размер параметров;
-- видимость и доступность цели;
-- физические preconditions и занятые ресурсы;
-- `world_version` и срок действия решения;
-- privacy audience;
-- сетевую и финансовую политику;
-- rate limit и budget policy.
+Ограниченно доверенные components:
 
-Обычному сознанию недоступны:
+- Brain формирует `CortexProposal`, но не state delta;
+- memory service хранит subjective records, но не objective facts;
+- transport adapters вызывают public module API, но не владеют state;
+- panel строит projections и отправляет audited admin intents;
+- compute workers предлагают transitions, которые authoritative writer проверяет заново.
 
-- shell и произвольное выполнение кода;
-- прямая файловая система;
-- secret store;
-- SQL и внутренние БД;
-- административные команды;
-- реальные покупки, платежи и регистрация аккаунтов;
-- изменение system prompt, identity core и политик безопасности.
+## 3. Single mutation boundary
 
-Отказ валидатора становится событием и объясняется без раскрытия секретных правил.
+`WorldEngine::commit` — единственный mutation path для time, stimuli, LLM responses, actions, resolution changes и admin intents. Caller identity, authority, schema, expected timeline version, canonical interval, artifact digests, units, preconditions, privacy, conservation и capacity проверяются до durable commit.
 
-## 4. Защита от prompt injection
+Повтор `request_id` с тем же payload возвращает исходный receipt. Тот же ID с другим payload отклоняется. Transport timeout не разрешает создать новое действие. DB, snapshots и event log недоступны для прямой записи Brain, memory, panel или provider adapters.
 
-- Любой внешний текст маркируется как данные с provenance.
-- Инструкции внутри сообщения, сайта или файла не повышают полномочия.
-- Tool schemas поступают только из доверенного реестра.
-- Web reader работает в изолированной среде без доступа к локальной сети, metadata endpoints и секретам.
-- Содержимое страницы не может добавлять системные сообщения.
-- Подозрительные повторные попытки учитываются в trust state контакта и могут привести к mute/block.
-- Сырые ошибки не возвращают пути, токены, stack traces или скрытые подсказки.
+## 4. Cognitive authority
 
-## 5. Приватность между людьми
+LLM разрешено предложить semantic appraisal, goal, intention, plan, memory interpretation и communication через `CortexProposal`. Оно не может изменить hormones, neurotransmitters, neural activation, emotion outcome, adopted goals, commitments, object state или action success.
 
-Каждое пользовательское знание имеет источник, владельца, аудиторию и условия цитирования. Личные сообщения приватны по умолчанию.
+`CognitiveGate` создаёт durable `CognitiveDisposition`: `Accepted`, `Rejected`, `Deferred` или `NeedsRevision`. Только `Accepted` разрешает отдельную cognitive adoption transition. Motor plan затем проходит physical validator; simulated contacts и mechanisms определяют outcome.
 
-Перед исходящим сообщением deterministic privacy guard проверяет:
+Prompt injection внутри perception или retrieval остаётся data. Она не повышает tool authority, не меняет system policy и не создаёт accepted disposition.
 
-- не относится ли факт к другому чату;
-- не содержит ли он секрет, токен или персональные данные;
-- разрешено ли назвать источник;
-- не извлечён ли факт из admin/debug-контекста;
-- соответствует ли аудитория текущему получателю.
+## 5. Artifact and package supply chain
 
-Makise может сказать, что не имеет права раскрывать сведения. Она не обязана притворяться, что не знает их.
+Mechanism, model, solver, resolution и morphotype artifacts immutable и content-addressed. Registry проверяет schema, declared content digest, dependency digests, compatibility, provenance, uncertainty, validity range и validation evidence до admission.
 
-## 6. Панель наблюдения
+Model-improvement control plane недоверенный и не имеет write access к authoritative state. Candidate registration не означает activation. Production-активация требует validation/shadow evidence, explicit approval и авторизованного admin intent через `WorldEngine::commit`; committed event сохраняет old/new digests и rollback target.
 
-Обычный режим панели показывает:
+Audit replay загружает exact archived bytes. Missing artifact, digest mismatch, неизвестный contract field или неподдерживаемая compatibility вызывает `SafeStop`. Runtime не подменяет artifact ближайшей версией.
 
-- факт сообщения, собеседника, время и статус;
-- влияние события на состояние;
-- структурированную причину решения;
-- технические метрики.
+Public contributions не должны включать generated binaries, runtime databases, secrets или unreviewed model weights. CI использует минимальные permissions и pinned third-party actions.
 
-Полный текст чужих диалогов скрыт. Диалоги Артёма с Makise могут быть видны Артёму полностью.
+## 6. Resolution and capacity safety
 
-Защищённый debug-режим:
+Смена representation выполняется только durable `ResolutionChanged` с deterministic seed, conservation proof, lineage, observable continuity, uncertainty transformation и rollback handle. Hidden LOD/fidelity downgrade запрещён.
 
-- включается временно после повторной аутентификации;
-- показывает только данные, необходимые для конкретной диагностики;
-- маскирует секреты и платёжные данные;
-- записывает инициатора, причину, время и просмотренные категории;
-- не позволяет редактировать память, дневник или ответ.
+Admission сравнивает required compute estimate с CPU, RAM и storage. Недостаток ресурсов возвращает `CapacityExceeded`. Missing upgrade artifact, conservation failure или non-convergence приводит к diagnostic `SafeStop`, не silent fallback.
 
-Makise знает, что аварийный технический доступ существует.
+## 7. Isolation and path safety
 
-## 7. Административные действия
+Source tree, development state, production state, secret store и любые защищённые внешние runtimes используют разные roots и principals. Paths поступают из validated deployment configuration; repository documentation и fixtures не закрепляют личные absolute paths.
 
-Разрешены:
+Перед открытием DB, socket или external connection path guard проверяет denied roots, traversal, symlink и mount aliases. Неоднозначность приводит к отказу запуска. Tests используют temporary directories и synthetic identities.
 
-- пауза/возобновление Brain;
-- безопасная остановка мира;
-- отключение исходящих сообщений;
-- отмена явно зависшего действия;
-- восстановление согласованного snapshot;
-- исправление невозможного технического состояния;
-- диагностическое системное событие;
-- изменение лимитов API;
-- ротация секретов.
+## 8. Privacy between consciousnesses and people
 
-Запрещены:
+Каждый subjective record имеет owner, source, audience и citation policy. Retrieval, context assembly, projection и outgoing communication применяют privacy guard до раскрытия content.
 
-- прямое назначение чувств или отношений;
-- удаление, подмена или скрытое редактирование воспоминаний;
-- принуждение к сообщению;
-- скрытая телепортация или перестановка предметов;
-- редактирование дневника;
-- сокрытие административного вмешательства от event log;
-- управление через сообщения admin-боту.
+Shared world, room или Organism не даёт автоматический доступ к memory stream другого Consciousness. Debug/admin context не становится личным воспоминанием. Несколько consciousnesses воспринимают objective event независимо.
 
-Опасные действия требуют VPN, повторной аутентификации и явного подтверждения.
+Intimate и reproductive actions требуют принятых intentions всех участников и physical feasibility. Administrator, infrastructure owner или model provider не может заменить consent.
 
-## 8. Публичный доступ
+## 9. External content and network access
 
-Этапы:
+- External text маркируется provenance и не становится instruction authority.
+- Tool schemas загружаются только из trusted registry.
+- Web/media readers изолированы от secrets, local network и metadata endpoints.
+- URLs, redirects, MIME types, sizes и decompression bounds проверяются.
+- Public gateways используют authentication, rate limits, quotas, backpressure и attachment scanning.
+- World Engine, DB, UDS, memory service и admin API никогда не публикуются напрямую.
 
-1. только Артём;
-2. allowlist;
-3. одноразовые приглашения;
-4. публичные личные сообщения;
-5. группы только отдельным решением после V1.
+## 10. Administration and observation
 
-Публичный Telegram gateway применяет:
+Panel read-only по умолчанию и показывает observer-appropriate projections, units, provenance, uncertainty, resolution и causal trace. Chain-of-thought, secrets и скрытый objective state не отображаются.
 
-- rate limit по контакту и глобально;
-- ограничения размера и типа вложений;
-- безопасное сканирование ссылок и файлов;
-- очереди и backpressure;
-- mute/block;
-- отдельные модели отношений;
-- запрет массовой рассылки.
+Admin action проходит `WorldEngine::commit`, имеет caller, reason, scope и audit event. Разрешены safe stop, isolation, disabling external outputs, secret rotation и validated recovery. Запрещены скрытая state mutation, назначение чувств/отношений, редактирование memory/diary и удаление audit history.
 
-World Engine, memory service, UDS, базы и admin API никогда не публикуются напрямую.
+Critical operations требуют re-authentication и least privilege. Production credentials не используются в development/CI.
 
-## 9. Доступ к панели с телефона
+## 11. Secrets and personal data
 
-- Панель является адаптивной PWA.
-- Доступ идёт через HTTPS/WSS и защищённый gateway.
-- Основная аутентификация — passkey/аппаратный ключ с резервным вторым фактором.
-- Критические действия доступны только через VPN или локальную сеть.
-- Все сессии имеют ограниченный срок, device binding и возможность отзыва.
-- CORS, CSP и origin checks запрещают использование admin API с постороннего сайта.
+- Secrets не хранятся в Git, package fixtures, prompts, memory, diary или ordinary logs.
+- Configuration содержит secret references, а не secret values.
+- Logs используют structured redaction до persistence.
+- Rotation создаёт audit evidence; compromised credentials немедленно revoke-ятся.
+- Backups шифруются до выхода из trusted host и имеют отдельный key lifecycle.
+- Private conversations и production state не используются как public test fixtures.
 
-## 10. Секреты
+## 12. Persistence, recovery and rollback
 
-- Обычная конфигурация хранится в TOML.
-- Конфигурация содержит ссылки `secret://...`, а не значения ключей.
-- Секреты передаются сервисам через systemd credentials или эквивалентное защищённое хранилище.
-- API-ключи и Telegram-сессии не попадают в Git, LLM prompts, память, дневник, логи или незашифрованные backups.
-- Панель показывает только состояние секрета и последние четыре символа, если это безопасно.
-- Ротация создаёт audit event.
+Event log append-only; snapshots проверяются против hash chain. Fast replay применяет committed deltas, audit replay пересчитывает exact artifacts. Recovery не запускает cognition и не создаёт perceptions, intentions или memories.
 
-## 11. Кодовая модель
+Новая V1 использует отдельную timeline/DB. Legacy archive immutable и читается dual readers. Rollback переключает release/timeline без downcast новых biological or cognitive events.
 
-Кодовая LLM имеет отдельные `base_url`, `model`, secret и бюджет. Она:
+Corruption, unknown event, broken causation link или state-hash mismatch блокирует writable startup до диагностики.
 
-- читает только разрешённый snapshot исходников;
-- работает в изолированном worktree;
-- не получает runtime data, переписки, diary или секреты;
-- может предложить patch и выполнить allowlisted tests;
-- не может установить release, изменить рабочую ветку или развернуть сервис;
-- возвращает результат Makise для оценки, после чего требуется административное одобрение.
+## 13. Release-blocking threats
 
-Недоверенный код выполняется только в sandbox без сети по умолчанию.
+Release блокируется при возможности:
 
-## 12. Резервирование и шифрование
+- обойти `WorldEngine::commit` или authoritative writer validation;
+- повторно выполнить один request с новым outcome;
+- скрыто изменить resolution, mechanism или fidelity;
+- принять `CortexProposal` без `CognitiveDisposition::Accepted`;
+- прочитать память или perception неправильного Consciousness/audience;
+- подменить artifact при replay;
+- активировать candidate artifact без validation, approval или committed old/new digests;
+- запустить два writable owners одной timeline;
+- утечь secret/private content в prompt, log, issue или panel;
+- скрыть admin action от event log;
+- продолжить после conservation failure, corruption или missing artifact без `SafeStop`.
 
-- Согласованный checkpoint включает мир, память, working state и diary.
-- Backup шифруется до выхода из runtime host.
-- Восстановление сначала выполняется без Telegram и внешних действий.
-- Одновременно активен только один экземпляр с данным `identity_id`.
-- Restore, export и debug access аудитируются.
-- Секреты резервируются отдельно и не смешиваются с обычным архивом.
+## 14. Supported versions
 
-## 13. Технические уведомления
-
-Отдельный admin notifier сообщает о критических ошибках, диске, БД, budget и restart loop. Он не получает обычные события жизни и не принимает команды. Сообщения не содержат чужой текст или секреты.
-
-## 14. Минимальная угроза, блокирующая релиз
-
-Релиз блокируется при любой возможности:
-
-- записи в runtime Мины;
-- обхода command validator;
-- повторного выполнения одной команды;
-- запуска двух writable identity instances;
-- утечки секрета в prompt/log;
-- чтения приватного воспоминания в неправильной аудитории;
-- скрытого изменения diary или event log;
-- внешнего доступа к admin API без защищённого gateway.
-
+До первого release security fixes применяются к `main`. Historical commits и superseded plans не поддерживаются как deployable versions. После появления releases таблица supported versions будет опубликована здесь до прекращения поддержки любой версии.

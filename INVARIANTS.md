@@ -67,9 +67,20 @@
 42. Corruption, non-convergence, missing artifacts и conservation failure приводят к diagnostic `SafeStop`, а не к правдоподобно выглядящей подмене.
 43. Секреты, chain-of-thought и скрытое objective state не попадают в обычные projections.
 
+## Causal topology, refinement and model evolution
+
+44. Durable causal timeline записывает transitions всех causal domains и не является `WORLD EVENTS` simulation layer.
+45. L0–L7 — карта единого causal graph с обратными связями, не последовательный pipeline, закрытые engines или обязательный порядок tick.
+46. Mixed resolution разрешён одновременно внутри и между domains; interaction проходит только через stable causal ports.
+47. Каждый refinement/aggregation имеет deterministic trigger из contract validity, uncertainty bound, divergent lineage, causal interaction requirements или validation policy; неформальная causal relevance и субъективная «важность» запрещены.
+48. Explicit `ResolutionChanged` не является скрытым LOD: split/merge сохраняет объявленные counts, mass, energy, charge, substance amounts, moments, lineage и observable continuity внутри error bounds.
+49. Self-improvement остаётся внешним control plane: candidate artifacts не получают write access к authoritative state и проходят validation/shadow evidence до допуска.
+50. Production-активация нового artifact возможна только авторизованным admin intent через `WorldEngine::commit`; transition фиксирует old/new digests и rollback, а audit replay старой истории использует прежние bytes.
+51. Автономная модификация production-кода и activation без approval не входят в V1.
+
 ## Validation scope
 
-44. Каждый mechanism имеет contract conformance, focused validation и resolution-upgrade tests.
-45. 365-day run доказывает integration/replay, не biological realism.
-46. Long-horizon и rare-event claims принимаются по distributions, incidence ranges, causal prerequisites и declared uncertainty, не по одному seed.
-47. Phase N+1 не начинается до отдельного gate commit Phase N.
+52. Каждый mechanism имеет contract conformance, focused validation и resolution-upgrade tests.
+53. 365-day run доказывает integration/replay, не biological realism.
+54. Long-horizon и rare-event claims принимаются по distributions, incidence ranges, causal prerequisites и declared uncertainty, не по одному seed.
+55. Phase N+1 не начинается до отдельного gate commit Phase N.

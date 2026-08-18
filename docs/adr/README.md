@@ -1,0 +1,19 @@
+# Architecture Decision Records
+
+ADR фиксируют труднообратимые решения и причины. Новый ADR не переписывает историю: прежний документ получает явный `superseded` status и ссылку на замену.
+
+## Index
+
+- [ADR-0001: отдельная система Makise](0001-separate-system.md) — accepted isolation boundary.
+- [ADR-0002: World Engine — единственный автор истины](0002-world-authority.md) — accepted authority rule; command-shaped API superseded deep-module `commit` contract.
+- [ADR-0003: реальное время и durable activities](0003-real-time-and-durable-activities.md) — partially superseded by ADR-0009.
+- [ADR-0004: WorldService через bounded actor и UDS](0004-world-service-uds.md) — accepted legacy runtime transport; future API remains adapter-only.
+- [ADR-0005: stable causal interfaces](0005-stable-causal-interfaces.md) — accepted.
+- [ADR-0006: unitful authoritative state](0006-unitful-authoritative-state.md) — accepted.
+- [ADR-0007: independent data-driven morphotypes](0007-independent-morphotypes.md) — accepted.
+- [ADR-0008: cognitive acceptance pipeline](0008-cognitive-acceptance-pipeline.md) — accepted.
+- [ADR-0009: canonical simulation time](0009-canonical-simulation-time.md) — accepted.
+- [ADR-0010: content-addressed artifacts](0010-content-addressed-artifacts.md) — accepted.
+- [ADR-0011: unified causal graph](0011-unified-causal-graph.md) — accepted; timeline, mixed resolution и external model-improvement control plane.
+
+Normative invariants находятся в [INVARIANTS.md](../../INVARIANTS.md); module boundary — в [ARCHITECTURE.md](../../ARCHITECTURE.md).

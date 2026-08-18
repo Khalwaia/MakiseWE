@@ -1,33 +1,15 @@
-# ADR-0004: WorldService работает через bounded actor и Unix Domain Socket
+---
+status: accepted-for-legacy-runtime
+date: 2026-08-05
+updated: 2026-08-19
+---
 
-Статус: принят  
-Дата: 2026-08-05
+# WorldService uses a bounded actor and Unix Domain Socket
 
-## Контекст
+Текущий executable использует отдельный World Engine process, bounded actor queue и persistent gRPC/HTTP2 connection через Unix Domain Socket с permissions `0600`. Rust владеет state и SQLite; C++ WorldClient использует generated Protobuf/gRPC bindings.
 
-Brain написан на C++, World Engine — на Rust. Прямой FFI сделал бы время жизни,
-падения и владение SQLite частью одного процесса. Прямой доступ Brain к базе нарушил
-бы single-writer и позволил бы обходить проверку команд.
+Это legacy runtime adapter для migration, а не новый authority boundary. RPC не добавляет mutation path: будущий transport переводит requests в `WorldEngine::commit`, `project` и `events`, не выдавая references на state или DB.
 
-## Решение
+Переполненная очередь возвращает `RESOURCE_EXHAUSTED`. Event публикуется только после durable append. Subscriber после lag/reconnect продолжает с durable cursor. Timeout использует исходный request ID.
 
-- `makise-world` владеет единственным `WorldEngine` в отдельном actor-потоке.
-- RPC handlers передают запросы в ограниченную очередь и не получают ссылок на
-  `WorldState` или SQLite.
-- Локальный транспорт — постоянный gRPC/HTTP2 поверх Unix Domain Socket с правами
-  `0600`.
-- Переполненная очередь немедленно возвращает `RESOURCE_EXHAUSTED`.
-- События сначала фиксируются в SQLite и только затем публикуются подписчикам.
-- Subscriber после lag или reconnect продолжает с `after_seq` из durable event log.
-- Повтор команды использует исходный `command_id`; сетевой timeout не создаёт новую
-  команду.
-- C++ Brain использует generated protobuf/gRPC bindings и тонкий `WorldClient`, а не
-  собственные JSON-модели протокола.
-
-## Последствия
-
-- Падение Brain не останавливает clock и durable activities мира.
-- Медленный подписчик не удерживает writer thread.
-- У процесса World Engine есть явная граница доверия и независимый lifecycle.
-- Для сборки C++ клиента требуются системные protobuf/gRPC development packages.
-- UDS не публикуется наружу; gateway и панель не получают к нему прямой доступ.
+Следствия: Brain failure не останавливает committed physical processes; медленный subscriber не удерживает writer; UDS, DB и admin interfaces не публикуются напрямую; protocol migration сохраняет legacy reader до отдельного contraction decision.

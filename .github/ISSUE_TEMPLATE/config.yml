@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Khalwaia/MakiseWE/security/advisories/new
+    about: Report vulnerabilities privately. Do not open a public issue.
+  - name: Architecture and roadmap
+    url: https://github.com/Khalwaia/MakiseWE/blob/main/ROADMAP.md
+    about: Check current phases and gates before proposing work.

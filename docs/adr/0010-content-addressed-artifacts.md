@@ -1,5 +1,6 @@
 ---
 status: accepted
+date: 2026-08-19
 ---
 
 # Content-addressed model and solver artifacts

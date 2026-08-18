@@ -4,7 +4,7 @@
 > Нормативная многомасштабная roadmap находится в [ROADMAP.md](ROADMAP.md), а
 > новый Phase 0 запрещает реализацию runtime biology до прохождения contract gate.
 
-Статус: зафиксированный исполняемый план
+Статус: superseded
 Дата: 2026-08-07
 Связанные документы: [ROADMAP.md](ROADMAP.md), [ARCHITECTURE.md](ARCHITECTURE.md), [WORLD_V1.md](WORLD_V1.md), [PROTO.md](PROTO.md), [INVARIANTS.md](INVARIANTS.md)
 
