@@ -22,7 +22,7 @@ anyhow = "1.0"
 hyper-util = { version = "0.1", features = ["tokio"] }
 prost = "0.14"
 prost-types = "0.14"
-rusqlite = { version = "0.37", features = ["bundled"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "query", "rustls"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
