@@ -26,6 +26,7 @@
 
 - [Phase 0 coverage matrix](coverage/phase0-coverage-matrix.md) фиксирует текущие contracts, evidence, unknowns и planned upgrades.
 - [24-hour Human/Neko scenario](scenarios/phase1-24h-human-neko.md) задаёт первый runtime vertical slice до начала Phase 1.
+- [Аудит биологической реалистичности](research/biology-realism.md) отделяет runtime evidence от целевой архитектуры и сверяет допущения с первичными источниками.
 - [Contract schemas and fixtures](../contracts) являются machine-readable Phase 0 artifacts.
 
 ## Архитектурные решения
