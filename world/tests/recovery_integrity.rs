@@ -12,6 +12,48 @@ fn definition() -> WorldDefinition {
     .unwrap()
 }
 
+fn file_digest(path: &Path) -> String {
+    Sha256::digest(std::fs::read(path).unwrap())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+#[test]
+fn public_legacy_reader_preserves_archive_bytes() {
+    let temp = tempfile::tempdir().unwrap();
+    let database = temp.path().join("world.db");
+
+    {
+        let engine = WorldEngine::open(
+            &database,
+            "legacy-baseline",
+            definition(),
+            "bed",
+            1_000_000,
+            &PathGuard::default(),
+        )
+        .unwrap();
+        assert!(!engine.events_after(0).unwrap().is_empty());
+    }
+
+    let digest_before_read = file_digest(&database);
+    {
+        let engine = WorldEngine::open(
+            &database,
+            "legacy-baseline",
+            definition(),
+            "bed",
+            1_000_000,
+            &PathGuard::default(),
+        )
+        .unwrap();
+        assert!(!engine.events_after(0).unwrap().is_empty());
+    }
+
+    assert_eq!(file_digest(&database), digest_before_read);
+}
+
 #[test]
 fn unknown_persisted_event_blocks_replay() {
     let temp = tempfile::tempdir().unwrap();
