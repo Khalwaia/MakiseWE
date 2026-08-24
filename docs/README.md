@@ -35,6 +35,7 @@
 - [Минимальный V1 causal kernel](plans/0001-causal-kernel.md) — compatibility-safe последовательность для deep interface, canonical transitions, replay и одного thermal mechanism. Plan не является свидетельством реализованного runtime.
 - [Phase 1 gate status](plans/0002-phase1-gate-status.md) — текущее evidence и открытые пробелы перед Phase 2.
 - [Phase 2 apartment and physical embodiment](plans/0003-phase2-apartment-embodiment.md) — план метрической физики, articulated bodies и closed-loop действий.
+- [Realism hardening](plans/0004-realism-hardening.md) — evidence record: физиологический пересчёт констант causal-kernel, sleep/digestion как причинные процессы и parameter guards.
 
 ## Архитектурные решения
 

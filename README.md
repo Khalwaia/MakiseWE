@@ -245,6 +245,7 @@ Phase 0 tests дополнительно проверяют JSON Schemas, fixtur
 - [Первый causal-kernel plan](docs/plans/0001-causal-kernel.md) — исполнимый compatibility-safe план первого runtime slice.
 - [Phase 1 gate status](docs/plans/0002-phase1-gate-status.md) — текущее состояние organism slices и открытые gate criteria.
 - [Phase 2 plan](docs/plans/0003-phase2-apartment-embodiment.md) — apartment and physical embodiment implementation plan.
+- [Realism hardening record](docs/plans/0004-realism-hardening.md) — физиологический пересчёт констант kernel, причинные sleep/digestion механизмы и parameter guards.
 - [STAGE_5.md](STAGE_5.md) — superseded historical plan; не является нормативной roadmap.
 
 ## Участие в разработке
