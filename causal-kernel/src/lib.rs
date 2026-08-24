@@ -10,6 +10,7 @@ mod cell_cohort;
 mod circadian;
 mod interoception;
 mod morphotype;
+mod neural_population;
 mod organism;
 mod quantity;
 mod thermal;
@@ -25,6 +26,7 @@ pub use circadian::{
 };
 pub use interoception::{INITIAL_CHEMICAL_STORE_UJ, InteroceptionObservables, advance_sleep_debt};
 pub use morphotype::Morphotype;
+pub use neural_population::{NeuralPopulation, NeuralPopulationError};
 pub use organism::{OrganismError, OrganismState};
 pub use quantity::{Dimension, Quantity, QuantityError, ReservoirState, StateHash, UnitScale};
 pub use thermal::{ReservoirPair, ThermalError, ThermalProposal, ThermalTransfer};
