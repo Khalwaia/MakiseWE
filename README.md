@@ -87,10 +87,11 @@ flowchart TB
 - schema tests проверяют validation, conservation, lineage, observable continuity, morphotype isolation и запрет прямой LLM mutation;
 - заранее определён 24-часовой Human/Neko vertical scenario.
 
-Начат **Phase 1**: первый causal-kernel slice реализован в `makise-causal-kernel` —
-checked fixed-point quantities, strict `MechanismContract` admission с content digests,
-pure thermal proposals с exact conservation, idempotent `advance_to` commits,
-durable receipts/head/simulated clock и determinism gates. Полная 24-часовая физиология ещё не реализована.
+Начат **Phase 1**: causal-kernel покрывает checked quantities, strict
+`MechanismContract` admission, organism slices, durable transition stream через
+`events()`, tamper detection и worker invariance. Отдельный gate commit остаётся
+обязательным перед Phase 2; план Phase 2 зафиксирован в
+[docs/plans/0003-phase2-apartment-embodiment.md](docs/plans/0003-phase2-apartment-embodiment.md).
 
 ## Что уже работает
 
@@ -243,6 +244,7 @@ Phase 0 tests дополнительно проверяют JSON Schemas, fixtur
 - [Coverage matrix](docs/coverage/phase0-coverage-matrix.md) — evidence, unknowns и planned upgrades.
 - [Первый causal-kernel plan](docs/plans/0001-causal-kernel.md) — исполнимый compatibility-safe план первого runtime slice.
 - [Phase 1 gate status](docs/plans/0002-phase1-gate-status.md) — текущее состояние organism slices и открытые gate criteria.
+- [Phase 2 plan](docs/plans/0003-phase2-apartment-embodiment.md) — apartment and physical embodiment implementation plan.
 - [STAGE_5.md](STAGE_5.md) — superseded historical plan; не является нормативной roadmap.
 
 ## Участие в разработке

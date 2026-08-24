@@ -17,8 +17,11 @@
 | Scripted cortex gate → intention | `4a48b53` | `tests/cognitive_gate.rs` |
 | 24h integration with restart parity | `3c4d91f` | `tests/phase1_integration.rs` |
 | Explicit durable ResolutionChanged | this slice | `tests/resolution_transition.rs` |
-| Acceleration / restart replay parity | this slice | `tests/acceleration_replay.rs` |
+| Acceleration / restart replay parity | this slice | `tests/acceleration_replay.rs`, `tests/restart_replay.rs` |
 | Data-driven anatomy graph and organ bindings | this slice | `tests/anatomy_binding.rs` |
+| Durable transition stream via `events()` | this slice | `tests/audit_replay.rs` |
+| Transition-chain tamper detection (`CorruptTransitionChain`) | this slice | `tests/audit_replay.rs::corrupted_transition_chain_is_rejected_on_open` |
+| Worker invariance 1 vs 16 workers | this slice | `tests/worker_invariance.rs` |
 
 ## Gate criteria из ROADMAP.md Phase 1
 
@@ -28,7 +31,7 @@
 | Непрерывная цепь food/load/temp/sleep/action | ✅ в kernel | integration test покрывает food→metabolism→thermal→sleep |
 | Accepted/rejected/deferred по причинам | ✅ | cognitive_gate.rs |
 | Cortex не мутирует body/world | ✅ | Intention.contains_physical_delta() == false, enforced by type |
-| 1:1 / acceleration / restart / replay parity | ✅ | 120 × 1 s equals one accelerated interval; split/restart matches uninterrupted physical state |
+| 1:1 / acceleration / restart / replay parity | ✅ | 120 × 1 s equals one accelerated interval; split/restart matches uninterrupted physical state; committed intervals survive reopen |
 | Единый resolution profile | ✅ | representation changes only through committed ResolutionChanged request |
 | Минимум один explicit ResolutionChanged | ✅ | validated, idempotent, durable transition preserves organism energy exactly |
 | Два полных morphotype packages (schema-level) | ✅ | Human/Neko fixtures expose graphs and bindings through runtime data API |

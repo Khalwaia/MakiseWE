@@ -187,11 +187,21 @@ pub enum EventQueryError {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CausalTransition {
     sequence: u64,
+    interval_start_second: i64,
+    interval_end_second: i64,
 }
 
 impl CausalTransition {
     pub fn sequence(&self) -> u64 {
         self.sequence
+    }
+
+    pub fn interval_start_second(&self) -> i64 {
+        self.interval_start_second
+    }
+
+    pub fn interval_end_second(&self) -> i64 {
+        self.interval_end_second
     }
 }
 
@@ -212,7 +222,10 @@ impl EventPage {
 }
 
 #[derive(Debug, Error)]
-pub enum ReadError {}
+pub enum ReadError {
+    #[error("storage failure while reading events")]
+    Storage(#[from] rusqlite::Error),
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommitRequest {
@@ -340,6 +353,8 @@ pub enum OpenError {
     Storage,
     #[error("storage is not a Makise V1 causal timeline")]
     IncompatibleStorage,
+    #[error("committed transition chain failed integrity verification")]
+    CorruptTransitionChain,
     #[error("timeline identity does not match open specification")]
     IdentityMismatch,
 }
@@ -386,6 +401,13 @@ impl WorldEngine {
             }
             verify_identity(&connection, &spec)?;
             ensure_runtime_tables(&connection)?;
+            verify_transition_chain(&connection).map_err(|error| {
+                if error == rusqlite::Error::QueryReturnedNoRows {
+                    OpenError::CorruptTransitionChain
+                } else {
+                    OpenError::Storage
+                }
+            })?;
             RecoveryStatus::Recovered
         };
 
@@ -520,6 +542,46 @@ impl WorldEngine {
         };
         {
             let transaction = self._connection.transaction()?;
+            if request.advance_to_seconds > 0 {
+                transaction.execute(
+                    "INSERT INTO causal_transitions
+                     (sequence, interval_start_second, interval_end_second)
+                     VALUES (?1, ?2, ?3)",
+                    params![
+                        receipt.timeline_version as i64,
+                        self.simulated_second - request.advance_to_seconds.max(0),
+                        self.simulated_second
+                    ],
+                )?;
+            }
+            if request.advance_to_seconds <= 0 {
+                if self.head_version == 0 {
+                    transaction.execute(
+                        "INSERT INTO causal_transitions
+                         (sequence, interval_start_second, interval_end_second)
+                         VALUES (1, ?1, ?1)",
+                        params![self.simulated_second],
+                    )?;
+                } else {
+                    let last_transition: i64 = transaction.query_row(
+                        "SELECT interval_end_second FROM causal_transitions
+                         ORDER BY sequence DESC LIMIT 1",
+                        [],
+                        |row| row.get(0),
+                    )?;
+                    transaction.execute(
+                        "INSERT INTO causal_transitions
+                         (sequence, interval_start_second, interval_end_second)
+                         VALUES (?1, ?2, ?2)",
+                        params![receipt.timeline_version as i64, last_transition],
+                    )?;
+                }
+            }
+            transaction.execute(
+                "INSERT INTO simulated_clock (singleton, second) VALUES (1, ?1)
+                 ON CONFLICT(singleton) DO UPDATE SET second = excluded.second",
+                params![self.simulated_second],
+            )?;
             transaction.execute(
                 "INSERT OR REPLACE INTO request_receipts (request_id, payload_digest, timeline_version)
                  VALUES (?1, ?2, ?3)",
@@ -529,11 +591,6 @@ impl WorldEngine {
                 "INSERT INTO timeline_head (singleton, version) VALUES (1, ?1)
                  ON CONFLICT(singleton) DO UPDATE SET version = excluded.version",
                 params![receipt.timeline_version],
-            )?;
-            transaction.execute(
-                "INSERT INTO simulated_clock (singleton, second) VALUES (1, ?1)
-                 ON CONFLICT(singleton) DO UPDATE SET second = excluded.second",
-                params![self.simulated_second],
             )?;
             transaction.execute(
                 "INSERT INTO sleep_state (singleton, phase) VALUES (1, ?1)
@@ -600,10 +657,28 @@ impl WorldEngine {
     }
 
     pub fn events(&self, query: EventQuery) -> Result<EventPage, ReadError> {
-        let _limit = query.limit;
+        let mut statement = self._connection.prepare(
+            "SELECT sequence, interval_start_second, interval_end_second
+             FROM causal_transitions WHERE sequence > ?1 ORDER BY sequence ASC LIMIT ?2",
+        )?;
+        let rows =
+            statement.query_map(params![query.after.0 as i64, query.limit as i64], |row| {
+                Ok(CausalTransition {
+                    sequence: row.get::<_, i64>(0)?.max(0) as u64,
+                    interval_start_second: row.get(1)?,
+                    interval_end_second: row.get(2)?,
+                })
+            })?;
+        let mut events = Vec::new();
+        for row in rows {
+            events.push(row?);
+        }
+        let next_cursor_value = events
+            .last()
+            .map_or(query.after.0, |transition| transition.sequence);
         Ok(EventPage {
-            events: Vec::new(),
-            next_cursor: query.after,
+            events,
+            next_cursor: EventCursor(next_cursor_value),
         })
     }
 }
@@ -660,6 +735,11 @@ fn create_timeline(connection: &mut Connection, spec: &OpenSpec) -> Result<(), O
 }
 
 const RUNTIME_SCHEMA: &str = "
+CREATE TABLE IF NOT EXISTS causal_transitions (
+    sequence INTEGER PRIMARY KEY,
+    interval_start_second INTEGER NOT NULL,
+    interval_end_second INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS request_receipts (
     request_id TEXT PRIMARY KEY,
     payload_digest BLOB NOT NULL,
@@ -795,4 +875,48 @@ fn read_resolution_id(connection: &Connection) -> Option<String> {
         .optional()
         .ok()
         .flatten()
+}
+
+fn verify_transition_chain(connection: &Connection) -> Result<(), rusqlite::Error> {
+    let mut statement = connection.prepare(
+        "SELECT sequence, interval_start_second, interval_end_second
+         FROM causal_transitions ORDER BY sequence ASC",
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok(CausalTransition {
+            sequence: row.get::<_, i64>(0)?.max(0) as u64,
+            interval_start_second: row.get(1)?,
+            interval_end_second: row.get(2)?,
+        })
+    })?;
+
+    let mut previous_end_second: Option<i64> = None;
+    let mut last_end_second = 0;
+    for (expected_index, row) in (1u64..).zip(rows) {
+        let transition = row?;
+        if transition.sequence != expected_index {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+        let expected_start = previous_end_second.unwrap_or(transition.interval_start_second);
+        if transition.interval_start_second != expected_start {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+        if transition.interval_end_second < transition.interval_start_second {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+        last_end_second = transition.interval_end_second;
+        previous_end_second = Some(transition.interval_end_second);
+    }
+
+    let simulated_clock: Option<i64> = connection
+        .query_row(
+            "SELECT second FROM simulated_clock WHERE singleton = 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if simulated_clock.unwrap_or(0) != last_end_second {
+        return Err(rusqlite::Error::QueryReturnedNoRows);
+    }
+    Ok(())
 }
