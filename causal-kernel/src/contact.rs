@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::rigid_body::GRAVITY_NM_PER_S2;
+use crate::rigid_body::{GRAVITY_NM_PER_S2, RigidBody};
 
 #[derive(Clone, Copy, Debug, Error, Eq, PartialEq)]
 pub enum ContactError {
@@ -12,6 +12,8 @@ pub enum ContactError {
     InvalidParameters,
     #[error("friction product is not a whole number of force units")]
     NonRepresentableFriction,
+    #[error("collision impulse quotient is not a whole velocity unit")]
+    NonRepresentableResponse,
     #[error("checked arithmetic overflow in contact mechanics")]
     Overflow,
 }
@@ -219,4 +221,196 @@ pub fn hold_projection(
         }
         _ => HoldState::Released,
     }
+}
+
+/// Proposed collision-response cause: the restitution coefficient in
+/// micro fixed point, where 0 is perfectly plastic and 1_000_000 is
+/// perfectly elastic.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CollisionResponseProposal {
+    restitution_micro: i64,
+}
+
+impl CollisionResponseProposal {
+    pub fn new(restitution_micro: i64) -> Result<Self, ContactError> {
+        if !(0..=1_000_000).contains(&restitution_micro) {
+            return Err(ContactError::InvalidParameters);
+        }
+        Ok(Self { restitution_micro })
+    }
+
+    pub fn restitution_micro(&self) -> i64 {
+        self.restitution_micro
+    }
+}
+
+/// Validated outcome of one collision resolution: impulse magnitude with
+/// the resulting body states plus exact kinetic energies on both sides
+/// of the interval boundary. Pair momentum is conserved bit-exact for
+/// every restitution; kinetic energy is conserved exactly at e = 1 and
+/// monotonically decreases otherwise.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CollisionResolution {
+    normal: [i64; 3],
+    impulse_mg_nm_per_s: i64,
+    next_a: RigidBody,
+    next_b: RigidBody,
+    kinetic_energy_before_nj: i64,
+    kinetic_energy_after_nj: i64,
+}
+
+impl CollisionResolution {
+    pub fn normal(&self) -> [i64; 3] {
+        self.normal
+    }
+    pub fn impulse_mg_nm_per_s(&self) -> i64 {
+        self.impulse_mg_nm_per_s
+    }
+    pub fn next_a(&self) -> &RigidBody {
+        &self.next_a
+    }
+    pub fn next_b(&self) -> &RigidBody {
+        &self.next_b
+    }
+    pub fn kinetic_energy_before_nj(&self) -> i64 {
+        self.kinetic_energy_before_nj
+    }
+    pub fn kinetic_energy_after_nj(&self) -> i64 {
+        self.kinetic_energy_after_nj
+    }
+}
+
+fn translational_kinetic_energy_nj(body: &RigidBody) -> Result<i64, ContactError> {
+    const DENOMINATOR: i128 = 2_000_000_000_000_000;
+    let mut squared_sum = 0i128;
+    for velocity in body.velocity_nm_per_s() {
+        squared_sum += i128::from(velocity) * i128::from(velocity);
+    }
+    let numerator = squared_sum * i128::from(body.mass_mg());
+    if numerator % DENOMINATOR != 0 {
+        return Err(ContactError::NonRepresentableResponse);
+    }
+    (numerator / DENOMINATOR)
+        .try_into()
+        .map_err(|_| ContactError::Overflow)
+}
+
+/// Resolves one overlapping contact: an impulse along the manifold normal
+/// when the bodies approach each other, then a mass-split positional
+/// correction. The correction gives `a` floor(d·m_b/(m_a+m_b)) of the
+/// depth and `b` the exact complement, so the split stays deterministic
+/// with at most one nanometre of declared bias instead of a silent
+/// rounding rule. Angular state is untouched — contacts act through the
+/// centre of mass this slice, mirroring torque-free gravity.
+pub fn resolve_collision(
+    a: &RigidBody,
+    a_collider: &BoxCollider,
+    b: &RigidBody,
+    b_collider: &BoxCollider,
+    proposal: &CollisionResponseProposal,
+) -> Result<Option<CollisionResolution>, ContactError> {
+    let Some(manifold) = contact_proposal(a, a_collider, b, b_collider)? else {
+        return Ok(None);
+    };
+    let axis = manifold
+        .normal()
+        .iter()
+        .position(|&component| component != 0)
+        .ok_or(ContactError::Overflow)?;
+    let sign = i128::from(manifold.normal()[axis]);
+    let mass_a = i128::from(a.mass_mg());
+    let mass_b = i128::from(b.mass_mg());
+
+    let relative_normal =
+        (i128::from(a.velocity_nm_per_s()[axis]) - i128::from(b.velocity_nm_per_s()[axis])) * sign;
+    let mut velocity_delta_a = 0i64;
+    let mut velocity_delta_b = 0i64;
+    let mut impulse = 0i64;
+    if relative_normal < 0 {
+        // Δv_a = s·(1+e)·(−v_rel)·m_b / (1e6·(m_a+m_b)) in mg-based
+        // units, where an impulse divided by mass already carries nm/s;
+        // fractional quotients are typed rejections, never rounds.
+        let scale = i128::from(1_000_000 + proposal.restitution_micro);
+        let denominator = i128::from(1_000_000) * (mass_a + mass_b);
+        let closing = -relative_normal;
+        let numerator_a = scale
+            .checked_mul(closing)
+            .and_then(|product| product.checked_mul(mass_b))
+            .ok_or(ContactError::Overflow)?;
+        let numerator_b = scale
+            .checked_mul(closing)
+            .and_then(|product| product.checked_mul(mass_a))
+            .ok_or(ContactError::Overflow)?;
+        if numerator_a % denominator != 0 || numerator_b % denominator != 0 {
+            return Err(ContactError::NonRepresentableResponse);
+        }
+        let magnitude_a: i64 = (numerator_a / denominator)
+            .try_into()
+            .map_err(|_| ContactError::Overflow)?;
+        let magnitude_b: i64 = (numerator_b / denominator)
+            .try_into()
+            .map_err(|_| ContactError::Overflow)?;
+        velocity_delta_a =
+            i64::try_from(sign * i128::from(magnitude_a)).map_err(|_| ContactError::Overflow)?;
+        velocity_delta_b =
+            i64::try_from(-sign * i128::from(magnitude_b)).map_err(|_| ContactError::Overflow)?;
+        impulse = i128::from(magnitude_a.abs())
+            .checked_mul(mass_a)
+            .and_then(|product| product.try_into().ok())
+            .ok_or(ContactError::Overflow)?;
+    }
+
+    let energy_before = translational_kinetic_energy_nj(a)?
+        .checked_add(translational_kinetic_energy_nj(b)?)
+        .ok_or(ContactError::Overflow)?;
+
+    let mut position_a = a.position_nm();
+    let mut position_b = b.position_nm();
+    let mut velocity_a = a.velocity_nm_per_s();
+    let mut velocity_b = b.velocity_nm_per_s();
+
+    velocity_a[axis] = i64::try_from(i128::from(velocity_a[axis]) + i128::from(velocity_delta_a))
+        .map_err(|_| ContactError::Overflow)?;
+    velocity_b[axis] = i64::try_from(i128::from(velocity_b[axis]) + i128::from(velocity_delta_b))
+        .map_err(|_| ContactError::Overflow)?;
+
+    // Mass-split de-penetration along the same axis.
+    let depth = i128::from(manifold.penetration_nm());
+    let split_denominator = mass_a + mass_b;
+    let shift_a = depth * mass_b / split_denominator;
+    let shift_b = depth - shift_a;
+    position_a[axis] = i64::try_from(i128::from(position_a[axis]) + shift_a * sign)
+        .map_err(|_| ContactError::Overflow)?;
+    position_b[axis] = i64::try_from(i128::from(position_b[axis]) - shift_b * sign)
+        .map_err(|_| ContactError::Overflow)?;
+
+    let rebuild = |body: &RigidBody,
+                   position: [i64; 3],
+                   velocity: [i64; 3]|
+     -> Result<RigidBody, ContactError> {
+        RigidBody::new(
+            body.mass_mg(),
+            position,
+            velocity,
+            body.center_of_mass_offset_nm(),
+            body.principal_inertia_mgm2(),
+            body.angular_velocity_urad_per_s(),
+        )
+        .map_err(|_| ContactError::Overflow)
+    };
+    let next_a = rebuild(a, position_a, velocity_a)?;
+    let next_b = rebuild(b, position_b, velocity_b)?;
+
+    let energy_after = translational_kinetic_energy_nj(&next_a)?
+        .checked_add(translational_kinetic_energy_nj(&next_b)?)
+        .ok_or(ContactError::Overflow)?;
+
+    Ok(Some(CollisionResolution {
+        normal: manifold.normal(),
+        impulse_mg_nm_per_s: impulse,
+        next_a,
+        next_b,
+        kinetic_energy_before_nj: energy_before,
+        kinetic_energy_after_nj: energy_after,
+    }))
 }

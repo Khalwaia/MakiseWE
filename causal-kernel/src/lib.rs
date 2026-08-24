@@ -40,8 +40,9 @@ pub use cognitive::{
     CognitiveDisposition, CognitiveGate, CognitiveGateError, CortexProposal, Intention,
 };
 pub use contact::{
-    BoxCollider, ContactError, ContactManifold, GraspAssessment, GraspRequest, HoldState,
-    contact_proposal, grasp_proposal, hold_projection,
+    BoxCollider, CollisionResolution, CollisionResponseProposal, ContactError, ContactManifold,
+    GraspAssessment, GraspRequest, HoldState, contact_proposal, grasp_proposal,
+    hold_projection, resolve_collision,
 };
 pub use digestion::ABSORPTION_RATE_UJ_PER_SECOND;
 pub use interoception::{INITIAL_CHEMICAL_STORE_UJ, InteroceptionObservables, advance_sleep_debt};
