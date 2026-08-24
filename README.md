@@ -242,6 +242,7 @@ Phase 0 tests дополнительно проверяют JSON Schemas, fixtur
 - [Phase 1 scenario](docs/scenarios/phase1-24h-human-neko.md) — заранее определённый 24-часовой acceptance scenario.
 - [Coverage matrix](docs/coverage/phase0-coverage-matrix.md) — evidence, unknowns и planned upgrades.
 - [Первый causal-kernel plan](docs/plans/0001-causal-kernel.md) — исполнимый compatibility-safe план первого runtime slice.
+- [Phase 1 gate status](docs/plans/0002-phase1-gate-status.md) — текущее состояние organism slices и открытые gate criteria.
 - [STAGE_5.md](STAGE_5.md) — superseded historical plan; не является нормативной roadmap.
 
 ## Участие в разработке
