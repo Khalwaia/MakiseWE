@@ -7,6 +7,7 @@ use thiserror::Error;
 
 mod artifact;
 mod circadian;
+mod interoception;
 mod organism;
 mod quantity;
 mod thermal;
@@ -16,9 +17,10 @@ pub use artifact::{
     ProgramAbi,
 };
 pub use circadian::{
-    ASLEEP_METABOLISM_UJ_PER_SECOND, AWAKE_METABOLISM_UJ_PER_SECOND, INITIAL_CHEMICAL_STORE_UJ,
-    SleepPhase, awake_metabolism_for_second, metabolic_demand_uj_per_second,
+    ASLEEP_METABOLISM_UJ_PER_SECOND, AWAKE_METABOLISM_UJ_PER_SECOND, SleepPhase,
+    awake_metabolism_for_second, metabolic_demand_uj_per_second,
 };
+pub use interoception::{INITIAL_CHEMICAL_STORE_UJ, InteroceptionObservables, advance_sleep_debt};
 pub use organism::{OrganismError, OrganismState};
 pub use quantity::{Dimension, Quantity, QuantityError, ReservoirState, StateHash, UnitScale};
 pub use thermal::{ReservoirPair, ThermalError, ThermalProposal, ThermalTransfer};
@@ -317,6 +319,7 @@ pub struct WorldEngine {
     reservoirs: Option<ReservoirPair>,
     organism: Option<OrganismState>,
     sleep_phase: circadian::SleepPhase,
+    sleep_debt_seconds: i64,
     simulated_second: i64,
 }
 
@@ -350,6 +353,7 @@ impl WorldEngine {
         let simulated_second = read_simulated_second(&connection)?;
         let sleep_phase = read_sleep_phase(&connection);
         let organism = read_organism(&connection);
+        let sleep_debt_seconds = read_sleep_debt(&connection);
 
         Ok((
             Self {
@@ -360,6 +364,7 @@ impl WorldEngine {
                 reservoirs: None,
                 organism,
                 sleep_phase,
+                sleep_debt_seconds,
                 simulated_second,
             },
             RecoveryReport { status },
@@ -414,6 +419,7 @@ impl WorldEngine {
 
         let mut current = self.reservoirs.clone();
         let mut current_organism = self.organism;
+        let mut current_sleep_debt = self.sleep_debt_seconds;
         if current_organism.is_none() && request.ingest_uj.is_some() {
             current_organism = Some(initial_organism());
         }
@@ -438,6 +444,8 @@ impl WorldEngine {
                     .apply_metabolism(demand)
                     .map_err(CommitError::MetabolismRejected)?;
             }
+            current_sleep_debt =
+                interoception::advance_sleep_debt(current_sleep_debt, self.sleep_phase);
         }
         if let (Some(energy), Some(organism)) = (request.ingest_uj, current_organism.as_mut()) {
             if energy <= 0 {
@@ -447,6 +455,7 @@ impl WorldEngine {
         }
         self.reservoirs = current;
         self.organism = current_organism;
+        self.sleep_debt_seconds = current_sleep_debt;
 
         self.simulated_second += request.advance_to_seconds.max(0);
 
@@ -503,6 +512,16 @@ impl WorldEngine {
 
     pub fn sleep_phase(&self) -> circadian::SleepPhase {
         self.sleep_phase
+    }
+
+    pub fn interoception(&self) -> Option<InteroceptionObservables> {
+        self.organism.map(|organism| {
+            InteroceptionObservables::from_state(
+                &organism,
+                self.sleep_debt_seconds,
+                self.sleep_phase,
+            )
+        })
     }
 
     pub fn request_sleep_without_intention(&mut self) -> Result<(), CommitError> {
@@ -599,6 +618,10 @@ CREATE TABLE IF NOT EXISTS organism_state (
     chemical_store_uj INTEGER NOT NULL,
     core_internal_energy_uj INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS sleep_debt (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    debt_seconds INTEGER NOT NULL
+);
 ";
 
 fn ensure_runtime_tables(connection: &Connection) -> Result<(), rusqlite::Error> {
@@ -642,7 +665,7 @@ fn read_sleep_phase(connection: &Connection) -> circadian::SleepPhase {
 }
 
 fn initial_organism() -> OrganismState {
-    OrganismState::new(circadian::INITIAL_CHEMICAL_STORE_UJ, 20_000_000_000_000)
+    OrganismState::new(interoception::INITIAL_CHEMICAL_STORE_UJ, 20_000_000_000_000)
 }
 
 fn read_organism(connection: &Connection) -> Option<OrganismState> {
@@ -655,6 +678,16 @@ fn read_organism(connection: &Connection) -> Option<OrganismState> {
             },
         )
         .ok()
+}
+
+fn read_sleep_debt(connection: &Connection) -> i64 {
+    connection
+        .query_row(
+            "SELECT debt_seconds FROM sleep_debt WHERE singleton = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0)
 }
 
 fn verify_identity(connection: &Connection, spec: &OpenSpec) -> Result<(), OpenError> {

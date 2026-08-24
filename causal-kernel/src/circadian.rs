@@ -38,8 +38,6 @@ pub const ASLEEP_METABOLISM_UJ_PER_SECOND: i64 = 800_000;
 /// (00:00–06:00) get a lower rate than daytime. Sleep phase still dominates.
 pub const NIGHT_AWAKE_METABOLISM_UJ_PER_SECOND: i64 = 1_000_000;
 
-pub const INITIAL_CHEMICAL_STORE_UJ: i64 = 8_400_000_000_000;
-
 pub fn metabolic_demand_uj_per_second(phase: SleepPhase) -> i64 {
     match phase {
         SleepPhase::Awake => AWAKE_METABOLISM_UJ_PER_SECOND,
