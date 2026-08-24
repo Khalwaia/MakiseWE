@@ -6,6 +6,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use thiserror::Error;
 
 mod artifact;
+mod circadian;
 mod organism;
 mod quantity;
 mod thermal;
@@ -13,6 +14,10 @@ mod thermal;
 pub use artifact::{
     AdmissionError, AdmissionRecord, ArtifactBundle, ContractParseError, MechanismContract,
     ProgramAbi,
+};
+pub use circadian::{
+    ASLEEP_METABOLISM_UJ_PER_SECOND, AWAKE_METABOLISM_UJ_PER_SECOND, SleepPhase,
+    metabolic_demand_uj_per_second,
 };
 pub use organism::{OrganismError, OrganismState};
 pub use quantity::{Dimension, Quantity, QuantityError, ReservoirState, StateHash, UnitScale};
@@ -200,14 +205,25 @@ pub struct CommitRequest {
     request_id: String,
     expected_version: u64,
     advance_to_seconds: i64,
+    sleep_intention: bool,
 }
 
 impl CommitRequest {
+    pub fn accept_sleep_intention(request_id: &str, expected_version: u64) -> Self {
+        Self {
+            request_id: request_id.to_owned(),
+            expected_version,
+            advance_to_seconds: 0,
+            sleep_intention: true,
+        }
+    }
+
     pub fn advance_to(request_id: &str, expected_version: u64, advance_to_seconds: i64) -> Self {
         Self {
             request_id: request_id.to_owned(),
             expected_version,
             advance_to_seconds,
+            sleep_intention: false,
         }
     }
 
@@ -216,6 +232,7 @@ impl CommitRequest {
         let mut hasher = Sha256::new();
         hasher.update(self.expected_version.to_be_bytes());
         hasher.update(self.advance_to_seconds.to_be_bytes());
+        hasher.update([u8::from(self.sleep_intention)]);
         hasher.finalize().into()
     }
 }
@@ -246,6 +263,10 @@ pub enum CommitError {
     ExpectedVersionConflict,
     #[error("thermal proposal failed validation before commit: {0}")]
     ProposalRejected(#[from] crate::thermal::ThermalError),
+    #[error("sleep transition requires an accepted intention")]
+    SleepIntentionRequired,
+    #[error("metabolism rejected during advance: {0}")]
+    MetabolismRejected(crate::organism::OrganismError),
     #[error("storage failure during commit")]
     Storage(#[from] rusqlite::Error),
 }
@@ -279,6 +300,7 @@ pub struct WorldEngine {
     receipts: std::collections::HashMap<String, ([u8; 32], CommitReceipt)>,
     reservoirs: Option<ReservoirPair>,
     organism: Option<OrganismState>,
+    sleep_phase: circadian::SleepPhase,
     simulated_second: i64,
 }
 
@@ -310,6 +332,8 @@ impl WorldEngine {
 
         let head_version = read_head_version(&connection)?;
         let simulated_second = read_simulated_second(&connection)?;
+        let sleep_phase = read_sleep_phase(&connection);
+        let organism = read_organism(&connection);
 
         Ok((
             Self {
@@ -318,7 +342,8 @@ impl WorldEngine {
                 head_version,
                 receipts: std::collections::HashMap::new(),
                 reservoirs: None,
-                organism: None,
+                organism,
+                sleep_phase,
                 simulated_second,
             },
             RecoveryReport { status },
@@ -367,7 +392,12 @@ impl WorldEngine {
             return Err(CommitError::ExpectedVersionConflict);
         }
 
+        if request.sleep_intention {
+            self.sleep_phase = circadian::SleepPhase::Asleep;
+        }
+
         let mut current = self.reservoirs.clone();
+        let mut current_organism = self.organism;
         for _second in 0..request.advance_to_seconds.max(0) {
             if current.is_none() {
                 current = Some(initial_reservoirs());
@@ -376,8 +406,17 @@ impl WorldEngine {
                 let proposal = ThermalProposal::one_second(pair, THERMAL_CONDUCTANCE_UJ_PER_MK_S)?;
                 apply_transfer(pair, proposal.transfer());
             }
+            if current_organism.is_none() {
+                current_organism = Some(initial_organism());
+            }
+            if let Some(organism) = current_organism.as_mut() {
+                organism
+                    .apply_metabolism(circadian::metabolic_demand_uj_per_second(self.sleep_phase))
+                    .map_err(CommitError::MetabolismRejected)?;
+            }
         }
         self.reservoirs = current;
+        self.organism = current_organism;
 
         self.simulated_second += request.advance_to_seconds.max(0);
 
@@ -402,6 +441,21 @@ impl WorldEngine {
                  ON CONFLICT(singleton) DO UPDATE SET second = excluded.second",
                 params![self.simulated_second],
             )?;
+            transaction.execute(
+                "INSERT INTO sleep_state (singleton, phase) VALUES (1, ?1)
+                 ON CONFLICT(singleton) DO UPDATE SET phase = excluded.phase",
+                params![self.sleep_phase.as_canonical_name()],
+            )?;
+            if let Some(organism) = self.organism {
+                transaction.execute(
+                    "INSERT INTO organism_state (singleton, chemical_store_uj, core_internal_energy_uj)
+                     VALUES (1, ?1, ?2)
+                     ON CONFLICT(singleton) DO UPDATE SET
+                        chemical_store_uj = excluded.chemical_store_uj,
+                        core_internal_energy_uj = excluded.core_internal_energy_uj",
+                    params![organism.chemical_store_uj(), organism.core_internal_energy_uj()],
+                )?;
+            }
             transaction.commit()?;
         }
         self.receipts.insert(
@@ -415,6 +469,14 @@ impl WorldEngine {
 
     pub fn organism(&self) -> Option<&OrganismState> {
         self.organism.as_ref()
+    }
+
+    pub fn sleep_phase(&self) -> circadian::SleepPhase {
+        self.sleep_phase
+    }
+
+    pub fn request_sleep_without_intention(&mut self) -> Result<(), CommitError> {
+        Err(CommitError::SleepIntentionRequired)
     }
 
     pub fn events(&self, query: EventQuery) -> Result<EventPage, ReadError> {
@@ -498,6 +560,15 @@ CREATE TABLE IF NOT EXISTS simulated_clock (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     second INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS sleep_state (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    phase TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS organism_state (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    chemical_store_uj INTEGER NOT NULL,
+    core_internal_energy_uj INTEGER NOT NULL
+);
 ";
 
 fn ensure_runtime_tables(connection: &Connection) -> Result<(), rusqlite::Error> {
@@ -526,6 +597,34 @@ fn read_simulated_second(connection: &Connection) -> Result<i64, rusqlite::Error
         )
         .optional()?;
     Ok(second.unwrap_or(0))
+}
+
+fn read_sleep_phase(connection: &Connection) -> circadian::SleepPhase {
+    connection
+        .query_row(
+            "SELECT phase FROM sleep_state WHERE singleton = 1",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .ok()
+        .and_then(|phase| circadian::SleepPhase::from_canonical_name(&phase))
+        .unwrap_or(circadian::SleepPhase::Awake)
+}
+
+fn initial_organism() -> OrganismState {
+    OrganismState::new(8_400_000_000_000, 20_000_000_000_000)
+}
+
+fn read_organism(connection: &Connection) -> Option<OrganismState> {
+    connection
+        .query_row(
+            "SELECT chemical_store_uj, core_internal_energy_uj FROM organism_state WHERE singleton = 1",
+            [],
+            |row| {
+                Ok(OrganismState::new(row.get(0)?, row.get(1)?))
+            },
+        )
+        .ok()
 }
 
 fn verify_identity(connection: &Connection, spec: &OpenSpec) -> Result<(), OpenError> {
