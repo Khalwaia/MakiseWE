@@ -16,6 +16,7 @@ mod neural_population;
 mod organism;
 mod quantity;
 mod resolution;
+mod rigid_body;
 mod thermal;
 
 pub use artifact::{
@@ -45,6 +46,7 @@ pub use organism::{
 };
 pub use quantity::{Dimension, Quantity, QuantityError, ReservoirState, StateHash, UnitScale};
 pub use resolution::{ResolutionChanged, ResolutionError};
+pub use rigid_body::{GravityProposal, RigidBody, RigidBodyError};
 pub use thermal::{ReservoirPair, ThermalError, ThermalProposal, ThermalTransfer};
 
 const APPLICATION_ID: i32 = 0x4d4b_5631;
