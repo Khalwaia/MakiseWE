@@ -6,6 +6,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use thiserror::Error;
 
 mod artifact;
+mod cell_cohort;
 mod circadian;
 mod interoception;
 mod morphotype;
@@ -17,6 +18,7 @@ pub use artifact::{
     AdmissionError, AdmissionRecord, ArtifactBundle, ContractParseError, MechanismContract,
     ProgramAbi,
 };
+pub use cell_cohort::{CellCohort, FineCell};
 pub use circadian::{
     ASLEEP_METABOLISM_UJ_PER_SECOND, AWAKE_METABOLISM_UJ_PER_SECOND, SleepPhase,
     awake_metabolism_for_second, metabolic_demand_uj_per_second,
