@@ -17,5 +17,6 @@ ADR фиксируют труднообратимые решения и прич
 - [ADR-0011: unified causal graph](0011-unified-causal-graph.md) — partially superseded by ADR-0013; основа единого graph и timeline сохранена, карта расширена L8–L9.
 - [ADR-0012: intentions запускают causal processes](0012-causal-processes-not-promised-outcomes.md) — accepted; semantic actions не обещают outcome.
 - [ADR-0013: diegetic technology и institutions](0013-diegetic-technology-and-institutions.md) — accepted; software, services и construction остаются внутри causal world.
+- [ADR-0014: fidelity envelope и validation evidence](0014-fidelity-envelope-and-validation-evidence.md) — accepted; realism claims требуют provenance, uncertainty и validation horizon.
 
 Normative invariants находятся в [INVARIANTS.md](../../INVARIANTS.md); module boundary — в [ARCHITECTURE.md](../../ARCHITECTURE.md).
