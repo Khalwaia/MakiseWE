@@ -12,6 +12,7 @@
 - Public documentation index, contribution guide, Code of Conduct, issue/PR templates, Dependabot и CI.
 - Нормативная causal civilization specification для closed-loop actions, техники, приложений, organizations, services, экономики и construction.
 - ADR о запрете promised outcomes и ADR о diegetic technology/institutions с capability-mediated external effects.
+- Phase 2 causal-kernel физические механизмы: метрическое rigid body (3D pose, center-of-mass, principal inertia) с точной консервацией энергии; box-контакты и grasp friction cone с projection удержания; data-driven articulated skeleton из anatomy graph морфотипов с joint limits и torque port; детерминированные physics islands с worker parity и явными suspend/resume transitions; collision response с точной консервацией импульса и restitution fixed point.
 
 ### Changed
 
