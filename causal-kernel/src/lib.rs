@@ -8,6 +8,7 @@ use thiserror::Error;
 mod artifact;
 mod cell_cohort;
 mod circadian;
+mod cognitive;
 mod interoception;
 mod morphotype;
 mod neural_population;
@@ -23,6 +24,9 @@ pub use cell_cohort::{CellCohort, FineCell};
 pub use circadian::{
     ASLEEP_METABOLISM_UJ_PER_SECOND, AWAKE_METABOLISM_UJ_PER_SECOND, SleepPhase,
     awake_metabolism_for_second, metabolic_demand_uj_per_second,
+};
+pub use cognitive::{
+    CognitiveDisposition, CognitiveGate, CognitiveGateError, CortexProposal, Intention,
 };
 pub use interoception::{INITIAL_CHEMICAL_STORE_UJ, InteroceptionObservables, advance_sleep_debt};
 pub use morphotype::Morphotype;
