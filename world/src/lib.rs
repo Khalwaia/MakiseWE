@@ -6,6 +6,7 @@ mod domain;
 mod engine;
 mod environment;
 mod error;
+mod mechanisms;
 mod path_guard;
 mod rpc;
 #[cfg(unix)]
