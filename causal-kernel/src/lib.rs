@@ -9,6 +9,7 @@ mod artifact;
 mod cell_cohort;
 mod circadian;
 mod cognitive;
+mod contact;
 mod digestion;
 mod interoception;
 mod morphotype;
@@ -32,6 +33,10 @@ pub use circadian::{
 };
 pub use cognitive::{
     CognitiveDisposition, CognitiveGate, CognitiveGateError, CortexProposal, Intention,
+};
+pub use contact::{
+    BoxCollider, ContactError, ContactManifold, GraspAssessment, GraspRequest, HoldState,
+    contact_proposal, grasp_proposal, hold_projection,
 };
 pub use digestion::ABSORPTION_RATE_UJ_PER_SECOND;
 pub use interoception::{INITIAL_CHEMICAL_STORE_UJ, InteroceptionObservables, advance_sleep_debt};
