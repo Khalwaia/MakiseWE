@@ -16,8 +16,8 @@ pub use artifact::{
     ProgramAbi,
 };
 pub use circadian::{
-    ASLEEP_METABOLISM_UJ_PER_SECOND, AWAKE_METABOLISM_UJ_PER_SECOND, SleepPhase,
-    metabolic_demand_uj_per_second,
+    ASLEEP_METABOLISM_UJ_PER_SECOND, AWAKE_METABOLISM_UJ_PER_SECOND, INITIAL_CHEMICAL_STORE_UJ,
+    SleepPhase, awake_metabolism_for_second, metabolic_demand_uj_per_second,
 };
 pub use organism::{OrganismError, OrganismState};
 pub use quantity::{Dimension, Quantity, QuantityError, ReservoirState, StateHash, UnitScale};
@@ -206,15 +206,27 @@ pub struct CommitRequest {
     expected_version: u64,
     advance_to_seconds: i64,
     sleep_intention: bool,
+    ingest_uj: Option<i64>,
 }
 
 impl CommitRequest {
+    pub fn ingest_food(request_id: &str, expected_version: u64, chemical_energy_uj: i64) -> Self {
+        Self {
+            request_id: request_id.to_owned(),
+            expected_version,
+            advance_to_seconds: 0,
+            sleep_intention: false,
+            ingest_uj: Some(chemical_energy_uj),
+        }
+    }
+
     pub fn accept_sleep_intention(request_id: &str, expected_version: u64) -> Self {
         Self {
             request_id: request_id.to_owned(),
             expected_version,
             advance_to_seconds: 0,
             sleep_intention: true,
+            ingest_uj: None,
         }
     }
 
@@ -224,6 +236,7 @@ impl CommitRequest {
             expected_version,
             advance_to_seconds,
             sleep_intention: false,
+            ingest_uj: None,
         }
     }
 
@@ -233,6 +246,7 @@ impl CommitRequest {
         hasher.update(self.expected_version.to_be_bytes());
         hasher.update(self.advance_to_seconds.to_be_bytes());
         hasher.update([u8::from(self.sleep_intention)]);
+        hasher.update(self.ingest_uj.unwrap_or(0).to_be_bytes());
         hasher.finalize().into()
     }
 }
@@ -265,6 +279,8 @@ pub enum CommitError {
     ProposalRejected(#[from] crate::thermal::ThermalError),
     #[error("sleep transition requires an accepted intention")]
     SleepIntentionRequired,
+    #[error("ingestion amount must be positive")]
+    InvalidIngestion,
     #[error("metabolism rejected during advance: {0}")]
     MetabolismRejected(crate::organism::OrganismError),
     #[error("storage failure during commit")]
@@ -398,6 +414,9 @@ impl WorldEngine {
 
         let mut current = self.reservoirs.clone();
         let mut current_organism = self.organism;
+        if current_organism.is_none() && request.ingest_uj.is_some() {
+            current_organism = Some(initial_organism());
+        }
         for _second in 0..request.advance_to_seconds.max(0) {
             if current.is_none() {
                 current = Some(initial_reservoirs());
@@ -410,10 +429,21 @@ impl WorldEngine {
                 current_organism = Some(initial_organism());
             }
             if let Some(organism) = current_organism.as_mut() {
+                let demand = if self.sleep_phase == circadian::SleepPhase::Asleep {
+                    circadian::metabolic_demand_uj_per_second(circadian::SleepPhase::Asleep)
+                } else {
+                    circadian::awake_metabolism_for_second(self.simulated_second + _second)
+                };
                 organism
-                    .apply_metabolism(circadian::metabolic_demand_uj_per_second(self.sleep_phase))
+                    .apply_metabolism(demand)
                     .map_err(CommitError::MetabolismRejected)?;
             }
+        }
+        if let (Some(energy), Some(organism)) = (request.ingest_uj, current_organism.as_mut()) {
+            if energy <= 0 {
+                return Err(CommitError::InvalidIngestion);
+            }
+            organism.absorb_chemical_energy(energy);
         }
         self.reservoirs = current;
         self.organism = current_organism;
@@ -612,7 +642,7 @@ fn read_sleep_phase(connection: &Connection) -> circadian::SleepPhase {
 }
 
 fn initial_organism() -> OrganismState {
-    OrganismState::new(8_400_000_000_000, 20_000_000_000_000)
+    OrganismState::new(circadian::INITIAL_CHEMICAL_STORE_UJ, 20_000_000_000_000)
 }
 
 fn read_organism(connection: &Connection) -> Option<OrganismState> {

@@ -42,4 +42,9 @@ impl OrganismState {
     pub fn total_accounted_uj(&self) -> i64 {
         self.chemical_store_uj + self.core_internal_energy_uj
     }
+
+    /// Adds absorbed chemical energy from digestion. Exact by construction.
+    pub fn absorb_chemical_energy(&mut self, energy_uj: i64) {
+        self.chemical_store_uj += energy_uj;
+    }
 }
