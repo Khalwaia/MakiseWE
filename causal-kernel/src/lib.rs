@@ -16,6 +16,7 @@ mod interoception;
 mod morphotype;
 mod neural_population;
 mod organism;
+mod physics_island;
 mod quantity;
 mod resolution;
 mod rigid_body;
@@ -52,6 +53,10 @@ pub use organism::{
     AMBIENT_HEAT_CAPACITY_UJ_PER_MK, BASELINE_AMBIENT_INTERNAL_ENERGY_UJ,
     BASELINE_CORE_INTERNAL_ENERGY_UJ, OrganismError, OrganismState,
     REFERENCE_AMBIENT_TEMPERATURE_MK, REFERENCE_CORE_TEMPERATURE_MK,
+};
+pub use physics_island::{
+    IslandError, IslandLayout, RestSuspension, advance_awake_bodies, advance_island_members,
+    layout_islands, resume_island, suspend_island,
 };
 pub use quantity::{Dimension, Quantity, QuantityError, ReservoirState, StateHash, UnitScale};
 pub use resolution::{ResolutionChanged, ResolutionError};
