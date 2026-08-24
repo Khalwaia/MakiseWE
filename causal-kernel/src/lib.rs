@@ -6,6 +6,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use thiserror::Error;
 
 mod artifact;
+mod organism;
 mod quantity;
 mod thermal;
 
@@ -13,6 +14,7 @@ pub use artifact::{
     AdmissionError, AdmissionRecord, ArtifactBundle, ContractParseError, MechanismContract,
     ProgramAbi,
 };
+pub use organism::{OrganismError, OrganismState};
 pub use quantity::{Dimension, Quantity, QuantityError, ReservoirState, StateHash, UnitScale};
 pub use thermal::{ReservoirPair, ThermalError, ThermalProposal, ThermalTransfer};
 
@@ -276,6 +278,7 @@ pub struct WorldEngine {
     head_version: u64,
     receipts: std::collections::HashMap<String, ([u8; 32], CommitReceipt)>,
     reservoirs: Option<ReservoirPair>,
+    organism: Option<OrganismState>,
     simulated_second: i64,
 }
 
@@ -315,6 +318,7 @@ impl WorldEngine {
                 head_version,
                 receipts: std::collections::HashMap::new(),
                 reservoirs: None,
+                organism: None,
                 simulated_second,
             },
             RecoveryReport { status },
@@ -407,6 +411,10 @@ impl WorldEngine {
         self.head_version = receipt.timeline_version;
 
         Ok(receipt)
+    }
+
+    pub fn organism(&self) -> Option<&OrganismState> {
+        self.organism.as_ref()
     }
 
     pub fn events(&self, query: EventQuery) -> Result<EventPage, ReadError> {
