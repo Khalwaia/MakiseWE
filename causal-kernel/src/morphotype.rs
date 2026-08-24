@@ -117,6 +117,8 @@ pub enum MorphotypeError {
     NotRootDefinition,
     #[error("anatomy binding references unknown anatomy node: {0}")]
     UnknownAnatomyNode(String),
+    #[error("no declared runtime parameters registered for morphotype: {0}")]
+    UnknownMorphotypeParameters(String),
 }
 
 /// Runtime view of a validated MorphotypeDefinition fixture. This slice binds
@@ -263,6 +265,15 @@ fn required_id(value: Option<&Value>) -> Result<String, MorphotypeError> {
         .ok_or(MorphotypeError::InvalidJson)
 }
 
-fn default_runtime_parameters_for(_morphotype_id: &str) -> Result<Morphotype, MorphotypeError> {
-    Ok(Morphotype::human())
+/// Declared runtime parameters are keyed by morphotype identity. An
+/// unregistered id must fail admission instead of silently binding human
+/// baseline values.
+fn default_runtime_parameters_for(morphotype_id: &str) -> Result<Morphotype, MorphotypeError> {
+    match morphotype_id {
+        "human-v1" => Ok(Morphotype::human()),
+        "neko-v1" => Ok(Morphotype::neko()),
+        other => Err(MorphotypeError::UnknownMorphotypeParameters(
+            other.to_owned(),
+        )),
+    }
 }

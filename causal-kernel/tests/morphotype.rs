@@ -1,4 +1,4 @@
-use makise_causal_kernel::{Morphotype, OrganismState, ReservoirState};
+use makise_causal_kernel::{Morphotype, MorphotypeDefinition, OrganismState, ReservoirState};
 
 #[test]
 fn human_morphotype_matches_current_baseline() {
@@ -34,6 +34,62 @@ fn neko_morphotype_differs_from_human_in_declared_parameters() {
     // Physical sanity: smaller body loses less heat through insulation.
     assert!(neko.core_heat_capacity_uj_per_mk() < human.core_heat_capacity_uj_per_mk());
     assert!(neko.ambient_conductance_uj_per_mk_s() < human.ambient_conductance_uj_per_mk_s());
+}
+
+#[test]
+fn neko_fixture_binds_neko_runtime_parameters_not_human() {
+    let neko_json = include_str!("../../contracts/fixtures/morphotypes/neko-minimal.json");
+    let definition = MorphotypeDefinition::from_fixture(neko_json).expect("neko package");
+    let bound = definition.runtime_parameters();
+    let human = Morphotype::human();
+    let neko = Morphotype::neko();
+
+    assert_eq!(
+        bound.awake_metabolism_uj_per_second(),
+        neko.awake_metabolism_uj_per_second()
+    );
+    assert_eq!(
+        bound.asleep_metabolism_uj_per_second(),
+        neko.asleep_metabolism_uj_per_second()
+    );
+    assert_eq!(
+        bound.night_awake_metabolism_uj_per_second(),
+        neko.night_awake_metabolism_uj_per_second()
+    );
+    assert_eq!(
+        bound.core_heat_capacity_uj_per_mk(),
+        neko.core_heat_capacity_uj_per_mk()
+    );
+    assert_eq!(
+        bound.ambient_conductance_uj_per_mk_s(),
+        neko.ambient_conductance_uj_per_mk_s()
+    );
+    assert_ne!(
+        bound.core_heat_capacity_uj_per_mk(),
+        human.core_heat_capacity_uj_per_mk(),
+        "neko package must not silently bind human runtime parameters"
+    );
+}
+
+#[test]
+fn unknown_morphotype_id_is_rejected_without_silent_default() {
+    let json = r#"{
+        "schema_version": "makise.morphotype-definition.v1",
+        "root_definition": true,
+        "morphotype_id": "unknown-x1",
+        "anatomy_graph": {
+            "nodes": [{ "node_id": "body", "kind": "mammalian-body", "count": 1 }],
+            "edges": []
+        },
+        "organ_bindings": []
+    }"#;
+
+    let error = MorphotypeDefinition::from_fixture(json)
+        .expect_err("unregistered morphotype id must be rejected, never defaulted to human");
+    assert!(matches!(
+        error,
+        makise_causal_kernel::MorphotypeError::UnknownMorphotypeParameters(_)
+    ));
 }
 
 #[test]

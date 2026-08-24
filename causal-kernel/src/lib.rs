@@ -30,7 +30,9 @@ pub use cognitive::{
     CognitiveDisposition, CognitiveGate, CognitiveGateError, CortexProposal, Intention,
 };
 pub use interoception::{INITIAL_CHEMICAL_STORE_UJ, InteroceptionObservables, advance_sleep_debt};
-pub use morphotype::{AnatomyEdge, AnatomyNode, Morphotype, MorphotypeDefinition, OrganBinding};
+pub use morphotype::{
+    AnatomyEdge, AnatomyNode, Morphotype, MorphotypeDefinition, MorphotypeError, OrganBinding,
+};
 pub use neural_population::{NeuralPopulation, NeuralPopulationError};
 pub use organism::{OrganismError, OrganismState};
 pub use quantity::{Dimension, Quantity, QuantityError, ReservoirState, StateHash, UnitScale};
