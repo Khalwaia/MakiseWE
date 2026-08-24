@@ -1,6 +1,7 @@
 {
   "makise.mechanism-contract.v1": [
-    "contracts/fixtures/mechanisms/minimal-mammalian-transport.json"
+    "contracts/fixtures/mechanisms/minimal-mammalian-transport.json",
+    "contracts/fixtures/mechanisms/two-reservoir-thermal-exchange.json"
   ],
   "makise.resolution-contract.v1": [
     "contracts/fixtures/resolutions/cohort-to-individual-cell.json",

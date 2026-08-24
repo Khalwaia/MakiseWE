@@ -1,0 +1,73 @@
+{
+  "schema_version": "makise.mechanism-contract.v1",
+  "mechanism_id": "thermal.two-reservoir-exchange",
+  "version": "0.1.0",
+  "content_digest": "sha256:6c08218c0b1b80a6c31cc2a482ece8c6e9e6a7bbe71d10bb4a8e222e82df7041",
+  "causal_inputs": [
+    { "port_id": "hot-energy-input", "variable": "reservoir.hot.internal-energy", "unit": "uJ", "dimension_kind": "physical_quantity" }
+  ],
+  "causal_outputs": [
+    { "port_id": "cold-energy-output", "variable": "reservoir.cold.internal-energy", "unit": "uJ", "dimension_kind": "physical_quantity" }
+  ],
+  "read_set": ["reservoir.hot.internal-energy", "reservoir.cold.internal-energy"],
+  "write_set": ["reservoir.hot.internal-energy", "reservoir.cold.internal-energy"],
+  "authoritative_state_variables": [
+    { "variable": "reservoir.hot.internal-energy", "unit": "uJ", "dimension_kind": "physical_quantity", "validity_range": { "min": 0, "max": 1000000000000000, "unit": "uJ" } },
+    { "variable": "reservoir.cold.internal-energy", "unit": "uJ", "dimension_kind": "physical_quantity", "validity_range": { "min": 0, "max": 1000000000000000, "unit": "uJ" } }
+  ],
+  "resolution": {
+    "supported_resolution_ids": ["two-reservoir-v1"],
+    "representation": "Finite reservoir internal energy with declared heat capacity"
+  },
+  "scales": {
+    "spatial": { "min": 0.001, "max": 10.0, "unit": "m" },
+    "temporal": { "min": 1.0, "max": 3600.0, "unit": "s" }
+  },
+  "canonical_scheduling": {
+    "boundary_rule": "Intrinsic boundaries every canonical second",
+    "partition_invariant": true,
+    "reduction_order": "Sort reservoir IDs lexicographically"
+  },
+  "observable_projections": [
+    {
+      "observable_id": "hot-temperature",
+      "source_variables": ["reservoir.hot.internal-energy"],
+      "unit": "mK",
+      "error_bound": { "kind": "absolute", "bound": 1, "unit": "mK", "confidence": 0.95 }
+    }
+  ],
+  "parameters": [
+    {
+      "parameter_id": "thermal-conductance",
+      "value": 1000,
+      "unit": "uJ/(mK*s)",
+      "provenance_category": "synthetic_fixture",
+      "uncertainty": { "kind": "relative", "bound": 0.05, "unit": "1", "confidence": 0.95 },
+      "validity_range": { "min": 100, "max": 10000, "unit": "uJ/(mK*s)" }
+    }
+  ],
+  "provenance_category": "synthetic_fixture",
+  "uncertainty_model": { "kind": "absolute", "bound": 1, "unit": "mK", "confidence": 0.95 },
+  "resolution_upgrade_paths": [
+    {
+      "from_resolution_id": "two-reservoir-v1",
+      "to_resolution_id": "individual-reservoir-v1",
+      "contract_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ],
+  "conservation_rules": [
+    { "quantity": "energy.total", "unit": "uJ", "tolerance": { "value": 0, "unit": "uJ" } }
+  ],
+  "validity_range": {
+    "conditions": ["Two finite thermal reservoirs with positive heat capacity"],
+    "exclusions": ["No biological realism claim"]
+  },
+  "failure_policy": {
+    "non_convergence": "safe_stop",
+    "invalid_input": "reject_transition",
+    "missing_artifact": "safe_stop"
+  },
+  "validation_scenarios": [
+    { "scenario_id": "schema-conservation-example", "evidence_kind": "schema_only", "acceptance": "Equal-and-opposite energy transfer keeps total energy exact" }
+  ]
+}

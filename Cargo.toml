@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "causal-kernel",
     "proto",
     "world",
 ]
