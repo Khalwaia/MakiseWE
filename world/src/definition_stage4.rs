@@ -86,6 +86,8 @@ impl TopologyPolicyDefinition {
 struct LocationDefinition {
     id: String,
     name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    metric_bounds_m: Option<MetricBoundsDefinition>,
     anchors: Vec<AnchorDefinition>,
     #[serde(default, skip_serializing_if = "SensoryDefinition::is_empty")]
     sensory: SensoryDefinition,
@@ -97,9 +99,122 @@ struct AnchorDefinition {
     id: String,
     name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    metric_position_m: Option<MetricPositionDefinition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     map_point: Option<MapPointDefinition>,
     #[serde(default, skip_serializing_if = "SensoryDefinition::is_empty")]
     sensory: SensoryDefinition,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct MetricQuantity {
+    pub value: f64,
+    pub unit: MetricUnit,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MetricUnit {
+    M,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MetricVector {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MetricBounds {
+    pub x: MetricQuantity,
+    pub y: MetricQuantity,
+    pub z: MetricQuantity,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MetricPosition {
+    value: MetricVector,
+}
+
+impl MetricPosition {
+    pub fn value(&self) -> MetricVector {
+        self.value
+    }
+}
+
+fn validate_metric_quantity(owner: &str, axis: &str, quantity: &MetricQuantity) -> Result<()> {
+    if quantity.unit != MetricUnit::M || !quantity.value.is_finite() || quantity.value < 0.0 {
+        return invalid(format!(
+            "{owner} {axis} metric quantity must be a finite non-negative metre"
+        ));
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MetricBoundsDefinition {
+    x: MetricQuantity,
+    y: MetricQuantity,
+    z: MetricQuantity,
+}
+
+impl MetricBoundsDefinition {
+    fn validated(self, owner: &str) -> Result<MetricBounds> {
+        for (axis, quantity) in [("x", &self.x), ("y", &self.y), ("z", &self.z)] {
+            validate_metric_quantity(owner, axis, quantity)?;
+        }
+        Ok(MetricBounds {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MetricPositionValueDefinition {
+    x: f64,
+    y: f64,
+    z: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MetricPositionDefinition {
+    value: MetricPositionValueDefinition,
+    unit: MetricUnit,
+}
+
+impl MetricPositionDefinition {
+    fn validated(self, owner: &str) -> Result<MetricPosition> {
+        let vector = [
+            ("x", self.value.x),
+            ("y", self.value.y),
+            ("z", self.value.z),
+        ];
+        for (axis, value) in vector {
+            validate_metric_position_value(owner, axis, value)?;
+        }
+        Ok(MetricPosition {
+            value: MetricVector {
+                x: self.value.x,
+                y: self.value.y,
+                z: self.value.z,
+            },
+        })
+    }
+}
+
+fn validate_metric_position_value(owner: &str, axis: &str, value: f64) -> Result<()> {
+    if !value.is_finite() {
+        return invalid(format!(
+            "{owner} {axis} metric position must be finite metres"
+        ));
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -260,6 +375,8 @@ struct ObjectDefinition {
     id: String,
     name: String,
     anchor_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    metric_bounds_m: Option<MetricBoundsDefinition>,
     #[serde(default)]
     observed_properties: BTreeMap<String, String>,
     #[serde(default)]
@@ -558,6 +675,7 @@ struct ObjectRecord {
     anchor_id: String,
     placement: PlacementDefinition,
     dimensions_mm: Option<DimensionsDefinition>,
+    metric_bounds: Option<MetricBounds>,
     mass_g: u64,
     components: BTreeSet<String>,
     placement_requires_power: bool,
@@ -603,6 +721,9 @@ pub struct WorldDefinition {
     objects_by_anchor: BTreeMap<String, Vec<ObservedObjectDefinition>>,
     sensory_by_anchor: BTreeMap<String, Vec<String>>,
     sensory_profiles_by_anchor: BTreeMap<String, SensoryProfile>,
+    location_metric_bounds: BTreeMap<String, MetricBounds>,
+    anchor_metric_positions: BTreeMap<String, MetricPosition>,
+    object_metric_bounds: BTreeMap<String, MetricBounds>,
     weather_site: Option<WeatherSite>,
     weather_fallback: Option<String>,
 }
@@ -640,6 +761,8 @@ impl WorldDefinition {
         let mut anchor_locations = BTreeMap::new();
         let mut sensory_by_anchor = BTreeMap::new();
         let mut sensory_profiles_by_anchor = BTreeMap::new();
+        let mut location_metric_bounds = BTreeMap::new();
+        let mut anchor_metric_positions = BTreeMap::new();
         let weather_site = package.metadata.as_ref().and_then(|metadata| {
             metadata.weather.as_ref().map(|weather| WeatherSite {
                 provider: weather.provider.clone(),
@@ -669,6 +792,13 @@ impl WorldDefinition {
             if location.anchors.is_empty() {
                 return invalid(format!("location {} has no anchors", location.id));
             }
+            let metric_bounds = location
+                .metric_bounds_m
+                .map(|bounds| bounds.validated(&format!("location {}", location.id)))
+                .transpose()?;
+            if let Some(bounds) = metric_bounds {
+                location_metric_bounds.insert(location.id.clone(), bounds);
+            }
             for anchor in &location.anchors {
                 require_id("anchor.id", &anchor.id)?;
                 require_name("anchor.name", &anchor.name)?;
@@ -684,6 +814,10 @@ impl WorldDefinition {
                     anchor.id.clone(),
                     (location.id.clone(), location.name.clone()),
                 );
+                if let Some(position) = anchor.metric_position_m {
+                    let position = position.validated(&format!("anchor {}", anchor.id))?;
+                    anchor_metric_positions.insert(anchor.id.clone(), position);
+                }
                 let cues = location
                     .sensory
                     .descriptions()
@@ -749,6 +883,10 @@ impl WorldDefinition {
 
         let templates = validate_templates(&package.object_templates)?;
         let (objects, objects_by_anchor) = validate_objects(package.objects, &anchors, &templates)?;
+        let object_metric_bounds = objects
+            .iter()
+            .filter_map(|(id, object)| object.metric_bounds.map(|bounds| (id.clone(), bounds)))
+            .collect();
 
         Ok(Self {
             world_id: package.world_id,
@@ -763,6 +901,9 @@ impl WorldDefinition {
             objects_by_anchor,
             sensory_by_anchor,
             sensory_profiles_by_anchor,
+            location_metric_bounds,
+            anchor_metric_positions,
+            object_metric_bounds,
             weather_site,
             weather_fallback,
         })
@@ -870,6 +1011,18 @@ impl WorldDefinition {
 
     pub fn sensory_profile(&self, anchor_id: &str) -> Option<&SensoryProfile> {
         self.sensory_profiles_by_anchor.get(anchor_id)
+    }
+
+    pub fn metric_bounds(&self, location_id: &str) -> Option<&MetricBounds> {
+        self.location_metric_bounds.get(location_id)
+    }
+
+    pub fn anchor_metric_position(&self, anchor_id: &str) -> Option<MetricPosition> {
+        self.anchor_metric_positions.get(anchor_id).copied()
+    }
+
+    pub fn object_metric_bounds(&self, object_id: &str) -> Option<&MetricBounds> {
+        self.object_metric_bounds.get(object_id)
     }
 
     pub fn weather_fallback_description(&self) -> Option<&str> {
@@ -1305,6 +1458,10 @@ fn validate_objects(
             .map(|value| value.initial_state.merged_with(&object.initial_state))
             .unwrap_or_else(|| object.initial_state.clone());
         validate_initial_state(&object.id, &initial_state, &components)?;
+        let metric_bounds = object
+            .metric_bounds_m
+            .map(|bounds| bounds.validated(&format!("object {}", object.id)))
+            .transpose()?;
         let mut passive_effects = template
             .map(|value| value.passive_effects.clone())
             .unwrap_or_default();
@@ -1325,6 +1482,7 @@ fn validate_objects(
             anchor_id: object.anchor_id.clone(),
             placement,
             dimensions_mm: template.map(|value| value.dimensions_mm.clone()),
+            metric_bounds,
             mass_g: template.map(|value| value.mass_g).unwrap_or(0),
             components,
             placement_requires_power: template

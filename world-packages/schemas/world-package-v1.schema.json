@@ -119,6 +119,43 @@
         "y": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
       }
     },
+    "metric_quantity_m": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "unit"],
+      "properties": {
+        "value": { "type": "number", "minimum": 0, "exclusiveMaximum": 1000000 },
+        "unit": { "const": "m" }
+      }
+    },
+    "metric_bounds_m": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": { "$ref": "#/$defs/metric_quantity_m" },
+        "y": { "$ref": "#/$defs/metric_quantity_m" },
+        "z": { "$ref": "#/$defs/metric_quantity_m" }
+      }
+    },
+    "metric_position_m": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "unit"],
+      "properties": {
+        "value": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y", "z"],
+          "properties": {
+            "x": { "type": "number", "minimum": -1000000, "maximum": 1000000 },
+            "y": { "type": "number", "minimum": -1000000, "maximum": 1000000 },
+            "z": { "type": "number", "minimum": -1000000, "maximum": 1000000 }
+          }
+        },
+        "unit": { "const": "m" }
+      }
+    },
     "anchor": {
       "type": "object",
       "additionalProperties": false,
@@ -127,6 +164,7 @@
         "id": { "$ref": "#/$defs/stable_id" },
         "name": { "$ref": "#/$defs/bounded_text" },
         "map_point": { "$ref": "#/$defs/map_point" },
+        "metric_position_m": { "$ref": "#/$defs/metric_position_m" },
         "sensory": { "$ref": "#/$defs/sensory" }
       }
     },
@@ -137,6 +175,7 @@
       "properties": {
         "id": { "$ref": "#/$defs/stable_id" },
         "name": { "$ref": "#/$defs/bounded_text" },
+        "metric_bounds_m": { "$ref": "#/$defs/metric_bounds_m" },
         "anchors": {
           "type": "array",
           "minItems": 1,
@@ -439,6 +478,7 @@
         "id": { "$ref": "#/$defs/stable_id" },
         "name": { "$ref": "#/$defs/bounded_text" },
         "anchor_id": { "$ref": "#/$defs/stable_id" },
+        "metric_bounds_m": { "$ref": "#/$defs/metric_bounds_m" },
         "observed_properties": { "$ref": "#/$defs/string_map" },
         "hidden_properties": { "$ref": "#/$defs/string_map" },
         "actions": {
