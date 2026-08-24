@@ -295,14 +295,17 @@ impl WorldEngine {
                 return Err(OpenError::IncompatibleStorage);
             }
             verify_identity(&connection, &spec)?;
+            ensure_runtime_tables(&connection)?;
             RecoveryStatus::Recovered
         };
+
+        let head_version = read_head_version(&connection)?;
 
         Ok((
             Self {
                 _connection: connection,
                 timeline_id: spec.timeline_id,
-                head_version: 0,
+                head_version,
                 receipts: std::collections::HashMap::new(),
                 reservoirs: None,
             },
@@ -313,7 +316,7 @@ impl WorldEngine {
     pub fn project(&self, _request: ProjectionRequest) -> Result<Projection, ProjectionError> {
         Ok(Projection {
             timeline_id: self.timeline_id.clone(),
-            timeline_version: 0,
+            timeline_version: self.head_version,
             entity_count: 0,
         })
     }
@@ -327,22 +330,38 @@ impl WorldEngine {
             replay.replayed_request = true;
             return Ok(replay);
         }
+        let stored_receipt: Option<(Vec<u8>, i64)> = self
+            ._connection
+            .query_row(
+                "SELECT payload_digest, timeline_version FROM request_receipts WHERE request_id = ?1",
+                params![request.request_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        if let Some((stored_digest, stored_version)) = stored_receipt {
+            if stored_digest != request.payload_digest().to_vec() {
+                return Err(CommitError::IdempotencyConflict);
+            }
+            let mut replay = CommitReceipt {
+                timeline_version: stored_version.max(0) as u64,
+                replayed_request: false,
+            };
+            replay.replayed_request = true;
+            return Ok(replay);
+        }
 
         if request.expected_version != self.head_version {
             return Err(CommitError::ExpectedVersionConflict);
         }
 
         let mut current = self.reservoirs.clone();
-        for second in 1..=request.advance_to_seconds.max(0) {
+        for _second in 0..request.advance_to_seconds.max(0) {
             if current.is_none() {
                 current = Some(initial_reservoirs());
             }
             if let Some(pair) = current.as_mut() {
-                for _ in 0..second {
-                    let proposal =
-                        ThermalProposal::one_second(pair, THERMAL_CONDUCTANCE_UJ_PER_MK_S)?;
-                    apply_transfer(pair, proposal.transfer());
-                }
+                let proposal = ThermalProposal::one_second(pair, THERMAL_CONDUCTANCE_UJ_PER_MK_S)?;
+                apply_transfer(pair, proposal.transfer());
             }
         }
         self.reservoirs = current;
@@ -351,11 +370,25 @@ impl WorldEngine {
             timeline_version: self.head_version + 1,
             replayed_request: false,
         };
+        {
+            let transaction = self._connection.transaction()?;
+            transaction.execute(
+                "INSERT OR REPLACE INTO request_receipts (request_id, payload_digest, timeline_version)
+                 VALUES (?1, ?2, ?3)",
+                params![request.request_id, request.payload_digest().to_vec(), receipt.timeline_version],
+            )?;
+            transaction.execute(
+                "INSERT INTO timeline_head (singleton, version) VALUES (1, ?1)
+                 ON CONFLICT(singleton) DO UPDATE SET version = excluded.version",
+                params![receipt.timeline_version],
+            )?;
+            transaction.commit()?;
+        }
         self.receipts.insert(
             request.request_id.clone(),
             (request.payload_digest(), receipt.clone()),
         );
-        self.head_version += 1;
+        self.head_version = receipt.timeline_version;
 
         Ok(receipt)
     }
@@ -415,6 +448,7 @@ fn create_timeline(connection: &mut Connection, spec: &OpenSpec) -> Result<(), O
             timeline_id TEXT NOT NULL
         );",
     )?;
+    transaction.execute_batch(RUNTIME_SCHEMA)?;
     transaction.execute(
         "INSERT INTO timeline_metadata (singleton, world_id, timeline_id)
          VALUES (1, ?1, ?2)",
@@ -424,6 +458,35 @@ fn create_timeline(connection: &mut Connection, spec: &OpenSpec) -> Result<(), O
     transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;
     transaction.commit()?;
     Ok(())
+}
+
+const RUNTIME_SCHEMA: &str = "
+CREATE TABLE IF NOT EXISTS request_receipts (
+    request_id TEXT PRIMARY KEY,
+    payload_digest BLOB NOT NULL,
+    timeline_version INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS timeline_head (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    version INTEGER NOT NULL
+);
+";
+
+fn ensure_runtime_tables(connection: &Connection) -> Result<(), rusqlite::Error> {
+    connection.execute_batch("BEGIN")?;
+    connection.execute_batch(RUNTIME_SCHEMA)?;
+    connection.execute_batch("COMMIT")
+}
+
+fn read_head_version(connection: &Connection) -> Result<u64, rusqlite::Error> {
+    let version: Option<i64> = connection
+        .query_row(
+            "SELECT version FROM timeline_head WHERE singleton = 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    Ok(version.map_or(0, |value| value.max(0) as u64))
 }
 
 fn verify_identity(connection: &Connection, spec: &OpenSpec) -> Result<(), OpenError> {
