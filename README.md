@@ -10,7 +10,7 @@
 
 ## Что такое MakiseWE
 
-MakiseWE строит непрерывный виртуальный мир, где физические, биологические и когнитивные последствия возникают из версионированных причинных механизмов. LLM участвует в осмыслении и планировании, но не назначает состояние тела, эмоции или успешность действий.
+MakiseWE строит непрерывный виртуальный мир, где физические, биологические, когнитивные, цифровые и institutional последствия возникают из версионированных причинных механизмов. LLM участвует в осмыслении и планировании, но не назначает состояние тела, программы, организации или успешность действий.
 
 Главная цель V1 — расширяемая симуляция полной жизни: от среды и повседневной физиологии до болезней, репродукции, развития, старения, нейробиологии и нескольких сознаний. Начальное разрешение задаёт рабочую точку, а не предел fidelity.
 
@@ -18,7 +18,7 @@ MakiseWE — самостоятельный проект. Он не импорт
 
 ## Архитектурные принципы
 
-- World Engine — единственный автор objective physical, biological и neural state.
+- World Engine — единственный автор authoritative physical, biological, neural, digital и institutional state.
 - `WorldEngine::commit` — единственный mutation path для времени, stimuli, model responses, actions, resolution changes и admin intents.
 - Каждый механизм публикует полный `MechanismContract`: causal ports, read/write sets, units, provenance, uncertainty, validity range, conservation, failure policy и validation evidence.
 - Каждый способ представления публикует `ResolutionContract`: lift, projection, conserved quantities, observable continuity, lineage, compute estimate и rollback.
@@ -28,13 +28,16 @@ MakiseWE — самостоятельный проект. Он не импорт
 - Durable causal timeline записывает transitions всех causal domains; `WORLD EVENTS` не является отдельным simulation layer.
 - Resolution меняется только через explicit causally triggered `ResolutionChanged` с deterministic trigger, conservation proof и error bounds.
 - LLM создаёт `CortexProposal`. `CognitiveGate` записывает `CognitiveDisposition`; только `Accepted` разрешает отдельную transition принятия goal или intention.
+- Accepted intention запускает durable closed-loop `ControlEpisode`, но не содержит promised outcome; semantic функции `cook`, `build` или `install` не мутируют финальное состояние.
+- Устройства и приложения принадлежат causal world: код фактически исполняется в deterministic sandbox, а доступ к sensors, network и physical devices проходит через scoped capabilities.
+- Organizations не являются сознаниями; contracts создают obligations, designs описывают намерение, а услуги и строительство исполняются через реальные digital, institutional и physical transitions.
 - Production, acceleration, recovery и replay используют одинаковые canonical transitions. Wall clock меняет темп, но не causal semantics.
 - Authoritative числа имеют units либо определённый dimensionless kind. Arbitrary normalized scores запрещены.
 - Capacity конечна и измерима, но schema не ограничивает число organisms, cells, neurons или consciousnesses.
 
 ### Causal map
 
-L0–L7 — области состояния и mechanisms, не шаги общего tick. Cellular, molecular, neural, organism и physical mechanisms взаимодействуют через stable causal ports; один organ или region может одновременно соседствовать с coarse и fine representations.
+L0–L9 — области состояния и mechanisms, не шаги общего tick. Physical, biological, neural, cognitive, digital и institutional mechanisms взаимодействуют через stable causal ports; один organ, device или process может одновременно соседствовать с coarse и fine representations.
 
 ```mermaid
 flowchart TB
@@ -49,6 +52,8 @@ flowchart TB
         L5["L5 Consciousness<br/>perception · interoception · memory · cognition"]
         L6["L6 Motor Control<br/>accepted intention · motor plan · validation · control"]
         L7["L7 Physical Action<br/>muscles · body · contacts · physical outcome"]
+        L8["L8 Digital / Computation<br/>devices · code · storage · sensors · networks"]
+        L9["L9 Institutional / Economic<br/>organizations · claims · contracts · services"]
 
         L0 <--> L1
         L1 <--> L2
@@ -58,6 +63,10 @@ flowchart TB
         L5 --> L6
         L6 --> L7
         L7 --> L0
+        L0 <--> L8
+        L5 <--> L8
+        L5 <--> L9
+        L8 <--> L9
     end
 
     Graph -. "committed transitions from every domain" .-> Timeline
@@ -78,7 +87,10 @@ flowchart TB
 - schema tests проверяют validation, conservation, lineage, observable continuity, morphotype isolation и запрет прямой LLM mutation;
 - заранее определён 24-часовой Human/Neko vertical scenario.
 
-**Phase 1 ещё не начат.** Он реализует только минимальный 24-часовой vertical slice и не строит полный biology stack заранее.
+Начат **Phase 1**: первый causal-kernel slice реализован в `makise-causal-kernel` —
+checked fixed-point quantities, strict `MechanismContract` admission с content digests,
+pure thermal proposals с exact conservation, idempotent `advance_to` commits,
+durable receipts/head/simulated clock и determinism gates. Полная 24-часовая физиология ещё не реализована.
 
 ## Что уже работает
 
@@ -94,6 +106,8 @@ flowchart TB
 - частичное восприятие без утечки скрытых object properties;
 - weather observations и deterministic environmental projections;
 - path guard, блокирующий доступ к защищённому внешнему runtime.
+- новый V1 `makise-causal-kernel`: quantities, artifact admission, thermal proposal,
+  идемпотентные commits и restart/replay persistence.
 
 Этот код не является реализацией новой многомасштабной физиологии. Новая V1 получит отдельную timeline/DB и compatibility migration по [PROTO.md](PROTO.md).
 
@@ -108,7 +122,7 @@ Roadmap состоит из последовательных gates:
 5. **Phase 4:** cells, immunity, infection, wounds, pathology, cancer, drugs, organ failure и death.
 6. **Phase 5:** genetics, reproduction, pregnancy, development, growth и aging.
 7. **Phase 6:** replaceable neural resolution, neurotransmission, autonomic/endocrine coupling, learning и memory consolidation.
-8. **Phase 7:** полная повседневная жизнь, communication, relationships, privacy и несколько consciousnesses.
+8. **Phase 7:** полная повседневная жизнь, техника, приложения, marketplace, organizations, services, construction, relationships, privacy и несколько consciousnesses.
 9. **Phase 8:** deterministic optimization, capacity admission, sleeping/offloading и stateless workers.
 
 Следующая фаза начинается только после отдельного gate commit предыдущей. Полная версия находится в [ROADMAP.md](ROADMAP.md).
@@ -211,11 +225,13 @@ Phase 0 tests дополнительно проверяют JSON Schemas, fixtur
 
 ## Документация
 
+- [AGENTS.md](AGENTS.md) — обязательные правила разработки MakiseWE с coding agents.
 - [Каталог документации](docs/README.md) — рекомендуемый порядок чтения и статус документов.
 - [VISION.md](VISION.md) — цель, границы и release outcome.
 - [CONTEXT.md](CONTEXT.md) — ubiquitous language.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — World Engine, causal contracts и component boundaries.
 - [WORLD_V1.md](WORLD_V1.md) — целевой мир, organisms и validation horizons.
+- [CIVILIZATION.md](CIVILIZATION.md) — causal actions, техника, приложения, organizations, services, экономика и construction.
 - [PROTO.md](PROTO.md) — module API, transition records, replay и migration.
 - [INVARIANTS.md](INVARIANTS.md) — обязательные архитектурные правила.
 - [MEMORY.md](MEMORY.md) — subjective memory и consciousness boundaries.
@@ -225,6 +241,7 @@ Phase 0 tests дополнительно проверяют JSON Schemas, fixtur
 - [docs/adr](docs/adr) — архитектурные решения и их статус.
 - [Phase 1 scenario](docs/scenarios/phase1-24h-human-neko.md) — заранее определённый 24-часовой acceptance scenario.
 - [Coverage matrix](docs/coverage/phase0-coverage-matrix.md) — evidence, unknowns и planned upgrades.
+- [Первый causal-kernel plan](docs/plans/0001-causal-kernel.md) — исполнимый compatibility-safe план первого runtime slice.
 - [STAGE_5.md](STAGE_5.md) — superseded historical plan; не является нормативной roadmap.
 
 ## Участие в разработке
