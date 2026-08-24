@@ -14,7 +14,7 @@ pub enum OrganismError {
     Overflow,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OrganismState {
     chemical_store_uj: i64,
     core_internal_energy_uj: i64,
@@ -42,7 +42,7 @@ impl OrganismState {
             chemical_store_uj,
             core_internal_energy_uj,
             ambient_reservoir,
-            morphotype: *morphotype,
+            morphotype: morphotype.clone(),
         }
     }
 
@@ -85,6 +85,10 @@ impl OrganismState {
 
     pub fn ambient_internal_energy_uj(&self) -> i64 {
         self.ambient_reservoir.internal_energy_microjoule()
+    }
+
+    pub fn morphotype(&self) -> &Morphotype {
+        &self.morphotype
     }
 
     /// Exchanges exactly one second of thermal energy between organism core

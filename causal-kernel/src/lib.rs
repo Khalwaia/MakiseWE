@@ -14,6 +14,7 @@ mod morphotype;
 mod neural_population;
 mod organism;
 mod quantity;
+mod resolution;
 mod thermal;
 
 pub use artifact::{
@@ -29,10 +30,11 @@ pub use cognitive::{
     CognitiveDisposition, CognitiveGate, CognitiveGateError, CortexProposal, Intention,
 };
 pub use interoception::{INITIAL_CHEMICAL_STORE_UJ, InteroceptionObservables, advance_sleep_debt};
-pub use morphotype::Morphotype;
+pub use morphotype::{AnatomyEdge, AnatomyNode, Morphotype, MorphotypeDefinition, OrganBinding};
 pub use neural_population::{NeuralPopulation, NeuralPopulationError};
 pub use organism::{OrganismError, OrganismState};
 pub use quantity::{Dimension, Quantity, QuantityError, ReservoirState, StateHash, UnitScale};
+pub use resolution::{ResolutionChanged, ResolutionError};
 pub use thermal::{ReservoirPair, ThermalError, ThermalProposal, ThermalTransfer};
 
 const APPLICATION_ID: i32 = 0x4d4b_5631;
@@ -219,6 +221,7 @@ pub struct CommitRequest {
     advance_to_seconds: i64,
     sleep_intention: bool,
     ingest_uj: Option<i64>,
+    resolution_changed: Option<crate::resolution::ResolutionChanged>,
 }
 
 impl CommitRequest {
@@ -229,6 +232,7 @@ impl CommitRequest {
             advance_to_seconds: 0,
             sleep_intention: false,
             ingest_uj: Some(chemical_energy_uj),
+            resolution_changed: None,
         }
     }
 
@@ -239,6 +243,7 @@ impl CommitRequest {
             advance_to_seconds: 0,
             sleep_intention: true,
             ingest_uj: None,
+            resolution_changed: None,
         }
     }
 
@@ -249,6 +254,22 @@ impl CommitRequest {
             advance_to_seconds,
             sleep_intention: false,
             ingest_uj: None,
+            resolution_changed: None,
+        }
+    }
+
+    pub fn resolution_changed(
+        request_id: &str,
+        expected_version: u64,
+        resolution_changed: ResolutionChanged,
+    ) -> Self {
+        Self {
+            request_id: request_id.to_owned(),
+            expected_version,
+            advance_to_seconds: 0,
+            sleep_intention: false,
+            ingest_uj: None,
+            resolution_changed: Some(resolution_changed),
         }
     }
 
@@ -259,6 +280,12 @@ impl CommitRequest {
         hasher.update(self.advance_to_seconds.to_be_bytes());
         hasher.update([u8::from(self.sleep_intention)]);
         hasher.update(self.ingest_uj.unwrap_or(0).to_be_bytes());
+        if let Some(resolution) = self.resolution_changed {
+            hasher.update(b"resolution-changed");
+            hasher.update(resolution.canonical_bytes());
+        } else {
+            hasher.update(b"no-resolution-change");
+        }
         hasher.finalize().into()
     }
 }
@@ -295,6 +322,8 @@ pub enum CommitError {
     InvalidIngestion,
     #[error("metabolism rejected during advance: {0}")]
     MetabolismRejected(crate::organism::OrganismError),
+    #[error("resolution change rejected before commit: {0}")]
+    ResolutionRejected(#[from] crate::resolution::ResolutionError),
     #[error("storage failure during commit")]
     Storage(#[from] rusqlite::Error),
 }
@@ -331,6 +360,7 @@ pub struct WorldEngine {
     sleep_phase: circadian::SleepPhase,
     sleep_debt_seconds: i64,
     simulated_second: i64,
+    resolution_id: Option<String>,
 }
 
 impl WorldEngine {
@@ -364,6 +394,7 @@ impl WorldEngine {
         let sleep_phase = read_sleep_phase(&connection);
         let organism = read_organism(&connection);
         let sleep_debt_seconds = read_sleep_debt(&connection);
+        let resolution_id = read_resolution_id(&connection);
 
         Ok((
             Self {
@@ -376,6 +407,7 @@ impl WorldEngine {
                 sleep_phase,
                 sleep_debt_seconds,
                 simulated_second,
+                resolution_id,
             },
             RecoveryReport { status },
         ))
@@ -388,6 +420,10 @@ impl WorldEngine {
             simulated_second: self.simulated_second,
             entity_count: 0,
         })
+    }
+
+    pub fn simulated_second(&self) -> i64 {
+        self.simulated_second
     }
 
     pub fn commit(&mut self, request: CommitRequest) -> Result<CommitReceipt, CommitError> {
@@ -427,20 +463,22 @@ impl WorldEngine {
             return Err(CommitError::ExpectedVersionConflict);
         }
 
+        if let Some(resolution) = request.resolution_changed {
+            resolution.validate()?;
+            self.resolution_id = Some(resolution.to_resolution_id().to_owned());
+        }
+
         if request.sleep_intention {
             self.sleep_phase = circadian::SleepPhase::Asleep;
         }
 
         let mut current = self.reservoirs.clone();
-        let mut current_organism = self.organism;
+        let mut current_organism = self.organism.clone();
         let mut current_sleep_debt = self.sleep_debt_seconds;
         if current_organism.is_none() && request.ingest_uj.is_some() {
             current_organism = Some(initial_organism());
         }
         for _second in 0..request.advance_to_seconds.max(0) {
-            if current.is_none() {
-                current = Some(initial_reservoirs());
-            }
             if let Some(pair) = current.as_mut() {
                 let proposal = ThermalProposal::one_second(pair, THERMAL_CONDUCTANCE_UJ_PER_MK_S)?;
                 apply_transfer(pair, proposal.transfer());
@@ -502,7 +540,14 @@ impl WorldEngine {
                  ON CONFLICT(singleton) DO UPDATE SET phase = excluded.phase",
                 params![self.sleep_phase.as_canonical_name()],
             )?;
-            if let Some(organism) = self.organism {
+            if let Some(resolution_id) = self.resolution_id.as_deref() {
+                transaction.execute(
+                    "INSERT INTO active_resolution (singleton, resolution_id) VALUES (1, ?1)
+                     ON CONFLICT(singleton) DO UPDATE SET resolution_id = excluded.resolution_id",
+                    params![resolution_id],
+                )?;
+            }
+            if let Some(organism) = &self.organism {
                 transaction.execute(
                     "INSERT INTO organism_state (singleton, chemical_store_uj, core_internal_energy_uj, ambient_internal_energy_uj)
                      VALUES (1, ?1, ?2, ?3)
@@ -536,10 +581,14 @@ impl WorldEngine {
         self.sleep_phase
     }
 
+    pub fn resolution_id(&self) -> Option<&str> {
+        self.resolution_id.as_deref()
+    }
+
     pub fn interoception(&self) -> Option<InteroceptionObservables> {
-        self.organism.map(|organism| {
+        self.organism.as_ref().map(|organism| {
             InteroceptionObservables::from_state(
-                &organism,
+                organism,
                 self.sleep_debt_seconds,
                 self.sleep_phase,
             )
@@ -560,13 +609,6 @@ impl WorldEngine {
 }
 
 const THERMAL_CONDUCTANCE_UJ_PER_MK_S: i64 = 1_000;
-
-fn initial_reservoirs() -> ReservoirPair {
-    ReservoirPair::new(
-        crate::quantity::ReservoirState::new(20_000_000_000_000, 4_000),
-        crate::quantity::ReservoirState::new(10_000_000_000_000, 6_000),
-    )
-}
 
 fn apply_transfer(pair: &mut ReservoirPair, transfer: &ThermalTransfer) {
     let hot = pair.hot();
@@ -644,6 +686,10 @@ CREATE TABLE IF NOT EXISTS organism_state (
 CREATE TABLE IF NOT EXISTS sleep_debt (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     debt_seconds INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS active_resolution (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    resolution_id TEXT NOT NULL
 );
 ";
 
@@ -737,4 +783,16 @@ fn verify_identity(connection: &Connection, spec: &OpenSpec) -> Result<(), OpenE
         Some(_) => Err(OpenError::IdentityMismatch),
         None => Err(OpenError::IncompatibleStorage),
     }
+}
+
+fn read_resolution_id(connection: &Connection) -> Option<String> {
+    connection
+        .query_row(
+            "SELECT resolution_id FROM active_resolution WHERE singleton = 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .ok()
+        .flatten()
 }
