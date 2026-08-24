@@ -108,6 +108,7 @@ impl ProjectionRequest {
 pub struct Projection {
     timeline_id: TimelineId,
     timeline_version: u64,
+    simulated_second: i64,
     entity_count: usize,
 }
 
@@ -122,6 +123,10 @@ impl Projection {
 
     pub fn is_empty(&self) -> bool {
         self.entity_count == 0
+    }
+
+    pub fn simulated_second(&self) -> i64 {
+        self.simulated_second
     }
 }
 
@@ -229,7 +234,7 @@ impl CommitReceipt {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub enum CommitError {
     #[error("causal transition commits are not enabled in this kernel slice")]
     NotEnabled,
@@ -271,6 +276,7 @@ pub struct WorldEngine {
     head_version: u64,
     receipts: std::collections::HashMap<String, ([u8; 32], CommitReceipt)>,
     reservoirs: Option<ReservoirPair>,
+    simulated_second: i64,
 }
 
 impl WorldEngine {
@@ -300,6 +306,7 @@ impl WorldEngine {
         };
 
         let head_version = read_head_version(&connection)?;
+        let simulated_second = read_simulated_second(&connection)?;
 
         Ok((
             Self {
@@ -308,6 +315,7 @@ impl WorldEngine {
                 head_version,
                 receipts: std::collections::HashMap::new(),
                 reservoirs: None,
+                simulated_second,
             },
             RecoveryReport { status },
         ))
@@ -317,6 +325,7 @@ impl WorldEngine {
         Ok(Projection {
             timeline_id: self.timeline_id.clone(),
             timeline_version: self.head_version,
+            simulated_second: self.simulated_second,
             entity_count: 0,
         })
     }
@@ -366,6 +375,8 @@ impl WorldEngine {
         }
         self.reservoirs = current;
 
+        self.simulated_second += request.advance_to_seconds.max(0);
+
         let receipt = CommitReceipt {
             timeline_version: self.head_version + 1,
             replayed_request: false,
@@ -381,6 +392,11 @@ impl WorldEngine {
                 "INSERT INTO timeline_head (singleton, version) VALUES (1, ?1)
                  ON CONFLICT(singleton) DO UPDATE SET version = excluded.version",
                 params![receipt.timeline_version],
+            )?;
+            transaction.execute(
+                "INSERT INTO simulated_clock (singleton, second) VALUES (1, ?1)
+                 ON CONFLICT(singleton) DO UPDATE SET second = excluded.second",
+                params![self.simulated_second],
             )?;
             transaction.commit()?;
         }
@@ -470,6 +486,10 @@ CREATE TABLE IF NOT EXISTS timeline_head (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     version INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS simulated_clock (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    second INTEGER NOT NULL
+);
 ";
 
 fn ensure_runtime_tables(connection: &Connection) -> Result<(), rusqlite::Error> {
@@ -487,6 +507,17 @@ fn read_head_version(connection: &Connection) -> Result<u64, rusqlite::Error> {
         )
         .optional()?;
     Ok(version.map_or(0, |value| value.max(0) as u64))
+}
+
+fn read_simulated_second(connection: &Connection) -> Result<i64, rusqlite::Error> {
+    let second: Option<i64> = connection
+        .query_row(
+            "SELECT second FROM simulated_clock WHERE singleton = 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    Ok(second.unwrap_or(0))
 }
 
 fn verify_identity(connection: &Connection, spec: &OpenSpec) -> Result<(), OpenError> {
