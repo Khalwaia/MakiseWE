@@ -8,6 +8,7 @@ use thiserror::Error;
 mod artifact;
 mod circadian;
 mod interoception;
+mod morphotype;
 mod organism;
 mod quantity;
 mod thermal;
@@ -21,6 +22,7 @@ pub use circadian::{
     awake_metabolism_for_second, metabolic_demand_uj_per_second,
 };
 pub use interoception::{INITIAL_CHEMICAL_STORE_UJ, InteroceptionObservables, advance_sleep_debt};
+pub use morphotype::Morphotype;
 pub use organism::{OrganismError, OrganismState};
 pub use quantity::{Dimension, Quantity, QuantityError, ReservoirState, StateHash, UnitScale};
 pub use thermal::{ReservoirPair, ThermalError, ThermalProposal, ThermalTransfer};

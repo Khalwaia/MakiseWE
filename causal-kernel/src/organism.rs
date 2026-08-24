@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+use crate::morphotype::Morphotype;
 use crate::quantity::ReservoirState;
 use crate::thermal::{ReservoirPair, ThermalProposal};
 
@@ -18,6 +19,7 @@ pub struct OrganismState {
     chemical_store_uj: i64,
     core_internal_energy_uj: i64,
     ambient_reservoir: ReservoirState,
+    morphotype: Morphotype,
 }
 
 impl OrganismState {
@@ -26,6 +28,21 @@ impl OrganismState {
             chemical_store_uj,
             core_internal_energy_uj,
             ambient_reservoir: ReservoirState::new(20_000_000_000_000, 1_000_000),
+            morphotype: Morphotype::human(),
+        }
+    }
+
+    pub fn with_morphotype(
+        morphotype: &Morphotype,
+        chemical_store_uj: i64,
+        core_internal_energy_uj: i64,
+        ambient_reservoir: ReservoirState,
+    ) -> Self {
+        Self {
+            chemical_store_uj,
+            core_internal_energy_uj,
+            ambient_reservoir,
+            morphotype: *morphotype,
         }
     }
 
@@ -38,6 +55,7 @@ impl OrganismState {
             chemical_store_uj,
             core_internal_energy_uj,
             ambient_reservoir,
+            morphotype: Morphotype::human(),
         }
     }
 
@@ -73,9 +91,14 @@ impl OrganismState {
     /// and ambient environment using the shared thermal mechanism. Total
     /// accounted energy is conserved without tolerance.
     pub fn apply_ambient_exchange(&mut self) -> Result<(), OrganismError> {
-        let core = ReservoirState::new(self.core_internal_energy_uj, 4_000);
+        let core = ReservoirState::new(
+            self.core_internal_energy_uj,
+            self.morphotype.core_heat_capacity_uj_per_mk(),
+        );
         let pair = ReservoirPair::new(core, self.ambient_reservoir);
-        let proposal = ThermalProposal::one_second(&pair, 50).map_err(OrganismError::Thermal)?;
+        let proposal =
+            ThermalProposal::one_second(&pair, self.morphotype.ambient_conductance_uj_per_mk_s())
+                .map_err(OrganismError::Thermal)?;
         let transfer = proposal.transfer();
         self.core_internal_energy_uj += transfer.delta_hot_uj();
         let new_ambient_energy = self
