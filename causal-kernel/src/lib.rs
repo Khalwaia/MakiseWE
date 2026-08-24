@@ -190,18 +190,57 @@ pub enum ReadError {}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommitRequest {
-    _private: (),
+    request_id: String,
+    expected_version: u64,
+    advance_to_seconds: i64,
+}
+
+impl CommitRequest {
+    pub fn advance_to(request_id: &str, expected_version: u64, advance_to_seconds: i64) -> Self {
+        Self {
+            request_id: request_id.to_owned(),
+            expected_version,
+            advance_to_seconds,
+        }
+    }
+
+    fn payload_digest(&self) -> [u8; 32] {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(self.expected_version.to_be_bytes());
+        hasher.update(self.advance_to_seconds.to_be_bytes());
+        hasher.finalize().into()
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommitReceipt {
-    _private: (),
+    timeline_version: u64,
+    replayed_request: bool,
 }
 
-#[derive(Clone, Debug, Error, Eq, PartialEq)]
+impl CommitReceipt {
+    pub fn timeline_version(&self) -> u64 {
+        self.timeline_version
+    }
+
+    pub fn replayed_request(&self) -> bool {
+        self.replayed_request
+    }
+}
+
+#[derive(Debug, Error)]
 pub enum CommitError {
     #[error("causal transition commits are not enabled in this kernel slice")]
     NotEnabled,
+    #[error("same request_id with different payload")]
+    IdempotencyConflict,
+    #[error("expected timeline version does not match current head")]
+    ExpectedVersionConflict,
+    #[error("thermal proposal failed validation before commit: {0}")]
+    ProposalRejected(#[from] crate::thermal::ThermalError),
+    #[error("storage failure during commit")]
+    Storage(#[from] rusqlite::Error),
 }
 
 impl RecoveryReport {
@@ -229,6 +268,9 @@ impl From<rusqlite::Error> for OpenError {
 pub struct WorldEngine {
     _connection: Connection,
     timeline_id: TimelineId,
+    head_version: u64,
+    receipts: std::collections::HashMap<String, ([u8; 32], CommitReceipt)>,
+    reservoirs: Option<ReservoirPair>,
 }
 
 impl WorldEngine {
@@ -260,6 +302,9 @@ impl WorldEngine {
             Self {
                 _connection: connection,
                 timeline_id: spec.timeline_id,
+                head_version: 0,
+                receipts: std::collections::HashMap::new(),
+                reservoirs: None,
             },
             RecoveryReport { status },
         ))
@@ -273,8 +318,46 @@ impl WorldEngine {
         })
     }
 
-    pub fn commit(&mut self, _request: CommitRequest) -> Result<CommitReceipt, CommitError> {
-        Err(CommitError::NotEnabled)
+    pub fn commit(&mut self, request: CommitRequest) -> Result<CommitReceipt, CommitError> {
+        if let Some((payload_digest, receipt)) = self.receipts.get(&request.request_id) {
+            if *payload_digest != request.payload_digest() {
+                return Err(CommitError::IdempotencyConflict);
+            }
+            let mut replay = receipt.clone();
+            replay.replayed_request = true;
+            return Ok(replay);
+        }
+
+        if request.expected_version != self.head_version {
+            return Err(CommitError::ExpectedVersionConflict);
+        }
+
+        let mut current = self.reservoirs.clone();
+        for second in 1..=request.advance_to_seconds.max(0) {
+            if current.is_none() {
+                current = Some(initial_reservoirs());
+            }
+            if let Some(pair) = current.as_mut() {
+                for _ in 0..second {
+                    let proposal =
+                        ThermalProposal::one_second(pair, THERMAL_CONDUCTANCE_UJ_PER_MK_S)?;
+                    apply_transfer(pair, proposal.transfer());
+                }
+            }
+        }
+        self.reservoirs = current;
+
+        let receipt = CommitReceipt {
+            timeline_version: self.head_version + 1,
+            replayed_request: false,
+        };
+        self.receipts.insert(
+            request.request_id.clone(),
+            (request.payload_digest(), receipt.clone()),
+        );
+        self.head_version += 1;
+
+        Ok(receipt)
     }
 
     pub fn events(&self, query: EventQuery) -> Result<EventPage, ReadError> {
@@ -284,6 +367,32 @@ impl WorldEngine {
             next_cursor: query.after,
         })
     }
+}
+
+const THERMAL_CONDUCTANCE_UJ_PER_MK_S: i64 = 1_000;
+
+fn initial_reservoirs() -> ReservoirPair {
+    ReservoirPair::new(
+        crate::quantity::ReservoirState::new(20_000_000_000_000, 4_000),
+        crate::quantity::ReservoirState::new(10_000_000_000_000, 6_000),
+    )
+}
+
+fn apply_transfer(pair: &mut ReservoirPair, transfer: &ThermalTransfer) {
+    let hot = pair.hot();
+    let new_hot_energy = hot.internal_energy_microjoule() + transfer.delta_hot_uj();
+    let cold = pair.cold();
+    let new_cold_energy = cold.internal_energy_microjoule() + transfer.delta_cold_uj();
+    *pair = ReservoirPair::new(
+        crate::quantity::ReservoirState::new(
+            new_hot_energy,
+            hot.heat_capacity_microjoule_per_millikelvin(),
+        ),
+        crate::quantity::ReservoirState::new(
+            new_cold_energy,
+            cold.heat_capacity_microjoule_per_millikelvin(),
+        ),
+    );
 }
 
 fn is_pristine_storage(connection: &Connection) -> Result<bool, rusqlite::Error> {

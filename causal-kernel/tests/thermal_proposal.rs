@@ -36,23 +36,17 @@ fn transfer_is_equal_and_opposite_exactly() {
 #[test]
 fn hotter_to_colder_matches_hand_computed_delta() {
     // Hand calculation (independent of implementation, integer arithmetic):
-    // T_hot = 20e12·10^6 / 4000   = 5_000_000_000_000_000 mK
-    // T_cold = 10e12·10^6 / 6000  = 1_666_666_666_666_666 mK (floor)
-    // ΔT = 3_333_333_333_333_334 mK
-    // Q = G·ΔT·t = 1000 · ΔT · 1 s = 3_333_333_333_333_334_000 uJ
+    // T_hot = E/C = 20e12/4000  = 5_000_000_000 mK
+    // T_cold = E/C = 10e12/6000 = 1_666_666_666 mK (floor)
+    // ΔT = 3_333_333_334 mK
+    // Q = G·ΔT·t = 1000 · ΔT · 1 s = 3_333_333_334_000 uJ
     let pair = reservoirs(20_000_000_000_000, 10_000_000_000_000);
 
     let proposal =
         ThermalProposal::one_second(&pair, CONDUCTANCE_UJ_PER_MK_S).expect("in envelope");
 
-    assert_eq!(
-        proposal.transfer().delta_hot_uj(),
-        -3_333_333_333_333_334_000
-    );
-    assert_eq!(
-        proposal.transfer().delta_cold_uj(),
-        3_333_333_333_333_334_000
-    );
+    assert_eq!(proposal.transfer().delta_hot_uj(), -3_333_333_334_000);
+    assert_eq!(proposal.transfer().delta_cold_uj(), 3_333_333_334_000);
 }
 
 #[test]
@@ -86,7 +80,10 @@ fn zero_heat_capacity_is_outside_validity_range() {
 
 #[test]
 fn overflow_in_transfer_is_typed_failure_not_clamp() {
-    let pair = reservoirs(i64::MAX / 2, i64::MIN / 2);
+    let pair = ReservoirPair::new(
+        ReservoirState::new(i64::MAX, 1),
+        ReservoirState::new(i64::MIN + 1, 6_000),
+    );
 
     let error = ThermalProposal::one_second(&pair, CONDUCTANCE_UJ_PER_MK_S)
         .err()

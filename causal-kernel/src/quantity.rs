@@ -127,6 +127,7 @@ impl Quantity {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ReservoirState {
     internal_energy_microjoule: i64,
     heat_capacity_microjoule_per_millikelvin: i64,

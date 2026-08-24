@@ -10,6 +10,7 @@ pub enum ThermalError {
     Overflow,
 }
 
+#[derive(Clone, Debug)]
 pub struct ReservoirPair {
     hot: ReservoirState,
     cold: ReservoirState,
@@ -64,14 +65,13 @@ impl ThermalProposal {
             return Err(ThermalError::OutsideValidityRange);
         }
 
-        let hot_temperature_mk = i128::from(pair.hot.internal_energy_microjoule())
-            .checked_mul(i128::from(1_000_000))
-            .and_then(|scaled| scaled.checked_div(i128::from(hot_capacity)))
-            .ok_or(ThermalError::Overflow)?;
+        // Temperature projection: T_mK = E_uJ / C_uJ_per_mK.
+        let hot_temperature_mk =
+            i128::from(pair.hot.internal_energy_microjoule()).checked_div(i128::from(hot_capacity));
         let cold_temperature_mk = i128::from(pair.cold.internal_energy_microjoule())
-            .checked_mul(i128::from(1_000_000))
-            .and_then(|scaled| scaled.checked_div(i128::from(cold_capacity)))
-            .ok_or(ThermalError::Overflow)?;
+            .checked_div(i128::from(cold_capacity));
+        let hot_temperature_mk = hot_temperature_mk.ok_or(ThermalError::Overflow)?;
+        let cold_temperature_mk = cold_temperature_mk.ok_or(ThermalError::Overflow)?;
 
         let delta_t_mk = hot_temperature_mk
             .checked_sub(cold_temperature_mk)
