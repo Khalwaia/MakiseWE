@@ -56,3 +56,68 @@ pub fn awake_metabolism_for_second(canonical_second: i64) -> i64 {
         AWAKE_METABOLISM_UJ_PER_SECOND
     }
 }
+
+/// Sleep-debt seconds accumulated per awake canonical second. Physical
+/// counter rate, not a score: one awake second adds exactly this many
+/// seconds of missed-recovery debt.
+pub const SLEEP_DEBT_PER_AWAKE_SECOND: i64 = 1;
+
+/// Sleep-debt seconds cleared per asleep canonical second. The 2:1 ratio
+/// is a coarse surrogate of the faster homeostatic decay during sleep:
+/// eight asleep hours clear sixteen awake hours. Upgradeable via measured
+/// mechanism artifacts (two-process model calibration).
+pub const SLEEP_RECOVERY_PER_ASLEEP_SECOND: i64 = 2;
+
+/// Sleep onset may trigger outside the night window once missed recovery
+/// reaches this many seconds (12 h).
+pub const SLEEP_DEBT_ONSET_THRESHOLD_SECONDS: i64 = 43_200;
+
+/// Outcome of the deterministic circadian transition mechanism for one
+/// canonical second.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SleepTransition {
+    None,
+    FallAsleep,
+    WakeUp,
+}
+
+fn second_of_day(canonical_second: i64) -> i64 {
+    canonical_second.rem_euclid(86_400)
+}
+
+fn in_night_window(second_of_day: i64) -> bool {
+    // 22:00–06:00 canonical window.
+    !(21_600..79_200).contains(&second_of_day)
+}
+
+fn in_morning_window(second_of_day: i64) -> bool {
+    // 06:00–12:00 canonical window.
+    (21_600..43_200).contains(&second_of_day)
+}
+
+/// Deterministic circadian transition rule. An accepted sleep intention
+/// creates a condition for onset; the physiological trigger (night window
+/// or sufficient sleep debt) decides whether and when the transition
+/// actually happens. Waking requires cleared recovery debt inside the
+/// morning window.
+pub fn evaluate_sleep_transition(
+    phase: SleepPhase,
+    intention_accepted: bool,
+    sleep_debt_seconds: i64,
+    canonical_second: i64,
+) -> SleepTransition {
+    let day_second = second_of_day(canonical_second);
+    match phase {
+        SleepPhase::Awake
+            if intention_accepted
+                && (in_night_window(day_second)
+                    || sleep_debt_seconds >= SLEEP_DEBT_ONSET_THRESHOLD_SECONDS) =>
+        {
+            SleepTransition::FallAsleep
+        }
+        SleepPhase::Asleep if sleep_debt_seconds <= 0 && in_morning_window(day_second) => {
+            SleepTransition::WakeUp
+        }
+        _ => SleepTransition::None,
+    }
+}

@@ -23,8 +23,10 @@ pub use artifact::{
 };
 pub use cell_cohort::{CellCohort, FineCell};
 pub use circadian::{
-    ASLEEP_METABOLISM_UJ_PER_SECOND, AWAKE_METABOLISM_UJ_PER_SECOND, SleepPhase,
-    awake_metabolism_for_second, metabolic_demand_uj_per_second,
+    ASLEEP_METABOLISM_UJ_PER_SECOND, AWAKE_METABOLISM_UJ_PER_SECOND,
+    SLEEP_DEBT_ONSET_THRESHOLD_SECONDS, SLEEP_DEBT_PER_AWAKE_SECOND,
+    SLEEP_RECOVERY_PER_ASLEEP_SECOND, SleepPhase, SleepTransition, awake_metabolism_for_second,
+    evaluate_sleep_transition, metabolic_demand_uj_per_second,
 };
 pub use cognitive::{
     CognitiveDisposition, CognitiveGate, CognitiveGateError, CortexProposal, Intention,
@@ -379,6 +381,7 @@ pub struct WorldEngine {
     reservoirs: Option<ReservoirPair>,
     organism: Option<OrganismState>,
     sleep_phase: circadian::SleepPhase,
+    sleep_intention_accepted: bool,
     sleep_debt_seconds: i64,
     simulated_second: i64,
     resolution_id: Option<String>,
@@ -421,6 +424,7 @@ impl WorldEngine {
         let simulated_second = read_simulated_second(&connection)?;
         let sleep_phase = read_sleep_phase(&connection);
         let organism = read_organism(&connection);
+        let sleep_intention_accepted = read_sleep_intention(&connection);
         let sleep_debt_seconds = read_sleep_debt(&connection);
         let resolution_id = read_resolution_id(&connection);
 
@@ -433,6 +437,7 @@ impl WorldEngine {
                 reservoirs: None,
                 organism,
                 sleep_phase,
+                sleep_intention_accepted,
                 sleep_debt_seconds,
                 simulated_second,
                 resolution_id,
@@ -497,7 +502,7 @@ impl WorldEngine {
         }
 
         if request.sleep_intention {
-            self.sleep_phase = circadian::SleepPhase::Asleep;
+            self.sleep_intention_accepted = true;
         }
 
         let mut current = self.reservoirs.clone();
@@ -507,6 +512,22 @@ impl WorldEngine {
             current_organism = Some(initial_organism());
         }
         for _second in 0..request.advance_to_seconds.max(0) {
+            let canonical_second = self.simulated_second + _second;
+            match circadian::evaluate_sleep_transition(
+                self.sleep_phase,
+                self.sleep_intention_accepted,
+                current_sleep_debt,
+                canonical_second,
+            ) {
+                circadian::SleepTransition::FallAsleep => {
+                    self.sleep_phase = circadian::SleepPhase::Asleep;
+                }
+                circadian::SleepTransition::WakeUp => {
+                    self.sleep_phase = circadian::SleepPhase::Awake;
+                    self.sleep_intention_accepted = false;
+                }
+                circadian::SleepTransition::None => {}
+            }
             if let Some(pair) = current.as_mut() {
                 let proposal = ThermalProposal::one_second(pair, THERMAL_CONDUCTANCE_UJ_PER_MK_S)?;
                 apply_transfer(pair, proposal.transfer());
@@ -602,6 +623,11 @@ impl WorldEngine {
                 "INSERT INTO sleep_state (singleton, phase) VALUES (1, ?1)
                  ON CONFLICT(singleton) DO UPDATE SET phase = excluded.phase",
                 params![self.sleep_phase.as_canonical_name()],
+            )?;
+            transaction.execute(
+                "INSERT INTO sleep_intention (singleton, accepted) VALUES (1, ?1)
+                 ON CONFLICT(singleton) DO UPDATE SET accepted = excluded.accepted",
+                params![i64::from(self.sleep_intention_accepted)],
             )?;
             if let Some(resolution_id) = self.resolution_id.as_deref() {
                 transaction.execute(
@@ -767,6 +793,10 @@ CREATE TABLE IF NOT EXISTS sleep_state (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     phase TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS sleep_intention (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    accepted INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS organism_state (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     chemical_store_uj INTEGER NOT NULL,
@@ -842,6 +872,17 @@ fn read_sleep_phase(connection: &Connection) -> circadian::SleepPhase {
         .ok()
         .and_then(|phase| circadian::SleepPhase::from_canonical_name(&phase))
         .unwrap_or(circadian::SleepPhase::Awake)
+}
+
+fn read_sleep_intention(connection: &Connection) -> bool {
+    connection
+        .query_row(
+            "SELECT accepted FROM sleep_intention WHERE singleton = 1",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map(|value| value != 0)
+        .unwrap_or(false)
 }
 
 fn initial_organism() -> OrganismState {

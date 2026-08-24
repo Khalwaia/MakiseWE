@@ -38,11 +38,12 @@ fn sleep_debt_accumulates_awake_and_clears_asleep() {
     }
     assert_eq!(debt_seconds, 100);
 
-    // Asleep seconds reduce debt but not below zero.
+    // Asleep seconds clear debt at the declared recovery rate (2:1
+    // surrogate of faster homeostatic decay) but not below zero.
     for _ in 0..40 {
         debt_seconds = makise_causal_kernel::advance_sleep_debt(debt_seconds, SleepPhase::Asleep);
     }
-    assert_eq!(debt_seconds, 60);
+    assert_eq!(debt_seconds, 20);
 
     for _ in 0..200 {
         debt_seconds = makise_causal_kernel::advance_sleep_debt(debt_seconds, SleepPhase::Asleep);

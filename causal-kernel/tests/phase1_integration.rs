@@ -11,10 +11,17 @@ fn spec(name: &str) -> OpenSpec {
     )
 }
 
-/// 24h scenario: wake → eat → activity → ambient drop → sleep.
-/// Proves causal integration across organism slices with exact conservation.
+/// 24h scenario: day of waking activity → dinner → accepted bedtime
+/// intention → physiological sleep onset in the night window → spontaneous
+/// wake in the morning window. Proves causal integration across organism
+/// slices with exact conservation.
 #[test]
 fn phase1_24h_human_scenario_conserves_energy_and_produces_intention() {
+    use makise_causal_kernel::{
+        BASELINE_AMBIENT_INTERNAL_ENERGY_UJ, BASELINE_CORE_INTERNAL_ENERGY_UJ,
+        INITIAL_CHEMICAL_STORE_UJ,
+    };
+
     let dir = tempfile::tempdir().expect("temp");
     let (mut engine, _) = WorldEngine::open(
         spec("p1-human"),
@@ -22,38 +29,25 @@ fn phase1_24h_human_scenario_conserves_energy_and_produces_intention() {
     )
     .expect("open");
 
-    // 06:00 wake: 1h awake metabolism (night rate until 06:00 boundary).
+    // Day of waking activity: 06:00 wake narrative ends at 22:00 canonical.
     engine
-        .commit(CommitRequest::advance_to("wake", 0, 3_600))
-        .unwrap();
-    let after_wake = engine.organism().unwrap();
-    let sleep_phase = engine.sleep_phase();
-    assert_eq!(sleep_phase, SleepPhase::Awake);
-    let chemical_after_wake = after_wake.chemical_store_uj();
-
-    // 07:00 breakfast: ingest measured food energy.
-    let meal_energy_uj = 2_000_000_000_000i64;
-    engine
-        .commit(CommitRequest::ingest_food("breakfast", 1, meal_energy_uj))
-        .unwrap();
-    let after_meal = engine.organism().unwrap();
-    assert_eq!(
-        after_meal.chemical_store_uj() - chemical_after_wake,
-        meal_energy_uj,
-        "ingestion must add exactly declared chemical energy"
+        .commit(CommitRequest::advance_to("day", 0, 79_200))
+        .expect("day");
+    assert_eq!(engine.sleep_phase(), SleepPhase::Awake);
+    let chemical_after_day = engine.organism().unwrap().chemical_store_uj();
+    assert!(
+        chemical_after_day < INITIAL_CHEMICAL_STORE_UJ,
+        "waking metabolism must draw on the chemical store"
     );
 
-    // 09:00-10:00 moderate activity: 1h awake day rate + thermal exchange.
+    // Dinner funds the overnight fast; ingestion adds exactly declared
+    // chemical energy.
+    let dinner_energy_uj = 3_000_000_000_000i64;
     engine
-        .commit(CommitRequest::advance_to("activity", 2, 3_600))
+        .commit(CommitRequest::ingest_food("dinner", 1, dinner_energy_uj))
         .unwrap();
 
-    // 14:00-16:00 ambient temperature step down: thermal exchange visible.
-    engine
-        .commit(CommitRequest::advance_to("cooling", 3, 7_200))
-        .unwrap();
-
-    // 23:00 accepted sleep intention via cognitive gate pipeline.
+    // Accepted bedtime intention through the cognitive gate pipeline.
     let gate = CognitiveGate::new();
     let proposal = CortexProposal::new(
         "sleep-intent",
@@ -68,20 +62,41 @@ fn phase1_24h_human_scenario_conserves_energy_and_produces_intention() {
     let _intention = gate.adopt_intention(&proposal).expect("accepted");
 
     engine
-        .commit(CommitRequest::accept_sleep_intention("sleep", 4))
-        .unwrap();
-    engine
-        .commit(CommitRequest::advance_to("recovery", 5, 25_200))
+        .commit(CommitRequest::accept_sleep_intention("sleep", 2))
         .unwrap();
 
-    // After 7h asleep: phase is Asleep, sleep debt reduced.
+    // One hour into the night window the organism has fallen asleep.
+    engine
+        .commit(CommitRequest::advance_to("onset", 3, 3_600))
+        .unwrap();
     assert_eq!(engine.sleep_phase(), SleepPhase::Asleep);
 
-    // Exact conservation: chemical burned == net thermal gain in both reservoirs.
-    let final_total = engine.organism().unwrap().total_accounted_uj();
-    let final_ambient = engine.organism().unwrap().ambient_internal_energy_uj();
-    assert!(final_total + final_ambient > 0, "energy cannot vanish");
-    // Restart parity: reopen and verify state survives.
+    // Overnight fast: recovery clears the debt inside the morning window
+    // and the organism wakes spontaneously before late morning.
+    engine
+        .commit(CommitRequest::advance_to("overnight", 4, 43_200))
+        .unwrap();
+    assert_eq!(
+        engine.sleep_phase(),
+        SleepPhase::Awake,
+        "cleared recovery debt inside the morning window must wake the organism"
+    );
+
+    // Exact conservation: accounted chemical+core energy plus ambient
+    // reservoir equals the constructed baseline plus ingested energy.
+    let accounted_before_restart = engine.organism().unwrap().total_accounted_uj();
+    let ambient_before_restart = engine.organism().unwrap().ambient_internal_energy_uj();
+    let expected_total = INITIAL_CHEMICAL_STORE_UJ
+        + BASELINE_CORE_INTERNAL_ENERGY_UJ
+        + BASELINE_AMBIENT_INTERNAL_ENERGY_UJ
+        + dinner_energy_uj;
+    assert_eq!(
+        accounted_before_restart + ambient_before_restart,
+        expected_total,
+        "energy cannot vanish: burn must land as heat in body or room"
+    );
+
+    // Restart parity: reopen and verify state survives exactly.
     std::mem::drop(engine);
     let (reopened, _) = WorldEngine::open(
         spec("p1-human"),
@@ -91,10 +106,14 @@ fn phase1_24h_human_scenario_conserves_energy_and_produces_intention() {
     let restored = reopened.organism().unwrap();
     assert_eq!(
         restored.total_accounted_uj(),
-        final_total,
+        accounted_before_restart,
         "restart must preserve accounted energy exactly"
     );
-    assert_eq!(reopened.sleep_phase(), SleepPhase::Asleep);
+    assert_eq!(
+        restored.ambient_internal_energy_uj(),
+        ambient_before_restart
+    );
+    assert_eq!(reopened.sleep_phase(), SleepPhase::Awake);
 }
 
 /// Neko with different morphotype parameters produces different thermal

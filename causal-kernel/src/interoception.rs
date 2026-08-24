@@ -1,15 +1,18 @@
+use crate::circadian::SLEEP_DEBT_PER_AWAKE_SECOND;
+use crate::circadian::SLEEP_RECOVERY_PER_ASLEEP_SECOND;
 use crate::circadian::SleepPhase;
 use crate::organism::OrganismState;
 
 pub const INITIAL_CHEMICAL_STORE_UJ: i64 = 8_400_000_000_000;
 
 /// Sleep debt in canonical seconds of missed recovery. Physical counter,
-/// not a normalized score: one awake second adds exactly one second of
-/// debt, one asleep second removes exactly one (floored at zero).
+/// not a normalized score: one awake second adds exactly
+/// [`SLEEP_DEBT_PER_AWAKE_SECOND`] seconds of debt, one asleep second
+/// clears exactly [`SLEEP_RECOVERY_PER_ASLEEP_SECOND`] (floored at zero).
 pub fn advance_sleep_debt(current_seconds: i64, phase: SleepPhase) -> i64 {
     match phase {
-        SleepPhase::Awake => current_seconds + 1,
-        SleepPhase::Asleep => (current_seconds - 1).max(0),
+        SleepPhase::Awake => current_seconds + SLEEP_DEBT_PER_AWAKE_SECOND,
+        SleepPhase::Asleep => (current_seconds - SLEEP_RECOVERY_PER_ASLEEP_SECOND).max(0),
     }
 }
 
