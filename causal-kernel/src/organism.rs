@@ -10,6 +10,8 @@ pub enum OrganismError {
     ChemicalOverdraft,
     #[error("thermal exchange rejected: {0}")]
     Thermal(#[from] crate::thermal::ThermalError),
+    #[error("ingestion exceeds declared chemical capacity; no partial application")]
+    DigestiveCapacityExceeded,
     #[error("checked arithmetic overflow in organism state")]
     Overflow,
 }
@@ -34,6 +36,7 @@ pub const BASELINE_AMBIENT_INTERNAL_ENERGY_UJ: i64 = 2_931_500_000_000_000;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OrganismState {
     chemical_store_uj: i64,
+    digestion_buffer_uj: i64,
     core_internal_energy_uj: i64,
     ambient_reservoir: ReservoirState,
     morphotype: Morphotype,
@@ -43,6 +46,7 @@ impl OrganismState {
     pub fn new(chemical_store_uj: i64, core_internal_energy_uj: i64) -> Self {
         Self {
             chemical_store_uj,
+            digestion_buffer_uj: 0,
             core_internal_energy_uj,
             ambient_reservoir: ReservoirState::new(
                 BASELINE_AMBIENT_INTERNAL_ENERGY_UJ,
@@ -60,6 +64,7 @@ impl OrganismState {
     ) -> Self {
         Self {
             chemical_store_uj,
+            digestion_buffer_uj: 0,
             core_internal_energy_uj,
             ambient_reservoir,
             morphotype: morphotype.clone(),
@@ -73,6 +78,7 @@ impl OrganismState {
     ) -> Self {
         Self {
             chemical_store_uj,
+            digestion_buffer_uj: 0,
             core_internal_energy_uj,
             ambient_reservoir,
             morphotype: Morphotype::human(),
@@ -91,6 +97,7 @@ impl OrganismState {
             .expect("baseline core energy fits i64");
         Self {
             chemical_store_uj: crate::interoception::INITIAL_CHEMICAL_STORE_UJ,
+            digestion_buffer_uj: 0,
             core_internal_energy_uj,
             ambient_reservoir: ReservoirState::new(
                 BASELINE_AMBIENT_INTERNAL_ENERGY_UJ,
@@ -102,19 +109,60 @@ impl OrganismState {
 
     pub(crate) fn with_ambient_from_row(
         chemical_store_uj: i64,
+        digestion_buffer_uj: i64,
         core_internal_energy_uj: i64,
         ambient_energy_uj: i64,
         ambient_capacity_uj_per_mk: i64,
     ) -> Self {
-        Self::with_ambient(
+        let mut organism = Self::with_ambient(
             chemical_store_uj,
             core_internal_energy_uj,
             ReservoirState::new(ambient_energy_uj, ambient_capacity_uj_per_mk),
-        )
+        );
+        organism.digestion_buffer_uj = digestion_buffer_uj;
+        organism
     }
 
     pub fn chemical_store_uj(&self) -> i64 {
         self.chemical_store_uj
+    }
+
+    /// Energy currently held in the digestive tract awaiting absorption.
+    pub fn digestion_buffer_uj(&self) -> i64 {
+        self.digestion_buffer_uj
+    }
+
+    /// Declared chemical capacity of the organism; ingestion beyond
+    /// store + buffer headroom is a typed rejection.
+    pub fn chemical_capacity_uj(&self) -> i64 {
+        crate::interoception::INITIAL_CHEMICAL_STORE_UJ
+    }
+
+    /// Buffers ingested energy without crediting the store. The caller is
+    /// responsible for capacity validation before mutation.
+    pub fn stage_ingestion(&mut self, energy_uj: i64) -> Result<(), OrganismError> {
+        let total = self
+            .chemical_store_uj
+            .checked_add(self.digestion_buffer_uj)
+            .ok_or(OrganismError::Overflow)?;
+        let new_total = total
+            .checked_add(energy_uj)
+            .ok_or(OrganismError::Overflow)?;
+        if new_total > self.chemical_capacity_uj() {
+            return Err(OrganismError::DigestiveCapacityExceeded);
+        }
+        self.digestion_buffer_uj = self
+            .digestion_buffer_uj
+            .checked_add(energy_uj)
+            .ok_or(OrganismError::Overflow)?;
+        Ok(())
+    }
+
+    /// Consumes absorbed flux from the buffer. Exact by construction;
+    /// the caller guarantees `energy_uj` does not exceed the buffer.
+    pub fn consume_digestion_buffer(&mut self, energy_uj: i64) {
+        debug_assert!(self.digestion_buffer_uj >= energy_uj);
+        self.digestion_buffer_uj -= energy_uj;
     }
 
     pub fn core_internal_energy_uj(&self) -> i64 {

@@ -9,6 +9,7 @@ mod artifact;
 mod cell_cohort;
 mod circadian;
 mod cognitive;
+mod digestion;
 mod interoception;
 mod morphotype;
 mod neural_population;
@@ -31,6 +32,7 @@ pub use circadian::{
 pub use cognitive::{
     CognitiveDisposition, CognitiveGate, CognitiveGateError, CortexProposal, Intention,
 };
+pub use digestion::ABSORPTION_RATE_UJ_PER_SECOND;
 pub use interoception::{INITIAL_CHEMICAL_STORE_UJ, InteroceptionObservables, advance_sleep_debt};
 pub use morphotype::{
     AnatomyEdge, AnatomyNode, Morphotype, MorphotypeDefinition, MorphotypeError, OrganBinding,
@@ -341,6 +343,8 @@ pub enum CommitError {
     SleepIntentionRequired,
     #[error("ingestion amount must be positive")]
     InvalidIngestion,
+    #[error("ingestion exceeds declared chemical capacity")]
+    DigestiveCapacityExceeded,
     #[error("metabolism rejected during advance: {0}")]
     MetabolismRejected(crate::organism::OrganismError),
     #[error("resolution change rejected before commit: {0}")]
@@ -536,6 +540,7 @@ impl WorldEngine {
                 current_organism = Some(initial_organism());
             }
             if let Some(organism) = current_organism.as_mut() {
+                crate::digestion::absorb_one_second(organism);
                 organism
                     .apply_ambient_exchange()
                     .map_err(CommitError::MetabolismRejected)?;
@@ -555,7 +560,15 @@ impl WorldEngine {
             if energy <= 0 {
                 return Err(CommitError::InvalidIngestion);
             }
-            organism.absorb_chemical_energy(energy);
+            organism
+                .stage_ingestion(energy)
+                .map_err(|error| match error {
+                    crate::organism::OrganismError::DigestiveCapacityExceeded => {
+                        CommitError::DigestiveCapacityExceeded
+                    }
+                    crate::organism::OrganismError::Overflow => CommitError::InvalidIngestion,
+                    other => CommitError::MetabolismRejected(other),
+                })?;
         }
         self.reservoirs = current;
         self.organism = current_organism;
@@ -638,15 +651,17 @@ impl WorldEngine {
             }
             if let Some(organism) = &self.organism {
                 transaction.execute(
-                "INSERT INTO organism_state (singleton, chemical_store_uj, core_internal_energy_uj, ambient_internal_energy_uj, ambient_heat_capacity_uj_per_mk)
-                 VALUES (1, ?1, ?2, ?3, ?4)
+                "INSERT INTO organism_state (singleton, chemical_store_uj, digestion_buffer_uj, core_internal_energy_uj, ambient_internal_energy_uj, ambient_heat_capacity_uj_per_mk)
+                 VALUES (1, ?1, ?2, ?3, ?4, ?5)
                  ON CONFLICT(singleton) DO UPDATE SET
                     chemical_store_uj = excluded.chemical_store_uj,
+                    digestion_buffer_uj = excluded.digestion_buffer_uj,
                     core_internal_energy_uj = excluded.core_internal_energy_uj,
                     ambient_internal_energy_uj = excluded.ambient_internal_energy_uj,
                     ambient_heat_capacity_uj_per_mk = excluded.ambient_heat_capacity_uj_per_mk",
                 params![
                     organism.chemical_store_uj(),
+                    organism.digestion_buffer_uj(),
                     organism.core_internal_energy_uj(),
                     organism.ambient_internal_energy_uj(),
                     organism
@@ -800,6 +815,7 @@ CREATE TABLE IF NOT EXISTS sleep_intention (
 CREATE TABLE IF NOT EXISTS organism_state (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     chemical_store_uj INTEGER NOT NULL,
+    digestion_buffer_uj INTEGER NOT NULL DEFAULT 0,
     core_internal_energy_uj INTEGER NOT NULL,
     ambient_internal_energy_uj INTEGER NOT NULL DEFAULT 2931500000000000,
     ambient_heat_capacity_uj_per_mk INTEGER NOT NULL DEFAULT 10000000000
@@ -821,22 +837,38 @@ fn ensure_runtime_tables(connection: &Connection) -> Result<(), rusqlite::Error>
     connection.execute_batch("COMMIT")
 }
 
-/// Expand migration: pre-capacity timelines keep their rows and gain the
-/// ambient heat capacity column at the declared baseline value.
+/// Expand migrations for timelines created before later organism state
+/// columns existed. Existing rows keep their values and gain declared
+/// defaults.
 fn migrate_organism_state_columns(connection: &Connection) -> Result<(), rusqlite::Error> {
-    let has_capacity_column: i64 = connection.query_row(
-        "SELECT COUNT(*) FROM pragma_table_info('organism_state')
-         WHERE name = 'ambient_heat_capacity_uj_per_mk'",
-        [],
-        |row| row.get(0),
-    )?;
-    if has_capacity_column == 0 {
-        connection.execute_batch(&format!(
-            "ALTER TABLE organism_state ADD COLUMN ambient_heat_capacity_uj_per_mk
-             INTEGER NOT NULL DEFAULT {};",
-            crate::organism::AMBIENT_HEAT_CAPACITY_UJ_PER_MK
-        ))?;
+    let columns: Vec<String> = {
+        let mut statement =
+            connection.prepare("SELECT name FROM pragma_table_info('organism_state')")?;
+        let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
+        rows.collect::<Result<Vec<_>, _>>()?
+    };
+
+    fn ensure_column(
+        columns: &[String],
+        connection: &Connection,
+        name: &str,
+        default_expr: &str,
+    ) -> Result<(), rusqlite::Error> {
+        if !columns.iter().any(|column| column == name) {
+            connection.execute_batch(&format!(
+                "ALTER TABLE organism_state ADD COLUMN {name} INTEGER NOT NULL DEFAULT {default_expr};"
+            ))?;
+        }
+        Ok(())
     }
+
+    ensure_column(
+        &columns,
+        connection,
+        "ambient_heat_capacity_uj_per_mk",
+        "10000000000",
+    )?;
+    ensure_column(&columns, connection, "digestion_buffer_uj", "0")?;
     Ok(())
 }
 
@@ -892,7 +924,9 @@ fn initial_organism() -> OrganismState {
 fn read_organism(connection: &Connection) -> Option<OrganismState> {
     connection
         .query_row(
-            "SELECT chemical_store_uj, core_internal_energy_uj,
+            "SELECT chemical_store_uj,
+                    COALESCE(digestion_buffer_uj, 0),
+                    core_internal_energy_uj,
                     COALESCE(ambient_internal_energy_uj, 2931500000000000),
                     COALESCE(ambient_heat_capacity_uj_per_mk, 10000000000)
              FROM organism_state WHERE singleton = 1",
@@ -901,8 +935,9 @@ fn read_organism(connection: &Connection) -> Option<OrganismState> {
                 Ok(OrganismState::with_ambient_from_row(
                     row.get(0)?,
                     row.get(1)?,
-                    row.get::<_, i64>(2)?,
+                    row.get(2)?,
                     row.get::<_, i64>(3)?,
+                    row.get::<_, i64>(4)?,
                 ))
             },
         )
