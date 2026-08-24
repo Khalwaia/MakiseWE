@@ -409,6 +409,10 @@ impl WorldEngine {
             return Ok(replay);
         }
 
+        if self.organism.is_none() && request.advance_to_seconds == 0 {
+            self.organism = Some(initial_organism());
+        }
+
         if request.expected_version != self.head_version {
             return Err(CommitError::ExpectedVersionConflict);
         }
@@ -435,6 +439,9 @@ impl WorldEngine {
                 current_organism = Some(initial_organism());
             }
             if let Some(organism) = current_organism.as_mut() {
+                organism
+                    .apply_ambient_exchange()
+                    .map_err(CommitError::MetabolismRejected)?;
                 let demand = if self.sleep_phase == circadian::SleepPhase::Asleep {
                     circadian::metabolic_demand_uj_per_second(circadian::SleepPhase::Asleep)
                 } else {
@@ -487,12 +494,17 @@ impl WorldEngine {
             )?;
             if let Some(organism) = self.organism {
                 transaction.execute(
-                    "INSERT INTO organism_state (singleton, chemical_store_uj, core_internal_energy_uj)
-                     VALUES (1, ?1, ?2)
+                    "INSERT INTO organism_state (singleton, chemical_store_uj, core_internal_energy_uj, ambient_internal_energy_uj)
+                     VALUES (1, ?1, ?2, ?3)
                      ON CONFLICT(singleton) DO UPDATE SET
                         chemical_store_uj = excluded.chemical_store_uj,
-                        core_internal_energy_uj = excluded.core_internal_energy_uj",
-                    params![organism.chemical_store_uj(), organism.core_internal_energy_uj()],
+                        core_internal_energy_uj = excluded.core_internal_energy_uj,
+                        ambient_internal_energy_uj = excluded.ambient_internal_energy_uj",
+                    params![
+                        organism.chemical_store_uj(),
+                        organism.core_internal_energy_uj(),
+                        organism.ambient_internal_energy_uj()
+                    ],
                 )?;
             }
             transaction.commit()?;
@@ -616,7 +628,8 @@ CREATE TABLE IF NOT EXISTS sleep_state (
 CREATE TABLE IF NOT EXISTS organism_state (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     chemical_store_uj INTEGER NOT NULL,
-    core_internal_energy_uj INTEGER NOT NULL
+    core_internal_energy_uj INTEGER NOT NULL,
+    ambient_internal_energy_uj INTEGER NOT NULL DEFAULT 20000000000000
 );
 CREATE TABLE IF NOT EXISTS sleep_debt (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
@@ -671,10 +684,16 @@ fn initial_organism() -> OrganismState {
 fn read_organism(connection: &Connection) -> Option<OrganismState> {
     connection
         .query_row(
-            "SELECT chemical_store_uj, core_internal_energy_uj FROM organism_state WHERE singleton = 1",
+            "SELECT chemical_store_uj, core_internal_energy_uj,
+                    COALESCE(ambient_internal_energy_uj, 20000000000000)
+             FROM organism_state WHERE singleton = 1",
             [],
             |row| {
-                Ok(OrganismState::new(row.get(0)?, row.get(1)?))
+                Ok(OrganismState::with_ambient_from_row(
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get::<_, i64>(2)?,
+                ))
             },
         )
         .ok()

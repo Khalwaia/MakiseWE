@@ -1,15 +1,23 @@
 use thiserror::Error;
 
+use crate::quantity::ReservoirState;
+use crate::thermal::{ReservoirPair, ThermalProposal};
+
 #[derive(Clone, Copy, Debug, Error, Eq, PartialEq)]
 pub enum OrganismError {
     #[error("metabolic demand exceeds chemical store; no partial application")]
     ChemicalOverdraft,
+    #[error("thermal exchange rejected: {0}")]
+    Thermal(#[from] crate::thermal::ThermalError),
+    #[error("checked arithmetic overflow in organism state")]
+    Overflow,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct OrganismState {
     chemical_store_uj: i64,
     core_internal_energy_uj: i64,
+    ambient_reservoir: ReservoirState,
 }
 
 impl OrganismState {
@@ -17,7 +25,32 @@ impl OrganismState {
         Self {
             chemical_store_uj,
             core_internal_energy_uj,
+            ambient_reservoir: ReservoirState::new(20_000_000_000_000, 1_000_000),
         }
+    }
+
+    pub fn with_ambient(
+        chemical_store_uj: i64,
+        core_internal_energy_uj: i64,
+        ambient_reservoir: ReservoirState,
+    ) -> Self {
+        Self {
+            chemical_store_uj,
+            core_internal_energy_uj,
+            ambient_reservoir,
+        }
+    }
+
+    pub(crate) fn with_ambient_from_row(
+        chemical_store_uj: i64,
+        core_internal_energy_uj: i64,
+        ambient_energy_uj: i64,
+    ) -> Self {
+        Self::with_ambient(
+            chemical_store_uj,
+            core_internal_energy_uj,
+            ReservoirState::new(ambient_energy_uj, 1_000_000),
+        )
     }
 
     pub fn chemical_store_uj(&self) -> i64 {
@@ -26,6 +59,36 @@ impl OrganismState {
 
     pub fn core_internal_energy_uj(&self) -> i64 {
         self.core_internal_energy_uj
+    }
+
+    pub fn ambient_reservoir(&self) -> &ReservoirState {
+        &self.ambient_reservoir
+    }
+
+    pub fn ambient_internal_energy_uj(&self) -> i64 {
+        self.ambient_reservoir.internal_energy_microjoule()
+    }
+
+    /// Exchanges exactly one second of thermal energy between organism core
+    /// and ambient environment using the shared thermal mechanism. Total
+    /// accounted energy is conserved without tolerance.
+    pub fn apply_ambient_exchange(&mut self) -> Result<(), OrganismError> {
+        let core = ReservoirState::new(self.core_internal_energy_uj, 4_000);
+        let pair = ReservoirPair::new(core, self.ambient_reservoir);
+        let proposal = ThermalProposal::one_second(&pair, 50).map_err(OrganismError::Thermal)?;
+        let transfer = proposal.transfer();
+        self.core_internal_energy_uj += transfer.delta_hot_uj();
+        let new_ambient_energy = self
+            .ambient_reservoir
+            .internal_energy_microjoule()
+            .checked_add(transfer.delta_cold_uj())
+            .ok_or(OrganismError::Overflow)?;
+        self.ambient_reservoir = ReservoirState::new(
+            new_ambient_energy,
+            self.ambient_reservoir
+                .heat_capacity_microjoule_per_millikelvin(),
+        );
+        Ok(())
     }
 
     /// Converts exactly `demand_uj` of chemical store into core thermal energy.
