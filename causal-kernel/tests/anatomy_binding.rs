@@ -31,8 +31,8 @@ fn runtime_morphotype_can_be_created_from_definition_data() {
     let definition = MorphotypeDefinition::from_fixture(human_json).expect("human package");
     let runtime = definition.runtime_parameters();
 
-    assert_eq!(runtime.awake_metabolism_uj_per_second(), 1_200_000);
-    assert_eq!(runtime.core_heat_capacity_uj_per_mk(), 4_000);
+    assert_eq!(runtime.awake_metabolism_uj_per_second(), 95_000_000);
+    assert_eq!(runtime.core_heat_capacity_uj_per_mk(), 216_380_000);
 }
 
 #[test]

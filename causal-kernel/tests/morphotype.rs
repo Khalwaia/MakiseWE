@@ -1,14 +1,16 @@
-use makise_causal_kernel::{Morphotype, MorphotypeDefinition, OrganismState, ReservoirState};
+use makise_causal_kernel::{
+    Morphotype, MorphotypeDefinition, OrganismState, REFERENCE_CORE_TEMPERATURE_MK,
+};
 
 #[test]
 fn human_morphotype_matches_current_baseline() {
     let morph = Morphotype::human();
 
-    assert_eq!(morph.awake_metabolism_uj_per_second(), 1_200_000);
-    assert_eq!(morph.asleep_metabolism_uj_per_second(), 800_000);
-    assert_eq!(morph.night_awake_metabolism_uj_per_second(), 1_000_000);
-    assert_eq!(morph.core_heat_capacity_uj_per_mk(), 4_000);
-    assert_eq!(morph.ambient_conductance_uj_per_mk_s(), 50,);
+    assert_eq!(morph.awake_metabolism_uj_per_second(), 95_000_000);
+    assert_eq!(morph.asleep_metabolism_uj_per_second(), 75_000_000);
+    assert_eq!(morph.night_awake_metabolism_uj_per_second(), 88_000_000);
+    assert_eq!(morph.core_heat_capacity_uj_per_mk(), 216_380_000);
+    assert_eq!(morph.ambient_conductance_uj_per_mk_s(), 5_600,);
 }
 
 #[test]
@@ -94,26 +96,21 @@ fn unknown_morphotype_id_is_rejected_without_silent_default() {
 
 #[test]
 fn organism_state_uses_morphotype_parameters_for_exchange() {
-    let human = OrganismState::with_morphotype(
-        &Morphotype::human(),
-        8_400_000_000_000,
-        160_000_000,
-        ReservoirState::new(20_000_000_000_000, 1_000_000),
-    );
-    let neko = OrganismState::with_morphotype(
-        &Morphotype::neko(),
-        8_400_000_000_000,
-        160_000_000,
-        ReservoirState::new(20_000_000_000_000, 1_000_000),
-    );
+    let mut h = OrganismState::physiological_baseline(&Morphotype::human());
+    let mut n = OrganismState::physiological_baseline(&Morphotype::neko());
 
-    let mut h = human;
-    let mut n = neko;
+    assert_eq!(h.core_temperature_mk(), n.core_temperature_mk());
+    assert_eq!(h.ambient_temperature_mk(), n.ambient_temperature_mk());
+
     h.apply_ambient_exchange().unwrap();
     n.apply_ambient_exchange().unwrap();
 
-    let h_delta = (h.core_internal_energy_uj() - 160_000_000).abs();
-    let n_delta = (n.core_internal_energy_uj() - 160_000_000).abs();
+    let h_delta = (h.morphotype().core_heat_capacity_uj_per_mk() * REFERENCE_CORE_TEMPERATURE_MK
+        - h.core_internal_energy_uj())
+    .abs();
+    let n_delta = (n.morphotype().core_heat_capacity_uj_per_mk() * REFERENCE_CORE_TEMPERATURE_MK
+        - n.core_internal_energy_uj())
+    .abs();
     // Lower conductance means less heat transferred in the same second.
     assert!(
         n_delta < h_delta,

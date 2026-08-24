@@ -27,16 +27,19 @@ impl SleepPhase {
 }
 
 /// Metabolic chemical demand in microjoules per canonical second.
-/// Values are declared constants with provenance `expert_estimate`
-/// until calibrated against reference data; the ratio is the causal
-/// claim under test (sleep lowers demand), exact magnitudes are
-/// upgradeable via mechanism artifacts.
-pub const AWAKE_METABOLISM_UJ_PER_SECOND: i64 = 1_200_000;
-pub const ASLEEP_METABOLISM_UJ_PER_SECOND: i64 = 800_000;
+///
+/// Provenance: `expert_estimate` anchored to published human physiology
+/// (Weir 1949 gas-exchange method; typical adult female daily energy
+/// expenditure of roughly 1500–2200 kcal/day), as summarized in
+/// docs/research/biology-realism.md. The causal claim under test is the
+/// ordering sleep < night-awake < day-awake; exact magnitudes are
+/// upgradeable via mechanism artifacts carrying measured provenance.
+pub const AWAKE_METABOLISM_UJ_PER_SECOND: i64 = 95_000_000;
+pub const ASLEEP_METABOLISM_UJ_PER_SECOND: i64 = 75_000_000;
 
 /// Canonical circadian modulation of awake demand: night seconds 0..21600
 /// (00:00–06:00) get a lower rate than daytime. Sleep phase still dominates.
-pub const NIGHT_AWAKE_METABOLISM_UJ_PER_SECOND: i64 = 1_000_000;
+pub const NIGHT_AWAKE_METABOLISM_UJ_PER_SECOND: i64 = 88_000_000;
 
 pub fn metabolic_demand_uj_per_second(phase: SleepPhase) -> i64 {
     match phase {

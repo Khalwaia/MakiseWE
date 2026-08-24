@@ -34,7 +34,11 @@ pub use morphotype::{
     AnatomyEdge, AnatomyNode, Morphotype, MorphotypeDefinition, MorphotypeError, OrganBinding,
 };
 pub use neural_population::{NeuralPopulation, NeuralPopulationError};
-pub use organism::{OrganismError, OrganismState};
+pub use organism::{
+    AMBIENT_HEAT_CAPACITY_UJ_PER_MK, BASELINE_AMBIENT_INTERNAL_ENERGY_UJ,
+    BASELINE_CORE_INTERNAL_ENERGY_UJ, OrganismError, OrganismState,
+    REFERENCE_AMBIENT_TEMPERATURE_MK, REFERENCE_CORE_TEMPERATURE_MK,
+};
 pub use quantity::{Dimension, Quantity, QuantityError, ReservoirState, StateHash, UnitScale};
 pub use resolution::{ResolutionChanged, ResolutionError};
 pub use thermal::{ReservoirPair, ThermalError, ThermalProposal, ThermalTransfer};
@@ -608,18 +612,22 @@ impl WorldEngine {
             }
             if let Some(organism) = &self.organism {
                 transaction.execute(
-                    "INSERT INTO organism_state (singleton, chemical_store_uj, core_internal_energy_uj, ambient_internal_energy_uj)
-                     VALUES (1, ?1, ?2, ?3)
-                     ON CONFLICT(singleton) DO UPDATE SET
-                        chemical_store_uj = excluded.chemical_store_uj,
-                        core_internal_energy_uj = excluded.core_internal_energy_uj,
-                        ambient_internal_energy_uj = excluded.ambient_internal_energy_uj",
-                    params![
-                        organism.chemical_store_uj(),
-                        organism.core_internal_energy_uj(),
-                        organism.ambient_internal_energy_uj()
-                    ],
-                )?;
+                "INSERT INTO organism_state (singleton, chemical_store_uj, core_internal_energy_uj, ambient_internal_energy_uj, ambient_heat_capacity_uj_per_mk)
+                 VALUES (1, ?1, ?2, ?3, ?4)
+                 ON CONFLICT(singleton) DO UPDATE SET
+                    chemical_store_uj = excluded.chemical_store_uj,
+                    core_internal_energy_uj = excluded.core_internal_energy_uj,
+                    ambient_internal_energy_uj = excluded.ambient_internal_energy_uj,
+                    ambient_heat_capacity_uj_per_mk = excluded.ambient_heat_capacity_uj_per_mk",
+                params![
+                    organism.chemical_store_uj(),
+                    organism.core_internal_energy_uj(),
+                    organism.ambient_internal_energy_uj(),
+                    organism
+                        .ambient_reservoir()
+                        .heat_capacity_microjoule_per_millikelvin(),
+                ],
+            )?;
             }
             transaction.commit()?;
         }
@@ -763,7 +771,8 @@ CREATE TABLE IF NOT EXISTS organism_state (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     chemical_store_uj INTEGER NOT NULL,
     core_internal_energy_uj INTEGER NOT NULL,
-    ambient_internal_energy_uj INTEGER NOT NULL DEFAULT 20000000000000
+    ambient_internal_energy_uj INTEGER NOT NULL DEFAULT 2931500000000000,
+    ambient_heat_capacity_uj_per_mk INTEGER NOT NULL DEFAULT 10000000000
 );
 CREATE TABLE IF NOT EXISTS sleep_debt (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
@@ -778,7 +787,27 @@ CREATE TABLE IF NOT EXISTS active_resolution (
 fn ensure_runtime_tables(connection: &Connection) -> Result<(), rusqlite::Error> {
     connection.execute_batch("BEGIN")?;
     connection.execute_batch(RUNTIME_SCHEMA)?;
+    migrate_organism_state_columns(connection)?;
     connection.execute_batch("COMMIT")
+}
+
+/// Expand migration: pre-capacity timelines keep their rows and gain the
+/// ambient heat capacity column at the declared baseline value.
+fn migrate_organism_state_columns(connection: &Connection) -> Result<(), rusqlite::Error> {
+    let has_capacity_column: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('organism_state')
+         WHERE name = 'ambient_heat_capacity_uj_per_mk'",
+        [],
+        |row| row.get(0),
+    )?;
+    if has_capacity_column == 0 {
+        connection.execute_batch(&format!(
+            "ALTER TABLE organism_state ADD COLUMN ambient_heat_capacity_uj_per_mk
+             INTEGER NOT NULL DEFAULT {};",
+            crate::organism::AMBIENT_HEAT_CAPACITY_UJ_PER_MK
+        ))?;
+    }
+    Ok(())
 }
 
 fn read_head_version(connection: &Connection) -> Result<u64, rusqlite::Error> {
@@ -816,14 +845,15 @@ fn read_sleep_phase(connection: &Connection) -> circadian::SleepPhase {
 }
 
 fn initial_organism() -> OrganismState {
-    OrganismState::new(interoception::INITIAL_CHEMICAL_STORE_UJ, 20_000_000_000_000)
+    OrganismState::physiological_baseline(&crate::morphotype::Morphotype::human())
 }
 
 fn read_organism(connection: &Connection) -> Option<OrganismState> {
     connection
         .query_row(
             "SELECT chemical_store_uj, core_internal_energy_uj,
-                    COALESCE(ambient_internal_energy_uj, 20000000000000)
+                    COALESCE(ambient_internal_energy_uj, 2931500000000000),
+                    COALESCE(ambient_heat_capacity_uj_per_mk, 10000000000)
              FROM organism_state WHERE singleton = 1",
             [],
             |row| {
@@ -831,6 +861,7 @@ fn read_organism(connection: &Connection) -> Option<OrganismState> {
                     row.get(0)?,
                     row.get(1)?,
                     row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
                 ))
             },
         )

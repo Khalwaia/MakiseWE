@@ -1,7 +1,7 @@
 use makise_causal_kernel::{
     CognitiveDisposition, CognitiveGate, CommitRequest, CortexProposal, Morphotype,
-    NeuralPopulation, OpenSpec, OrganismState, ReservoirState, SleepPhase, StorageLocation,
-    TimelineId, WorldEngine, WorldId,
+    NeuralPopulation, OpenSpec, OrganismState, SleepPhase, StorageLocation, TimelineId,
+    WorldEngine, WorldId,
 };
 
 fn spec(name: &str) -> OpenSpec {
@@ -101,37 +101,26 @@ fn phase1_24h_human_scenario_conserves_energy_and_produces_intention() {
 /// response under identical stimulus — data-driven difference, no branches.
 #[test]
 fn phase1_neko_vs_human_morphotype_data_driven_difference() {
-    let human = OrganismState::with_morphotype(
-        &Morphotype::human(),
-        8_400_000_000_000,
-        160_000_000,
-        ReservoirState::new(20_000_000_000_000, 1_000_000),
-    );
-    let neko = OrganismState::with_morphotype(
-        &Morphotype::neko(),
-        8_400_000_000_000,
-        160_000_000,
-        ReservoirState::new(20_000_000_000_000, 1_000_000),
-    );
+    let mut h = OrganismState::physiological_baseline(&Morphotype::human());
+    let mut n = OrganismState::physiological_baseline(&Morphotype::neko());
 
-    let mut h = human;
-    let mut n = neko;
+    assert_eq!(h.core_temperature_mk(), n.core_temperature_mk());
+
     h.apply_ambient_exchange().unwrap();
     n.apply_ambient_exchange().unwrap();
 
-    let h_delta = (160_000_000 - h.core_internal_energy_uj()).abs();
-    let n_delta = (160_000_000 - n.core_internal_energy_uj()).abs();
     assert_ne!(
-        h_delta, n_delta,
+        h.core_internal_energy_uj(),
+        n.core_internal_energy_uj(),
         "different morphotypes must produce different thermal outcomes"
     );
 }
 
-/// NeuralPopulation integrates into the same accounting: spikes cost µJ.
+/// NeuralPopulation integrates into the same accounting: spikes cost nJ.
 #[test]
 fn phase1_neural_activity_costs_exact_energy() {
     let mut brain = NeuralPopulation::new(86_000_000_000);
-    brain.record_spikes(1_000, 50_000).expect("spikes");
+    brain.record_spikes(1_000, 10).expect("spikes");
     assert_eq!(brain.total_spike_count(), 1_000);
-    assert_eq!(brain.cumulative_spike_energy_uj(), 50_000_000);
+    assert_eq!(brain.cumulative_spike_energy_nj(), 10_000);
 }

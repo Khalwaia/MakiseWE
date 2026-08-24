@@ -46,14 +46,24 @@ impl Morphotype {
         self
     }
 
-    /// Baseline human parameters matching the current hardcoded constants.
+    /// Human baseline parameters. Provenance: `expert_estimate` anchored
+    /// to published values summarized in docs/research/biology-realism.md:
+    /// tissue specific heat 3490 J/(kg·K) × 62 kg reference mass →
+    /// 216_380_000 µJ/mK core heat capacity; whole-body passive
+    /// conductance ≈ 5.6 W/K inside the published 4–10 W/K band for
+    /// radiation + convection; metabolic rates from circadian.rs. The
+    /// conductance is tuned so the passive equilibrium at a 20 °C room
+    /// lands at ≈310.1 K.
     pub fn human() -> Self {
-        Self::new(1_200_000, 800_000, 1_000_000, 4_000, 50)
+        Self::new(95_000_000, 75_000_000, 88_000_000, 216_380_000, 5_600)
     }
 
-    /// Neko: smaller body mass, fur insulation, slightly different metabolism.
+    /// Neko: fictional morphotype (`fictional_assumption` / `species_proxy`).
+    /// Assumed ~30 kg body mass with fur-insulated surface. No empirical
+    /// population exists; these magnitudes are declared placeholders whose
+    /// only contract-tested properties are orderings relative to human.
     pub fn neko() -> Self {
-        Self::new(960_000, 640_000, 800_000, 2_000, 25)
+        Self::new(55_000_000, 45_000_000, 50_000_000, 104_700_000, 3_200)
     }
 
     pub fn awake_metabolism_uj_per_second(&self) -> i64 {

@@ -14,6 +14,23 @@ pub enum OrganismError {
     Overflow,
 }
 
+/// Declared reference temperatures for baseline state construction and
+/// validation bands. Provenance: `expert_estimate` anchored to published
+/// human physiology (Mackowiak 1992 circadian band around 36.4–37.4 °C;
+/// nominal apartment surrogate 20 °C) as summarized in
+/// docs/research/biology-realism.md.
+pub const REFERENCE_CORE_TEMPERATURE_MK: i64 = 310_150;
+pub const REFERENCE_AMBIENT_TEMPERATURE_MK: i64 = 293_150;
+
+/// Room-sized thermal surrogate capacity: 1e7 J/K expressed in µJ/mK.
+/// Chosen so a full day of metabolic heat input shifts ambient by < 1 K.
+pub const AMBIENT_HEAT_CAPACITY_UJ_PER_MK: i64 = 10_000_000_000;
+
+/// Baseline reservoir internal energies: heat capacity × reference
+/// temperature, exact integer products.
+pub const BASELINE_CORE_INTERNAL_ENERGY_UJ: i64 = 67_110_257_000_000;
+pub const BASELINE_AMBIENT_INTERNAL_ENERGY_UJ: i64 = 2_931_500_000_000_000;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OrganismState {
     chemical_store_uj: i64,
@@ -27,7 +44,10 @@ impl OrganismState {
         Self {
             chemical_store_uj,
             core_internal_energy_uj,
-            ambient_reservoir: ReservoirState::new(20_000_000_000_000, 1_000_000),
+            ambient_reservoir: ReservoirState::new(
+                BASELINE_AMBIENT_INTERNAL_ENERGY_UJ,
+                AMBIENT_HEAT_CAPACITY_UJ_PER_MK,
+            ),
             morphotype: Morphotype::human(),
         }
     }
@@ -59,15 +79,37 @@ impl OrganismState {
         }
     }
 
+    /// Builds a baseline organism whose core internal energy equals the
+    /// declared morphotype heat capacity × reference core temperature,
+    /// with the room surrogate at reference ambient temperature. Using a
+    /// shared raw energy across morphotypes would silently encode
+    /// different temperatures.
+    pub fn physiological_baseline(morphotype: &Morphotype) -> Self {
+        let core_internal_energy_uj = morphotype
+            .core_heat_capacity_uj_per_mk()
+            .checked_mul(REFERENCE_CORE_TEMPERATURE_MK)
+            .expect("baseline core energy fits i64");
+        Self {
+            chemical_store_uj: crate::interoception::INITIAL_CHEMICAL_STORE_UJ,
+            core_internal_energy_uj,
+            ambient_reservoir: ReservoirState::new(
+                BASELINE_AMBIENT_INTERNAL_ENERGY_UJ,
+                AMBIENT_HEAT_CAPACITY_UJ_PER_MK,
+            ),
+            morphotype: morphotype.clone(),
+        }
+    }
+
     pub(crate) fn with_ambient_from_row(
         chemical_store_uj: i64,
         core_internal_energy_uj: i64,
         ambient_energy_uj: i64,
+        ambient_capacity_uj_per_mk: i64,
     ) -> Self {
         Self::with_ambient(
             chemical_store_uj,
             core_internal_energy_uj,
-            ReservoirState::new(ambient_energy_uj, 1_000_000),
+            ReservoirState::new(ambient_energy_uj, ambient_capacity_uj_per_mk),
         )
     }
 
@@ -89,6 +131,21 @@ impl OrganismState {
 
     pub fn morphotype(&self) -> &Morphotype {
         &self.morphotype
+    }
+
+    /// Declared observable projection: core temperature in millikelvin.
+    /// Integer division; truncation error is below 1 mK by construction.
+    pub fn core_temperature_mk(&self) -> i64 {
+        self.core_internal_energy_uj / self.morphotype.core_heat_capacity_uj_per_mk()
+    }
+
+    /// Declared observable projection: ambient reservoir temperature in
+    /// millikelvin. Integer division; truncation error is below 1 mK.
+    pub fn ambient_temperature_mk(&self) -> i64 {
+        self.ambient_reservoir.internal_energy_microjoule()
+            / self
+                .ambient_reservoir
+                .heat_capacity_microjoule_per_millikelvin()
     }
 
     /// Exchanges exactly one second of thermal energy between organism core
