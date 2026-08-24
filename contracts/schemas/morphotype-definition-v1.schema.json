@@ -40,7 +40,16 @@
             "properties": {
               "from": { "$ref": "#/$defs/id" },
               "to": { "$ref": "#/$defs/id" },
-              "relation": { "$ref": "#/$defs/id" }
+              "relation": { "$ref": "#/$defs/id" },
+              "joint": {
+                "type": "object", "additionalProperties": false,
+                "required": ["limit_min_urad", "limit_max_urad", "driven_inertia_mgm2"],
+                "properties": {
+                  "limit_min_urad": { "type": "integer" },
+                  "limit_max_urad": { "type": "integer" },
+                  "driven_inertia_mgm2": { "type": "integer", "minimum": 1 }
+                }
+              }
             }
           }
         }

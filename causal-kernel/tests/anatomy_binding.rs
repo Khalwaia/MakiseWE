@@ -10,8 +10,8 @@ fn human_and_neko_anatomy_graphs_drive_organ_bindings() {
 
     assert_eq!(human.morphotype_id(), "human-v1");
     assert_eq!(neko.morphotype_id(), "neko-v1");
-    assert_eq!(human.anatomy_nodes().len(), 3);
-    assert_eq!(neko.anatomy_nodes().len(), 7);
+    assert_eq!(human.anatomy_nodes().len(), 7);
+    assert_eq!(neko.anatomy_nodes().len(), 11);
     assert_eq!(human.organ_bindings().len(), 1);
     assert_eq!(neko.organ_bindings().len(), 4);
 

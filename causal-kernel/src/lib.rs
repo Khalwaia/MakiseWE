@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::{Connection, OptionalExtension, params};
 use thiserror::Error;
 
+mod articulation;
 mod artifact;
 mod cell_cohort;
 mod circadian;
@@ -20,6 +21,9 @@ mod resolution;
 mod rigid_body;
 mod thermal;
 
+pub use articulation::{
+    ArticulatedBody, ArticulationError, JointSpec, MotionStep, MotorTorqueProposal,
+};
 pub use artifact::{
     AdmissionError, AdmissionRecord, ArtifactBundle, ContractParseError, MechanismContract,
     ProgramAbi,

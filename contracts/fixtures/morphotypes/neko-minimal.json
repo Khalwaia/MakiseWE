@@ -12,15 +12,36 @@
       { "node_id": "tail-muscles", "kind": "caudal-muscle-group", "count": 1 },
       { "node_id": "tail-vessels", "kind": "caudal-vasculature", "count": 1 },
       { "node_id": "tail-nerves", "kind": "caudal-innervation", "count": 1 },
-      { "node_id": "circulation", "kind": "closed-circulatory-system", "count": 1 }
+      { "node_id": "circulation", "kind": "closed-circulatory-system", "count": 1 },
+      { "node_id": "thigh-left", "kind": "neko-thigh-segment", "count": 1 },
+      { "node_id": "shank-left", "kind": "neko-shank-segment", "count": 1 },
+      { "node_id": "thigh-right", "kind": "neko-thigh-segment", "count": 1 },
+      { "node_id": "shank-right", "kind": "neko-shank-segment", "count": 1 }
     ],
     "edges": [
       { "from": "external-auricles", "to": "body", "relation": "anatomical-part-of" },
-      { "from": "tail-vertebrae", "to": "body", "relation": "anatomical-part-of" },
+      { "from": "tail-vertebrae", "to": "body", "relation": "articulated-joint-of",
+        "joint": { "limit_min_urad": -1500000, "limit_max_urad": 1500000, "driven_inertia_mgm2": 120000 } },
       { "from": "tail-muscles", "to": "tail-vertebrae", "relation": "actuates" },
       { "from": "tail-vessels", "to": "tail-vertebrae", "relation": "perfuses" },
       { "from": "tail-nerves", "to": "tail-muscles", "relation": "innervates" },
-      { "from": "circulation", "to": "body", "relation": "anatomical-part-of" }
+      { "from": "circulation", "to": "body", "relation": "anatomical-part-of" },
+      {
+        "from": "thigh-left", "to": "body", "relation": "articulated-joint-of",
+        "joint": { "limit_min_urad": -500000, "limit_max_urad": 2500000, "driven_inertia_mgm2": 180000 }
+      },
+      {
+        "from": "shank-left", "to": "thigh-left", "relation": "articulated-joint-of",
+        "joint": { "limit_min_urad": -100000, "limit_max_urad": 2000000, "driven_inertia_mgm2": 60000 }
+      },
+      {
+        "from": "thigh-right", "to": "body", "relation": "articulated-joint-of",
+        "joint": { "limit_min_urad": -500000, "limit_max_urad": 2500000, "driven_inertia_mgm2": 180000 }
+      },
+      {
+        "from": "shank-right", "to": "thigh-right", "relation": "articulated-joint-of",
+        "joint": { "limit_min_urad": -100000, "limit_max_urad": 2000000, "driven_inertia_mgm2": 60000 }
+      }
     ]
   },
   "development": {
@@ -72,6 +93,7 @@
   ],
   "validation_fixtures": [
     { "fixture_id": "neko-root-isolation", "evidence_kind": "schema_only", "acceptance": "Definition is an independent root with cat ears and tail anatomy" },
-    { "fixture_id": "neko-hearing-balance-thermal", "evidence_kind": "expert_estimate", "acceptance": "Bindings explicitly cover hearing, balance and thermoregulatory surface" }
+    { "fixture_id": "neko-hearing-balance-thermal", "evidence_kind": "expert_estimate", "acceptance": "Bindings explicitly cover hearing, balance and thermoregulatory surface" },
+    { "fixture_id": "neko-locomotor-joint-limits", "evidence_kind": "expert_estimate", "acceptance": "Digitigrade hind-limb and tail-base ranges are fictional_assumption species_proxy placeholders; only ordering relative to human is contract-checked" }
   ]
 }

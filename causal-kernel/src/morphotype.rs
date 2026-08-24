@@ -3,6 +3,8 @@ use std::collections::BTreeMap;
 use serde_json::Value;
 use thiserror::Error;
 
+use crate::articulation::JointSpec;
+
 /// Declared morphotype parameters. Data, not behavior: each value has units,
 /// provenance `expert_estimate`, and can be replaced via mechanism artifacts
 /// without changing code paths.
@@ -138,6 +140,7 @@ pub struct MorphotypeDefinition {
     morphotype_id: String,
     anatomy_nodes: Vec<AnatomyNode>,
     anatomy_edges: Vec<AnatomyEdge>,
+    anatomy_joints: Vec<JointSpec>,
     organ_bindings: Vec<OrganBinding>,
     runtime_parameters: Morphotype,
 }
@@ -190,6 +193,7 @@ impl MorphotypeDefinition {
                 })
             })
             .collect::<Result<Vec<_>, MorphotypeError>>()?;
+        let anatomy_joints = parse_anatomy_joints(&anatomy_nodes, &anatomy_edges, graph)?;
         let organ_bindings = object
             .get("organ_bindings")
             .and_then(Value::as_array)
@@ -228,6 +232,7 @@ impl MorphotypeDefinition {
             morphotype_id,
             anatomy_nodes,
             anatomy_edges,
+            anatomy_joints,
             organ_bindings,
             runtime_parameters,
         })
@@ -243,6 +248,11 @@ impl MorphotypeDefinition {
 
     pub fn anatomy_edges(&self) -> &[AnatomyEdge] {
         &self.anatomy_edges
+    }
+
+    /// Declared articulated joints in deterministic edge order.
+    pub fn anatomy_joints(&self) -> &[JointSpec] {
+        &self.anatomy_joints
     }
 
     pub fn organ_bindings(&self) -> &[OrganBinding] {
@@ -273,6 +283,68 @@ fn required_id(value: Option<&Value>) -> Result<String, MorphotypeError> {
                     .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
         })
         .ok_or(MorphotypeError::InvalidJson)
+}
+
+/// Extracts declared joints from anatomy edges. A `joint` declaration is
+/// only valid on an `articulated-joint-of` edge, and vice versa; both
+/// endpoints must reference known anatomy nodes. Order follows the edge
+/// array so the runtime skeleton is deterministic.
+fn parse_anatomy_joints(
+    nodes: &[AnatomyNode],
+    edges: &[AnatomyEdge],
+    graph: &serde_json::Map<String, Value>,
+) -> Result<Vec<JointSpec>, MorphotypeError> {
+    let raw_edges = graph
+        .get("edges")
+        .and_then(Value::as_array)
+        .ok_or(MorphotypeError::InvalidJson)?;
+    let known_nodes = nodes
+        .iter()
+        .map(|node| (node.node_id.as_str(), ()))
+        .collect::<BTreeMap<_, ()>>();
+    let mut joints = Vec::new();
+    for (edge, raw) in edges.iter().zip(raw_edges) {
+        let joint = raw.get("joint");
+        if (edge.relation == "articulated-joint-of") != joint.is_some() {
+            return Err(MorphotypeError::InvalidJson);
+        }
+        let Some(joint) = joint else { continue };
+        if !known_nodes.contains_key(edge.from.as_str())
+            || !known_nodes.contains_key(edge.to.as_str())
+        {
+            return Err(MorphotypeError::UnknownAnatomyNode(format!(
+                "{}->{}",
+                edge.from, edge.to
+            )));
+        }
+        let limit_min_urad = joint
+            .get("limit_min_urad")
+            .and_then(Value::as_i64)
+            .ok_or(MorphotypeError::InvalidJson)?;
+        let limit_max_urad = joint
+            .get("limit_max_urad")
+            .and_then(Value::as_i64)
+            .ok_or(MorphotypeError::InvalidJson)?;
+        let driven_inertia_mgm2 = joint
+            .get("driven_inertia_mgm2")
+            .and_then(Value::as_i64)
+            .filter(|inertia| *inertia >= 1)
+            .ok_or(MorphotypeError::InvalidJson)?;
+        if limit_min_urad > limit_max_urad {
+            return Err(MorphotypeError::InvalidJson);
+        }
+        joints.push(
+            JointSpec::new(
+                edge.from.clone(),
+                edge.to.clone(),
+                limit_min_urad,
+                limit_max_urad,
+                driven_inertia_mgm2,
+            )
+            .map_err(|_| MorphotypeError::InvalidJson)?,
+        );
+    }
+    Ok(joints)
 }
 
 /// Declared runtime parameters are keyed by morphotype identity. An

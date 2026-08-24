@@ -8,11 +8,31 @@
     "nodes": [
       { "node_id": "body", "kind": "mammalian-body", "count": 1 },
       { "node_id": "external-auricles", "kind": "human-auricle-pair", "count": 1 },
-      { "node_id": "circulation", "kind": "closed-circulatory-system", "count": 1 }
+      { "node_id": "circulation", "kind": "closed-circulatory-system", "count": 1 },
+      { "node_id": "thigh-left", "kind": "human-thigh-segment", "count": 1 },
+      { "node_id": "shank-left", "kind": "human-shank-segment", "count": 1 },
+      { "node_id": "thigh-right", "kind": "human-thigh-segment", "count": 1 },
+      { "node_id": "shank-right", "kind": "human-shank-segment", "count": 1 }
     ],
     "edges": [
       { "from": "external-auricles", "to": "body", "relation": "anatomical-part-of" },
-      { "from": "circulation", "to": "body", "relation": "anatomical-part-of" }
+      { "from": "circulation", "to": "body", "relation": "anatomical-part-of" },
+      {
+        "from": "thigh-left", "to": "body", "relation": "articulated-joint-of",
+        "joint": { "limit_min_urad": -300000, "limit_max_urad": 2000000, "driven_inertia_mgm2": 1000000 }
+      },
+      {
+        "from": "shank-left", "to": "thigh-left", "relation": "articulated-joint-of",
+        "joint": { "limit_min_urad": 0, "limit_max_urad": 2400000, "driven_inertia_mgm2": 400000 }
+      },
+      {
+        "from": "thigh-right", "to": "body", "relation": "articulated-joint-of",
+        "joint": { "limit_min_urad": -300000, "limit_max_urad": 2000000, "driven_inertia_mgm2": 1000000 }
+      },
+      {
+        "from": "shank-right", "to": "thigh-right", "relation": "articulated-joint-of",
+        "joint": { "limit_min_urad": 0, "limit_max_urad": 2400000, "driven_inertia_mgm2": 400000 }
+      }
     ]
   },
   "development": {
@@ -58,6 +78,7 @@
     "sha256:1111111111111111111111111111111111111111111111111111111111111111"
   ],
   "validation_fixtures": [
-    { "fixture_id": "human-root-isolation", "evidence_kind": "schema_only", "acceptance": "Definition is a root and contains no inheritance field" }
+    { "fixture_id": "human-root-isolation", "evidence_kind": "schema_only", "acceptance": "Definition is a root and contains no inheritance field" },
+    { "fixture_id": "locomotor-joint-limits", "evidence_kind": "expert_estimate", "acceptance": "Hip range approx -17..115 degrees, knee 0..137.5 degrees; segment inertias are coarse adult estimates, uncalibrated" }
   ]
 }
