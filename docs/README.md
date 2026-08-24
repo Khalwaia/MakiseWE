@@ -16,11 +16,12 @@
 4. [ARCHITECTURE.md](../ARCHITECTURE.md) — World Engine и causal boundaries.
 5. [INVARIANTS.md](../INVARIANTS.md) — обязательные правила.
 6. [WORLD_V1.md](../WORLD_V1.md) — мир, organisms и validation horizons.
-7. [PROTO.md](../PROTO.md) — persistence, replay и migration.
-8. [MEMORY.md](../MEMORY.md) — subjective memory каждого Consciousness.
-9. [SECURITY.md](../SECURITY.md) — trust boundaries и disclosure policy.
-10. [ROADMAP.md](../ROADMAP.md) — phases и gates.
-11. [CHANGELOG.md](../CHANGELOG.md) — значимые изменения проекта.
+7. [CIVILIZATION.md](../CIVILIZATION.md) — actions, devices, applications, institutions, services и construction.
+8. [PROTO.md](../PROTO.md) — persistence, replay и migration.
+9. [MEMORY.md](../MEMORY.md) — subjective memory каждого Consciousness.
+10. [SECURITY.md](../SECURITY.md) — trust boundaries и disclosure policy.
+11. [ROADMAP.md](../ROADMAP.md) — phases и gates.
+12. [CHANGELOG.md](../CHANGELOG.md) — значимые изменения проекта.
 
 ## Evidence и scenarios
 
@@ -28,6 +29,10 @@
 - [24-hour Human/Neko scenario](scenarios/phase1-24h-human-neko.md) задаёт первый runtime vertical slice до начала Phase 1.
 - [Аудит биологической реалистичности](research/biology-realism.md) отделяет runtime evidence от целевой архитектуры и сверяет допущения с первичными источниками.
 - [Contract schemas and fixtures](../contracts) являются machine-readable Phase 0 artifacts.
+
+## Implementation plans
+
+- [Минимальный V1 causal kernel](plans/0001-causal-kernel.md) — compatibility-safe последовательность для deep interface, canonical transitions, replay и одного thermal mechanism. Plan не является свидетельством реализованного runtime.
 
 ## Архитектурные решения
 

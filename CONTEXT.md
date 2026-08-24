@@ -69,3 +69,73 @@ _Avoid_: raw state, UI score
 **CausalTransition**:
 Атомарно зафиксированное изменение authoritative state, обусловленное перечисленными причинами на каноническом интервале симуляции.
 _Avoid_: tick, mutation, patch
+
+**FidelityEnvelope**:
+Объявленная область причинной и эмпирической достоверности Mechanism по состояниям, масштабам, ошибке и validation evidence.
+_Avoid_: максимальная реалистичность без границ, quality preset
+
+## Действия и процессы
+
+**Intention**:
+Принятая Consciousness цель, разрешающая попытку действия, но не содержащая физический результат и не гарантирующая успех.
+_Avoid_: command outcome, completed action
+
+**PlanHypothesis**:
+Изменяемая гипотеза о доступной последовательности affordances для продвижения к Intention с учётом текущих наблюдений.
+_Avoid_: гарантированный сценарий, recipe execution
+
+**ControlEpisode**:
+Сохраняемая closed-loop попытка реализовать Intention через perception, control, Mechanism и replanning; хранит текущее состояние, а не обещанный финальный mutation.
+_Avoid_: activity timer, delayed mutation
+
+**PhysicalProcess**:
+Развивающаяся во времени причинная динамика материи, энергии, полей или тела, способная дать частичный, побочный либо неуспешный результат.
+_Avoid_: semantic action function, scripted outcome
+
+## Техника и цифровой мир
+
+**DigitalDevice**:
+Физический объект с вычислительным состоянием, чьи execution, sensors, radios, energy, heat, wear и failures принадлежат одному CausalGraph.
+_Avoid_: UI inventory item, external computer
+
+**CodeArtifact**:
+Неизменяемые bytes исходного, собранного или исполняемого кода с digest, provenance, dependencies и lineage.
+_Avoid_: mutable app version, LLM-described program
+
+**CapabilityGrant**:
+Отзываемое ограниченное право конкретного субъекта или CodeArtifact запрашивать определённое наблюдение либо воздействие над заданным ресурсом.
+_Avoid_: global permission, direct world access
+
+**ExternalEffectIntent**:
+Авторизованный запрос на потенциально необратимое воздействие вне симуляции, ещё не являющийся доказательством выполнения.
+_Avoid_: external side effect, success event
+
+**ExternalEffectReceipt**:
+Идемпотентное подтверждение фактического внешнего результата, используемое replay без повторного выполнения воздействия.
+_Avoid_: assumed success, repeated replay call
+
+## Институты и производство
+
+**Organization**:
+Институциональная структура ролей, полномочий, имущества, правил и обязательств; не имеет собственного Consciousness без действующих участников.
+_Avoid_: collective mind, autonomous person
+
+**ServiceOffering**:
+Публичное предложение выполнить определённую работу при объявленных условиях, не гарантирующее появление результата.
+_Avoid_: service function, automatic fulfillment
+
+**ServiceContract**:
+Принятое сторонами множество взаимных прав, обязанностей, критериев приёмки и последствий нарушения.
+_Avoid_: completed order, guaranteed outcome
+
+**Possession**:
+Фактический физический контроль над объектом, не обязательно совпадающий с институциональным правом на него.
+_Avoid_: ownership, TitleClaim
+
+**TitleClaim**:
+Институционально признанное притязание субъекта на объект или территорию, существующее отдельно от Possession.
+_Avoid_: physical control, immutable ownership
+
+**DesignArtifact**:
+Версионированное описание намеренной конструкции, не тождественное фактически построенной геометрии и состоянию объекта.
+_Avoid_: finished building, authoritative geometry

@@ -9,9 +9,9 @@ Deliverables:
 
 - архивировать прежний Stage 5A.1 diff без `.agents` и `skills-lock.json`;
 - определить ubiquitous language в [CONTEXT.md](CONTEXT.md);
-- согласовать VISION, ARCHITECTURE, WORLD, ROADMAP, INVARIANTS и protocol design;
+- согласовать VISION, ARCHITECTURE, WORLD, CIVILIZATION, ROADMAP, INVARIANTS и protocol design;
 - сохранить старый [STAGE_5.md](STAGE_5.md) с пометкой superseded;
-- зафиксировать ADR stable causal interfaces/resolution upgrades, unitful state, independent morphotypes, cognitive acceptance, canonical time, content-addressed artifacts и unified causal graph;
+- зафиксировать ADR stable causal interfaces/resolution upgrades, unitful state, independent morphotypes, cognitive acceptance, canonical time, content-addressed artifacts, unified causal graph, causal processes и diegetic technology/institutions;
 - добавить JSON Schemas для `MechanismContract`, `ResolutionContract`, `MorphotypeDefinition`, `CortexProposal`, `CognitiveDisposition` и decision envelope;
 - добавить fixtures Human, Neko, двух resolution upgrades и accepted/rejected/deferred proposals;
 - определить [24-часовой Phase 1 scenario](docs/scenarios/phase1-24h-human-neko.md) и [coverage matrix](docs/coverage/phase0-coverage-matrix.md).
@@ -21,12 +21,13 @@ Deliverables:
 Gate:
 
 - нормативные документы называют V1 resolution начальным, не постоянным;
-- durable timeline отделена от L0–L7 causal domains; domains образуют единый feedback graph, не последовательный pipeline;
+- durable timeline отделена от L0–L9 causal domains; domains образуют единый feedback graph, не последовательный pipeline;
 - все fixtures валидируются schemas;
 - Human/Neko — independent roots, runtime design не содержит morphotype-specific branches;
 - оба upgrade examples сохраняют quantities, lineage и observables в error bounds;
 - каждый resolution transition имеет deterministic contract trigger; hidden LOD и субъективная «важность» запрещены;
 - rejected/deferred proposal не становится cognitive state, accepted требует отдельной transition;
+- semantic actions не содержат precomputed outcome; приложения, organizations и designs не получают привилегированный mutation path;
 - arbitrary normalized scores запрещены;
 - diff содержит только docs, schemas, fixtures, schema-validation tests и необходимую test dependency metadata;
 - formatting, Markdown links, schema gates и workspace tests проходят.
@@ -41,7 +42,7 @@ Gate: один общий data-driven pipeline; непрерывная цепь 
 
 Добавить metric 3D geometry, materials, mass/inertia, articulated bodies, active physics islands, fluids, atmosphere, heat/humidity/gases/aerosols, acoustics/light/odors, electricity/water. Anchors остаются semantic projection. Intentions запускают closed-loop motor programs.
 
-Gate: walk, grasp, carry, cook, spill, heat, clean и dress проходят physics, conservation и replay; `duration_ms` и resource/cleanliness/charge scores не authoritative.
+Gate: walk, grasp, carry, cook, spill, heat, clean и dress развиваются через durable closed-loop control, physics, conservation, feedback, interruption и replay; `duration_ms`, completion mutation и resource/cleanliness/charge scores не authoritative.
 
 ## Phase 3 — everyday physiology
 
@@ -65,9 +66,15 @@ Gate: cohort и individual implementations проходят одинаковые
 
 Gate: `NeuralPopulation` и будущий `IndividualNeuronNetwork` имеют одинаковые ports; LLM остаётся cortex proposal source; generic valence/arousal/urgency scores не authoritative.
 
-## Phase 7 — full life and multiple consciousnesses
+## Phase 7 — technology, economy, society and multiple consciousnesses
 
-Добавить physical recipes/food transformations, clothing physics, skills через practice evidence/reaction time/error distributions, speech/hearing/phone/Telegram/music/deliveries/consumables, commitments/relationships/privacy/subjective memory и независимое восприятие shared world. Intimate/reproductive actions требуют accepted intentions всех участников.
+Добавить physical recipes/food transformations, clothing physics, skills через practice evidence/reaction time/error distributions, speech/hearing/music/deliveries/consumables, commitments/relationships/privacy/subjective memory и независимое восприятие shared world.
+
+Добавить физико-цифровые devices, deterministic sandbox execution, source/build/binary/release lineage, character-authored applications, marketplace, capabilities, simulated networks и external effect intent/receipt. Добавить organizations без собственного Consciousness, authority delegation, possession/title claims, offers/contracts/obligations, payment/debt/employment/lease, physical/digital/hybrid services, disputes и enforcement.
+
+Добавить data-driven construction/manufacturing: design artifacts отдельно от authoritative geometry, material/energy provenance, work orders, logistics, inspection, operation и failures. Сквозные сценарии: персонаж создаёт и публикует приложение; organization оказывает сервис; дом строится из материалов и труда; датацентр связывает power/cooling/hardware/software/network/contracts.
+
+Gate: ни приложение, ни order, contract, design или semantic action не создаёт outcome напрямую; self-improvement создаёт immutable candidate без расширения authority; simulated compute не получает host resources; external replay не повторяет side effects; intimate/reproductive actions требуют accepted intentions всех участников.
 
 ## Phase 8 — performance and scaling
 
@@ -87,4 +94,5 @@ Workstation gate: Human + Neko, два active Consciousness, 1:1 на 16 cores/3
 - targeted 10/30/80-year и rare-event ensembles в declared acceptance ranges;
 - 30 календарных дней shadow/closed launch с real LLM, restart, downtime и provider failures;
 - panel с units, provenance, uncertainty, resolution и causal trace;
+- сквозные cooking/application/service/house/datacenter сценарии не содержат semantic outcome mutations;
 - ни один subsystem не заявляет неограниченный realism без validity range и upgrade path.

@@ -2,15 +2,15 @@
 
 Статус: нормативная архитектурная база Phase 0
 Дата: 2026-08-19
-Связанные документы: [CONTEXT.md](CONTEXT.md), [ARCHITECTURE.md](ARCHITECTURE.md), [WORLD_V1.md](WORLD_V1.md), [ROADMAP.md](ROADMAP.md), [INVARIANTS.md](INVARIANTS.md), [PROTO.md](PROTO.md)
+Связанные документы: [CONTEXT.md](CONTEXT.md), [ARCHITECTURE.md](ARCHITECTURE.md), [WORLD_V1.md](WORLD_V1.md), [CIVILIZATION.md](CIVILIZATION.md), [ROADMAP.md](ROADMAP.md), [INVARIANTS.md](INVARIANTS.md), [PROTO.md](PROTO.md)
 
 ## 1. Назначение
 
-Makise — персистентная многомасштабная причинная симуляция мира, организмов и отдельных сознаний. Её цель — непрерывная жизнь, где физические, биологические и когнитивные последствия возникают из проверяемых механизмов, а не из художественного описания LLM или набора игровых шкал.
+Makise — персистентная многомасштабная причинная симуляция мира, организмов, отдельных сознаний и создаваемой ими цивилизации. Её цель — непрерывная жизнь, где физические, биологические, когнитивные, цифровые и institutional последствия возникают из проверяемых механизмов, а не из художественного описания LLM или набора игровых шкал.
 
-Simulation образует единый causal graph с обратными связями и mixed resolution. Physical world, organism, tissue/cellular, molecular/biochemical, neural/brain, consciousness, motor control и physical action являются causal domains, а не последовательными стадиями tick или независимыми engines. Durable causal timeline хранит переходы всех domains и сама не является `WORLD EVENTS` layer.
+Simulation образует единый causal graph с обратными связями и mixed resolution. Physical world, organism, tissue/cellular, molecular/biochemical, neural/brain, consciousness, motor control, physical action, digital/computation и institutional/economic state являются causal domains, а не последовательными стадиями tick или независимыми engines. Durable causal timeline хранит переходы всех domains и сама не является `WORLD EVENTS` layer.
 
-World Engine остаётся единственным автором объективного physical/biological state. Сознание воспринимает только доступные observables, может ошибаться, предлагает appraisal, goals и intentions, но не назначает исходы мира или тела.
+World Engine остаётся единственным автором authoritative physical, biological, neural, digital и institutional state. Сознание воспринимает только доступные observables, может ошибаться, предлагает appraisal, goals и intentions, но не назначает исходы мира, тела, программы, услуги или строительства.
 
 ## 2. V1 задаёт стартовое разрешение, а не предел
 
@@ -37,13 +37,13 @@ Human и Neko — независимые root morphotypes:
 
 LLM может предложить semantic appraisal, goal, intention, plan, memory interpretation или communication. `CognitiveGate` оценивает предложение через neural state, identity values, traits, memory, commitments и physical feasibility. Результат `Accepted`, `Rejected`, `Deferred` или `NeedsRevision` записывается durable event с причинами.
 
-Только `Accepted` порождает отдельный переход принятия goal/intention. Motor plan проходит физический validator, а успех действия определяется симуляцией. LLM не меняет hormones, neurotransmitters, neural activation, emotion outcome, commitments, object state или результат действия.
+Только `Accepted` порождает отдельный переход принятия goal/intention. Intention запускает closed-loop `ControlEpisode`, не обещанный outcome; каждый физический, цифровой или institutional шаг проверяется текущим state и feedback. LLM не меняет hormones, neurotransmitters, neural activation, emotion outcome, commitments, object state, code execution или результат действия.
 
 ## 5. Целевая жизнь V1
 
 V1 охватывает не только повседневный комфорт, но и болезни, травмы, лекарства, репродукцию, развитие, старение и смерть. Эти возможности добавляются узкими вертикальными сценариями после 24-часового Human/Neko slice, а не заранее построенным монолитом biology.
 
-Мир постепенно получает метрическую квартиру, физику тел и материалов, воздух, воду, тепло, бытовые процессы, коммуникацию и несколько сознаний. Семантические anchors сохраняются как compatibility projection, но не являются authoritative geometry.
+Мир постепенно получает метрическую geometry, физику тел и материалов, воздух, воду, тепло, бытовые процессы, технику, исполняемые приложения, networks, organizations, services, производство, строительство и несколько сознаний. Персонажи могут создавать software, marketplace releases, компании, дома и датацентры через фактический код, contracts, material flows и work. Семантические action names, anchors, orders и designs остаются projections или intentions и не создают outcome.
 
 ## 6. Доказательства, а не обещания
 

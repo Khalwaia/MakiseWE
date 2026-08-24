@@ -2,7 +2,7 @@
 
 Статус: нормативная security policy Phase 0 и публичная disclosure policy
 Дата: 2026-08-19
-Связанные документы: [ARCHITECTURE.md](ARCHITECTURE.md), [PROTO.md](PROTO.md), [MEMORY.md](MEMORY.md), [INVARIANTS.md](INVARIANTS.md)
+Связанные документы: [ARCHITECTURE.md](ARCHITECTURE.md), [CIVILIZATION.md](CIVILIZATION.md), [PROTO.md](PROTO.md), [MEMORY.md](MEMORY.md), [INVARIANTS.md](INVARIANTS.md)
 
 ## Сообщение об уязвимости
 
@@ -20,7 +20,7 @@ Maintainers подтвердят получение, проверят impact и 
 
 ## 1. Security goals
 
-1. World Engine остаётся единственным автором objective physical, biological и neural state.
+1. World Engine остаётся единственным автором authoritative physical, biological, neural, digital и institutional state.
 2. LLM, memory, panel, packages и workers не обходят causal validation.
 3. Каждое Consciousness получает только разрешённые perception и memory projections.
 4. Artifacts, transitions, snapshots и replay защищены content digest и hash-chain validation.
@@ -38,7 +38,9 @@ Maintainers подтвердят получение, проверят impact и 
 - mechanism, solver, resolution, morphotype и model artifacts до validation;
 - imported legacy DB, logs, packages и snapshots;
 - stateless worker proposals;
-- panel/gateway requests.
+- panel/gateway requests;
+- character-authored source/binaries, application packages, marketplace listings и simulated network traffic;
+- claims, contracts, organization authority evidence и external effect intents.
 
 Ограниченно доверенные components:
 
@@ -109,7 +111,15 @@ Admin action проходит `WorldEngine::commit`, имеет caller, reason, 
 
 Critical operations требуют re-authentication и least privilege. Production credentials не используются в development/CI.
 
-## 11. Secrets and personal data
+## 11. Diegetic code and external effects
+
+Character-authored и self-modifying code исполняется только в deterministic sandbox с bounded compute/storage, virtual clock, mediated syscalls и scoped `CapabilityGrant`. Simulated malware может воздействовать на simulated devices, credentials и services только в пределах causal state; host filesystem, local network, secrets, metadata endpoints и control plane недоступны.
+
+Выход в настоящий мир требует двух независимых решений: diegetic authority/consent и host authorization. Одобренный `ExternalEffectIntent` получает idempotency key; executor возвращает durable `ExternalEffectReceipt`. Timeout имеет unknown outcome и разрешается lookup/reconciliation, не повторной отправкой. Replay никогда не вызывает executor.
+
+Organization role, TitleClaim, device possession, application permission и host authority не взаимозаменяемы. Compromise одного principal не расширяет остальные scopes. Self-improvement создаёт недоверенный candidate; публикация, установка, capability expansion и host deployment требуют независимых gates.
+
+## 12. Secrets and personal data
 
 - Secrets не хранятся в Git, package fixtures, prompts, memory, diary или ordinary logs.
 - Configuration содержит secret references, а не secret values.
@@ -118,7 +128,7 @@ Critical operations требуют re-authentication и least privilege. Product
 - Backups шифруются до выхода из trusted host и имеют отдельный key lifecycle.
 - Private conversations и production state не используются как public test fixtures.
 
-## 12. Persistence, recovery and rollback
+## 13. Persistence, recovery and rollback
 
 Event log append-only; snapshots проверяются против hash chain. Fast replay применяет committed deltas, audit replay пересчитывает exact artifacts. Recovery не запускает cognition и не создаёт perceptions, intentions или memories.
 
@@ -126,7 +136,7 @@ Event log append-only; snapshots проверяются против hash chain.
 
 Corruption, unknown event, broken causation link или state-hash mismatch блокирует writable startup до диагностики.
 
-## 13. Release-blocking threats
+## 14. Release-blocking threats
 
 Release блокируется при возможности:
 
@@ -137,11 +147,14 @@ Release блокируется при возможности:
 - прочитать память или perception неправильного Consciousness/audience;
 - подменить artifact при replay;
 - активировать candidate artifact без validation, approval или committed old/new digests;
+- позволить simulated code обойти capability policy или получить host access;
+- повторно выполнить внешний side effect при retry, recovery или replay;
+- превратить Organization, contract, design или semantic action в прямой outcome mutation;
 - запустить два writable owners одной timeline;
 - утечь secret/private content в prompt, log, issue или panel;
 - скрыть admin action от event log;
 - продолжить после conservation failure, corruption или missing artifact без `SafeStop`.
 
-## 14. Supported versions
+## 15. Supported versions
 
 До первого release security fixes применяются к `main`. Historical commits и superseded plans не поддерживаются как deployable versions. После появления releases таблица supported versions будет опубликована здесь до прекращения поддержки любой версии.

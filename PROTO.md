@@ -2,7 +2,7 @@
 
 Статус: нормативный Phase 0 design; wire implementation следует отдельной migration
 Дата: 2026-08-19
-Связанные документы: [ARCHITECTURE.md](ARCHITECTURE.md), [INVARIANTS.md](INVARIANTS.md), [ADR-0010](docs/adr/0010-content-addressed-artifacts.md)
+Связанные документы: [ARCHITECTURE.md](ARCHITECTURE.md), [CIVILIZATION.md](CIVILIZATION.md), [INVARIANTS.md](INVARIANTS.md), [ADR-0010](docs/adr/0010-content-addressed-artifacts.md)
 
 ## 1. Module boundary
 
@@ -13,7 +13,7 @@ Public domain API состоит из `open`, `commit`, `project` и `events`, �
 - `request_id`, schema version и expected world/timeline version;
 - caller identity/authority и target timeline;
 - canonical simulation interval либо внешний cause timestamp;
-- ровно один typed intent: advance time, stimulus, cortex response, action, resolution change или admin intent;
+- ровно один typed intent: advance time, stimulus, cortex response, action/control, digital input, capability request, institutional claim, external effect, resolution change или admin intent;
 - referenced artifact digests и deterministic seed material, если оно требуется;
 - causation/correlation IDs.
 
@@ -37,6 +37,8 @@ uncertainty_and_error_bounds
 conservation_report
 representation_lineage_refs[]
 deterministic_seed_ref (when used)
+fidelity_envelope_ref and validation_evidence_refs
+authority/capability/consent evidence (when required)
 previous_state_hash, resulting_state_hash
 schema_version, committed_at
 ```
@@ -51,6 +53,12 @@ Physical quantities сериализуются как `{value, unit}` с contrac
 - `ResolutionChangeRequested`, `ResolutionChanged`, `ResolutionChangeRolledBack`;
 - `CortexFrameProjected`, `CortexProposalRecorded`, `CognitiveDispositionRecorded`, `CognitiveStateAdopted`;
 - `MotorPlanValidated`, `PhysicalActionTransitioned`;
+- `ControlEpisodeStarted`, `ControlEpisodeTransitioned`, `ControlEpisodePaused`, `ControlEpisodeTerminated`;
+- `CodeArtifactRegistered`, `BuildCompleted`, `ReleasePublished`, `ApplicationInstalled`, `DigitalExecutionTransitioned`;
+- `CapabilityGranted`, `CapabilityRevoked`, `DeviceEffectRequested`, `DeviceEffectObserved`;
+- `OrganizationFormed`, `AuthorityDelegated`, `ClaimRecorded`, `ContractAccepted`, `ObligationTransitioned`, `PaymentSettled`;
+- `DesignArtifactRegistered`, `WorkOrderAccepted`, `ConstructionTransitioned`, `InspectionRecorded`;
+- `ExternalObservationCommitted`, `ExternalEffectIntentCommitted`, `ExternalEffectReceiptCommitted`;
 - `OrganismCreated`, `ConsciousnessAttached`/`Detached`;
 - `CapacityExceeded`, `ConservationViolation`, `NonConvergence`, `SafeStopEntered`;
 - `ArtifactRegistered`, `ArtifactActivationCommitted` and migration/recovery evidence.
@@ -59,11 +67,13 @@ Physical quantities сериализуются как `{value, unit}` с contrac
 
 `ArtifactActivationCommitted` возникает только из авторизованного admin intent и содержит old/new content digests, validation/shadow evidence, compatibility decision, canonical activation boundary и rollback target. Регистрация candidate не активирует его; audit replay до activation продолжает загружать прежний digest.
 
+`ControlEpisodeStarted` хранит controller state и следующую reevaluation boundary, но не final delta и не гарантированное время завершения. Contract, order, design и application request являются institutional/digital causes, а не evidence физического выполнения. `ExternalEffectReceiptCommitted` причинно ссылается на единственный intent/idempotency key и содержит фактический результат внешнего executor.
+
 ## 4. Replay modes
 
 Fast replay проверяет hash-chain и применяет committed unit-typed deltas. Audit replay загружает artifacts по digest, повторно запускает canonical mechanisms и сравнивает deltas, uncertainty, conservation и resulting hash.
 
-Partitioning, worker count и wall-clock mode не являются event semantics. Canonical reduction ordering входит в mechanism scheduling contract. Missing artifact, digest mismatch или расхождение audit replay создаёт `SafeStop`; replay не выбирает «похожую» текущую model version.
+Partitioning, worker count и wall-clock mode не являются event semantics. Canonical reduction ordering входит в mechanism scheduling contract. Missing artifact, digest mismatch или расхождение audit replay создаёт `SafeStop`; replay не выбирает «похожую» текущую model version. External effect при fast/audit replay не исполняется: применяется и проверяется сохранённый receipt.
 
 ## 5. Storage and timelines
 

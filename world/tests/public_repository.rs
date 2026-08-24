@@ -308,7 +308,10 @@ fn collect_markdown(root: &Path, directory: &Path, output: &mut BTreeSet<PathBuf
         let path = entry.expect("read documentation entry").path();
         if path.is_dir() {
             let name = path.file_name().and_then(|value| value.to_str());
-            if matches!(name, Some(".git" | ".agents" | ".github" | "target")) {
+            if matches!(
+                name,
+                Some(".git" | ".agents" | ".github" | "graphify-out" | "target")
+            ) {
                 continue;
             }
             collect_markdown(root, &path, output);

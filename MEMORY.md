@@ -12,7 +12,7 @@
 
 ## 2. Границы authority
 
-World Engine остаётся единственным автором objective physical, biological и neural state. Внешний stimulus, LLM response и cognitive decision входят в причинную историю через `WorldEngine::commit`.
+World Engine остаётся единственным автором authoritative physical, biological, neural, digital и institutional state. Внешний stimulus, LLM response и cognitive decision входят в причинную историю через `WorldEngine::commit`.
 
 Memory service владеет только subjective records и derived retrieval indexes. Он не может:
 

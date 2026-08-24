@@ -5,7 +5,7 @@
 
 ## Authority and mutation
 
-1. World Engine — единственный автор objective physical, biological и neural state.
+1. World Engine — единственный автор authoritative physical, biological, neural, digital и institutional state.
 2. `WorldEngine::commit` — единственный mutation path; time, stimuli, LLM responses, actions, resolution changes и admin intents не имеют обхода.
 3. Projections, memory, panel, transport, LLM и compute workers никогда не получают право прямой записи authoritative state.
 4. Каждый `CausalTransition` содержит causes, canonical interval, unit-typed deltas, artifact digests, uncertainty/error bounds, conservation report и state hash.
@@ -42,7 +42,7 @@
 ## Cognition and consent
 
 25. LLM может предлагать только semantic appraisal, goal, intention, plan, memory interpretation и communication.
-26. LLM не меняет physical/biological state, hormones, neurotransmitters, neural activation, emotion outcome, adopted goals/commitments, object state или action success.
+26. LLM не меняет physical/biological/neural/digital/institutional state, hormones, neurotransmitters, neural activation, emotion outcome, adopted goals/commitments, object state, code execution или action success.
 27. Каждый `CortexProposal` получает durable `CognitiveDisposition`: `Accepted`, `Rejected`, `Deferred` или `NeedsRevision` с причинами.
 28. Только `Accepted` разрешает отдельную transition принятия goal/intention; proposal никогда не равен state.
 29. Motor plan проходит отдельный physical validator; outcome определяется simulation.
@@ -70,11 +70,11 @@
 ## Causal topology, refinement and model evolution
 
 44. Durable causal timeline записывает transitions всех causal domains и не является `WORLD EVENTS` simulation layer.
-45. L0–L7 — карта единого causal graph с обратными связями, не последовательный pipeline, закрытые engines или обязательный порядок tick.
+45. L0–L9 — карта единого causal graph с обратными связями, не последовательный pipeline, закрытые engines или обязательный порядок tick.
 46. Mixed resolution разрешён одновременно внутри и между domains; interaction проходит только через stable causal ports.
 47. Каждый refinement/aggregation имеет deterministic trigger из contract validity, uncertainty bound, divergent lineage, causal interaction requirements или validation policy; неформальная causal relevance и субъективная «важность» запрещены.
 48. Explicit `ResolutionChanged` не является скрытым LOD: split/merge сохраняет объявленные counts, mass, energy, charge, substance amounts, moments, lineage и observable continuity внутри error bounds.
-49. Self-improvement остаётся внешним control plane: candidate artifacts не получают write access к authoritative state и проходят validation/shadow evidence до допуска.
+49. Улучшение authoritative mechanism/model/solver остаётся внешним control plane: candidate artifacts World Engine не получают write access к authoritative state и проходят validation/shadow evidence до допуска.
 50. Production-активация нового artifact возможна только авторизованным admin intent через `WorldEngine::commit`; transition фиксирует old/new digests и rollback, а audit replay старой истории использует прежние bytes.
 51. Автономная модификация production-кода и activation без approval не входят в V1.
 
@@ -84,3 +84,36 @@
 53. 365-day run доказывает integration/replay, не biological realism.
 54. Long-horizon и rare-event claims принимаются по distributions, incidence ranges, causal prerequisites и declared uncertainty, не по одному seed.
 55. Phase N+1 не начинается до отдельного gate commit Phase N.
+
+## Actions and outcomes
+
+56. Semantic action, recipe, order, contract, design или application request не содержит precomputed authoritative outcome и не мутирует финальное состояние напрямую.
+57. Accepted `Intention` может начать `ControlEpisode`, но не гарантирует success, duration или completion; каждый следующий transition зависит от текущего state и feedback.
+58. `ControlEpisode` durable хранит controller state, constraints, blockers и reevaluation boundary; interruption, partial result, failure и replanning являются первичными outcomes.
+59. Cooking, eating, sleeping, cleaning, treatment, programming, service fulfillment и construction возникают из reusable physical/biological/neural/digital/institutional mechanisms, не из action-specific engine branches.
+60. Observer labels `ready`, `clean`, `habitable`, `service completed` и аналогичные classifications являются projections объявленных observables, не authoritative booleans без отдельного causal definition.
+
+## Technology and code
+
+61. `DigitalDevice` связывает physical hardware, energy, heat, wear, sensors/radios и machine state в том же CausalGraph.
+62. Application outcome определяется исполнением exact `CodeArtifact`; LLM description, listing metadata или developer intention не заменяют execution.
+63. Source, build recipe, binary, package и release immutable и content-addressed; install/process/user data имеют отдельные identity и lifecycle.
+64. Self-improvement создаёт новый candidate с lineage и evidence; оно не переписывает активный release, не публикует себя и не расширяет capabilities без policy/approval.
+65. Code получает sensors, network, credentials и device/world effects только через scoped, revocable `CapabilityGrant`; grant разрешает request, но не гарантирует effect.
+66. Simulated code не получает прямого host filesystem/network/clock/secret access и не может конвертировать diegetic compute в host capacity.
+
+## Institutions, economy and construction
+
+67. `Organization` не является Consciousness; institutional decisions причинно принадлежат конкретным Consciousness либо CodeArtifact в пределах durable delegated authority.
+68. Possession, TitleClaim, authority, offer, contract, obligation, payment и physical fulfillment являются разными state/transition kinds и не выводятся друг из друга автоматически.
+69. `ServiceContract` создаёт obligations и acceptance criteria, но не выполненную услугу; fulfillment проходит те же causal mechanisms, failures и evidence, что обычное действие.
+70. Price является результатом offers, negotiation, scarcity, costs, risk и beliefs, не intrinsic authoritative property объекта.
+71. `DesignArtifact` не является authoritative geometry; дом, фабрика или датацентр возникают только из material/energy flows, work, assembly, inspection и эксплуатации.
+72. Imported initial assets имеют provenance/uncertainty; новые production/construction transitions сохраняют declared mass, energy, materials и lineage.
+
+## External effects and security
+
+73. Любой внешний side effect требует diegetic permission, отдельную host authorization и committed `ExternalEffectIntent` до выполнения.
+74. Внешний executor идемпотентен и возвращает `ExternalEffectReceipt`; fast/audit replay никогда повторно не выполняет сообщение, платёж, заказ или device command.
+75. Malware, fraud и exploitation внутри мира могут моделироваться только в sandbox; simulated compromise не повышает host authority.
+76. Каждый realism claim ограничен `FidelityEnvelope`; выход за validity/error bounds требует explicit refinement, typed failure или `CapacityExceeded`, не silent plausible substitute.
