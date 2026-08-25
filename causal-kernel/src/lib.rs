@@ -20,6 +20,7 @@ mod morphotype;
 mod neural_population;
 mod organism;
 mod physics_island;
+mod propagation;
 mod quantity;
 mod resolution;
 mod rigid_body;
@@ -72,6 +73,12 @@ pub use organism::{
 pub use physics_island::{
     ENVIRONMENT_FLOOR_Y_NM, IslandError, IslandLayout, RestSuspension, advance_awake_bodies,
     advance_island_members, layout_islands, resting_islands, resume_island, suspend_island,
+};
+pub use propagation::{
+    HEARING_THRESHOLD_INTENSITY_FW_PER_M2, LIGHT_MAX_DISTANCE_NM, LIGHT_MIN_DISTANCE_NM,
+    ODOUR_MAX_DISTANCE_NM, ODOUR_MIN_DISTANCE_NM, PROPAGATION_REFERENCE_DISTANCE_NM,
+    PropagationError, SOUND_MAX_DISTANCE_NM, SOUND_MIN_DISTANCE_NM, illuminance_mlx,
+    odour_concentration_mg_per_m3, sound_intensity_fw_per_m2,
 };
 pub use quantity::{Dimension, Quantity, QuantityError, ReservoirState, StateHash, UnitScale};
 pub use resolution::{ResolutionChanged, ResolutionError};
