@@ -218,3 +218,91 @@ pub fn resume_island(suspension: &RestSuspension, bodies: &[RigidBody]) -> Resul
     }
     Ok(())
 }
+
+/// Declared apartment environment boundary: the floor plane at y = 0.
+/// Bodies whose bottom face reaches it stand on the environment rather
+/// than on another simulated body; the plane is a structural fact of the
+/// slice's validity range, not a hidden material parameter.
+pub const ENVIRONMENT_FLOOR_Y_NM: i64 = 0;
+
+fn has_environment_support(body: &RigidBody, collider: &BoxCollider) -> bool {
+    // i128 keeps the subtraction total for extreme positions.
+    let bottom_nm = i128::from(body.position_nm()[1]) - i128::from(collider.half_extents_nm()[1]);
+    bottom_nm <= i128::from(ENVIRONMENT_FLOOR_Y_NM)
+}
+
+fn has_member_support(
+    body_index: usize,
+    members: &[usize],
+    bodies: &[RigidBody],
+    colliders: &[BoxCollider],
+) -> Result<bool, IslandError> {
+    for &neighbour in members {
+        if neighbour == body_index {
+            continue;
+        }
+        let Some(manifold) = contact_proposal(
+            &bodies[body_index],
+            &colliders[body_index],
+            &bodies[neighbour],
+            &colliders[neighbour],
+        )?
+        else {
+            continue;
+        };
+        let vertical = manifold.normal()[1] != 0;
+        let above = bodies[body_index].position_nm()[1] > bodies[neighbour].position_nm()[1];
+        if vertical && above {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Physical rest trigger that feeds island scheduling: the ascending
+/// indices of islands where every member is simultaneously
+///
+/// 1. **quiescent** — velocity exactly `[0, 0, 0]` nm/s (integer
+///    exactness leaves no epsilon to hide drift in), and
+/// 2. **supported** — standing on the declared floor plane at y = 0 or
+///    resting through a vertical contact against a lower island member.
+///
+/// The result is a pure function of the input states: no mutation, no
+/// heuristic threshold, no timer. Callers may use it as evidence for an
+/// explicit `suspend_island` transition; suspension itself remains a
+/// deliberate representation change with its own digest discipline
+/// (INVARIANTS §12). Axis-aligned box colliders keep every support
+/// normal an exact ±unit axis.
+pub fn resting_islands(
+    layout: &IslandLayout,
+    bodies: &[RigidBody],
+    colliders: &[BoxCollider],
+) -> Result<Vec<usize>, IslandError> {
+    if bodies.len() != colliders.len() {
+        return Err(IslandError::MismatchedInputs);
+    }
+    let mut resting = Vec::new();
+    for (island_index, members) in layout.islands().iter().enumerate() {
+        let quiescent = members
+            .iter()
+            .all(|&member| bodies[member].velocity_nm_per_s() == [0; 3]);
+        if !quiescent {
+            continue;
+        }
+        let mut supported = true;
+        for &member in members {
+            if has_environment_support(&bodies[member], &colliders[member]) {
+                continue;
+            }
+            if has_member_support(member, members, bodies, colliders)? {
+                continue;
+            }
+            supported = false;
+            break;
+        }
+        if supported {
+            resting.push(island_index);
+        }
+    }
+    Ok(resting)
+}
