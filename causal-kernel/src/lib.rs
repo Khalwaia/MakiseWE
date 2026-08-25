@@ -22,6 +22,7 @@ mod quantity;
 mod resolution;
 mod rigid_body;
 mod thermal;
+mod walk;
 
 pub use articulation::{
     ArticulatedBody, ArticulationError, JointSpec, MotionStep, MotorTorqueProposal,
@@ -60,6 +61,10 @@ pub use organism::{
 pub use physics_island::{
     ENVIRONMENT_FLOOR_Y_NM, IslandError, IslandLayout, RestSuspension, advance_awake_bodies,
     advance_island_members, layout_islands, resting_islands, resume_island, suspend_island,
+};
+pub use walk::{
+    COM_SHIFT_SPEED_NM_PER_S, STRIDE_LENGTH_NM, Side, WalkBlocker, WalkControlEpisode,
+    WalkError, WalkPhase, WalkStep, WalkerObservables, step_walk_episode,
 };
 pub use quantity::{Dimension, Quantity, QuantityError, ReservoirState, StateHash, UnitScale};
 pub use resolution::{ResolutionChanged, ResolutionError};
