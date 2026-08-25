@@ -91,10 +91,16 @@ flowchart TB
 `MechanismContract` admission, organism slices, durable transition stream через
 `events()`, tamper detection и worker invariance; gate закрыт отдельным commit.
 
-Идёт **Phase 2** — apartment and physical embodiment: metric rigid bodies,
-контакты с Coulomb friction, physics islands с physical rest trigger, bipedal
-balance и durable walk `ControlEpisode`, fluid statics и pour/spill учёт.
-Прогресс по slices — в [docs/plans/0005-phase2-slice-status.md](docs/plans/0005-phase2-slice-status.md);
+**Phase 2** — apartment and physical embodiment — завершён отдельным gate
+commit: metric rigid bodies с точной консервацией, контакты с Coulomb
+friction, physics islands с physical rest trigger, bipedal balance и durable
+walk `ControlEpisode`, fluid statics и pour/spill учёт, room atmosphere с
+measured теплоёмкостью воздуха и конвекцией через shared thermal port,
+point-source звук/свет/запахи с declared затуханием, electricity/water сети,
+cook/clean/dress `ControlEpisode`s и durable body records через
+`WorldEngine::commit`. Сквозной `apartment-v2` acceptance scenario прошёл с
+отрицательными тестами плана. Evidence — в
+[docs/plans/0005-phase2-slice-status.md](docs/plans/0005-phase2-slice-status.md);
 план зафиксирован в
 [docs/plans/0003-phase2-apartment-embodiment.md](docs/plans/0003-phase2-apartment-embodiment.md).
 
@@ -125,8 +131,8 @@ Roadmap состоит из последовательных gates:
 
 1. **Phase 0:** contracts, schemas, fixtures и architecture — завершён.
 2. **Phase 1:** 24 часа Human/Neko; среда, минимальная физиология, сон, perception, scripted cortex и explicit `ResolutionChanged` — завершён.
-3. **Phase 2:** метрическая квартира, материалы, articulated bodies, contacts, fluids, heat, air, light, sound, electricity и water — в процессе.
-4. **Phase 3:** everyday cardiovascular, respiratory, renal, digestive, endocrine, skin и musculoskeletal physiology.
+3. **Phase 2:** метрическая квартира, материалы, articulated bodies, contacts, fluids, heat, air, light, sound, electricity и water — завершён.
+4. **Phase 3:** everyday cardiovascular, respiratory, renal, digestive, endocrine, skin и musculoskeletal physiology — не начат; требуется отдельный план.
 5. **Phase 4:** cells, immunity, infection, wounds, pathology, cancer, drugs, organ failure и death.
 6. **Phase 5:** genetics, reproduction, pregnancy, development, growth и aging.
 7. **Phase 6:** replaceable neural resolution, neurotransmission, autonomic/endocrine coupling, learning и memory consolidation.

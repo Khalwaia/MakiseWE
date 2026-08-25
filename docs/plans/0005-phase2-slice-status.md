@@ -1,6 +1,6 @@
-# Phase 2 Slice Status — causal-kernel apartment physics
+# Phase 2 Gate Status — causal-kernel apartment physics
 
-## Status: ACCEPTANCE COMPLETE — все slices и `apartment-v2` scenario доказаны; остался отдельный gate commit перед Phase 3
+## Status: GATED — все slices плана 0003 и acceptance scenario доказаны; Phase 2 закрыт отдельным gate commit
 
 План: [0003-phase2-apartment-embodiment.md](0003-phase2-apartment-embodiment.md).
 Evidence-детали каждого slice — в [coverage matrix](../coverage/phase0-coverage-matrix.md).
@@ -69,3 +69,16 @@ mass-only без latent heat и saturation curve (declared gaps). Сквозно
 отключение питания замораживает нагрев typed blocker'ом, dress-прерывание
 оставляет durable partial 1-of-2, reopen восстанавливает stream/bodies/hash.
 Остаётся отдельный gate commit перед Phase 3.
+
+## Вердикт gate
+
+Критерии плана 0003 §5 выполнены: walk/grasp/spill/heat/clean/dress развиваются
+через durable closed-loop control, physics, conservation, feedback,
+interruption и replay; ни один semantic intent не содержит completion mutation
+или guaranteed duration; partition/restart/replay parity доказан сквозным
+сценарием; invalid units/preconditions/conservation отклоняются typed
+rejection'ами до commit; coverage matrix несёт фактический evidence с
+provenance-тирами по ADR-0014. Declared gaps (latent heat, saturation curve,
+free-field propagation без отражений, capacity-only сети, snapshot-level body
+placement) остаются честными границами envelope и не блокируют gate. Phase 3
+не начинается без отдельного плана.
