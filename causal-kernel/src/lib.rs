@@ -224,6 +224,12 @@ impl EventCursor {
     pub fn start() -> Self {
         Self(0)
     }
+
+    /// Declared observable: how many canonical transitions precede
+    /// this cursor in the durable stream.
+    pub fn offset(&self) -> u64 {
+        self.0
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -288,6 +294,8 @@ impl EventPage {
 pub enum ReadError {
     #[error("storage failure while reading events")]
     Storage(#[from] rusqlite::Error),
+    #[error("stored body row cannot be reconstructed as a valid rigid body")]
+    CorruptBodyState,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -298,6 +306,7 @@ pub struct CommitRequest {
     sleep_intention: bool,
     ingest_uj: Option<i64>,
     resolution_changed: Option<crate::resolution::ResolutionChanged>,
+    body: Option<(String, crate::rigid_body::RigidBody)>,
 }
 
 impl CommitRequest {
@@ -309,6 +318,7 @@ impl CommitRequest {
             sleep_intention: false,
             ingest_uj: Some(chemical_energy_uj),
             resolution_changed: None,
+            body: None,
         }
     }
 
@@ -320,6 +330,7 @@ impl CommitRequest {
             sleep_intention: true,
             ingest_uj: None,
             resolution_changed: None,
+            body: None,
         }
     }
 
@@ -331,6 +342,7 @@ impl CommitRequest {
             sleep_intention: false,
             ingest_uj: None,
             resolution_changed: None,
+            body: None,
         }
     }
 
@@ -346,6 +358,28 @@ impl CommitRequest {
             sleep_intention: false,
             ingest_uj: None,
             resolution_changed: Some(resolution_changed),
+            body: None,
+        }
+    }
+
+    /// Stages a named metric rigid body as durable timeline state. The
+    /// placement is one authoritative delta: retrying the identical
+    /// request replays its receipt, a different pose under the same
+    /// request id is an idempotency conflict.
+    pub fn place_body(
+        request_id: &str,
+        expected_version: u64,
+        body_id: impl Into<String>,
+        body: crate::rigid_body::RigidBody,
+    ) -> Self {
+        Self {
+            request_id: request_id.to_owned(),
+            expected_version,
+            advance_to_seconds: 0,
+            sleep_intention: false,
+            ingest_uj: None,
+            resolution_changed: None,
+            body: Some((body_id.into(), body)),
         }
     }
 
@@ -361,6 +395,33 @@ impl CommitRequest {
             hasher.update(resolution.canonical_bytes());
         } else {
             hasher.update(b"no-resolution-change");
+        }
+        match &self.body {
+            Some((body_id, body)) => {
+                hasher.update(b"body");
+                hasher.update(body_id.as_bytes());
+                for value in [
+                    body.mass_mg(),
+                    body.position_nm()[0],
+                    body.position_nm()[1],
+                    body.position_nm()[2],
+                    body.velocity_nm_per_s()[0],
+                    body.velocity_nm_per_s()[1],
+                    body.velocity_nm_per_s()[2],
+                    body.center_of_mass_offset_nm()[0],
+                    body.center_of_mass_offset_nm()[1],
+                    body.center_of_mass_offset_nm()[2],
+                    body.principal_inertia_mgm2()[0],
+                    body.principal_inertia_mgm2()[1],
+                    body.principal_inertia_mgm2()[2],
+                    body.angular_velocity_urad_per_s()[0],
+                    body.angular_velocity_urad_per_s()[1],
+                    body.angular_velocity_urad_per_s()[2],
+                ] {
+                    hasher.update(value.to_be_bytes());
+                }
+            }
+            None => hasher.update(b"no-body"),
         }
         hasher.finalize().into()
     }
@@ -402,6 +463,8 @@ pub enum CommitError {
     MetabolismRejected(crate::organism::OrganismError),
     #[error("resolution change rejected before commit: {0}")]
     ResolutionRejected(#[from] crate::resolution::ResolutionError),
+    #[error("body identifier cannot be empty")]
+    InvalidBodyId,
     #[error("storage failure during commit")]
     Storage(#[from] rusqlite::Error),
 }
@@ -553,6 +616,12 @@ impl WorldEngine {
             return Err(CommitError::ExpectedVersionConflict);
         }
 
+        if let Some((body_id, _)) = &request.body
+            && body_id.trim().is_empty()
+        {
+            return Err(CommitError::InvalidBodyId);
+        }
+
         if let Some(resolution) = request.resolution_changed {
             resolution.validate()?;
             self.resolution_id = Some(resolution.to_resolution_id().to_owned());
@@ -685,6 +754,54 @@ impl WorldEngine {
                  ON CONFLICT(singleton) DO UPDATE SET version = excluded.version",
                 params![receipt.timeline_version],
             )?;
+            if let Some((body_id, body)) = &request.body {
+                transaction.execute(
+                    "INSERT INTO body_state (
+                        body_id, mass_mg,
+                        position_x_nm, position_y_nm, position_z_nm,
+                        velocity_x_nm_per_s, velocity_y_nm_per_s, velocity_z_nm_per_s,
+                        com_offset_x_nm, com_offset_y_nm, com_offset_z_nm,
+                        inertia_x_mgm2, inertia_y_mgm2, inertia_z_mgm2,
+                        angular_x_urad_per_s, angular_y_urad_per_s, angular_z_urad_per_s
+                     ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+                     ON CONFLICT(body_id) DO UPDATE SET
+                        mass_mg = excluded.mass_mg,
+                        position_x_nm = excluded.position_x_nm,
+                        position_y_nm = excluded.position_y_nm,
+                        position_z_nm = excluded.position_z_nm,
+                        velocity_x_nm_per_s = excluded.velocity_x_nm_per_s,
+                        velocity_y_nm_per_s = excluded.velocity_y_nm_per_s,
+                        velocity_z_nm_per_s = excluded.velocity_z_nm_per_s,
+                        com_offset_x_nm = excluded.com_offset_x_nm,
+                        com_offset_y_nm = excluded.com_offset_y_nm,
+                        com_offset_z_nm = excluded.com_offset_z_nm,
+                        inertia_x_mgm2 = excluded.inertia_x_mgm2,
+                        inertia_y_mgm2 = excluded.inertia_y_mgm2,
+                        inertia_z_mgm2 = excluded.inertia_z_mgm2,
+                        angular_x_urad_per_s = excluded.angular_x_urad_per_s,
+                        angular_y_urad_per_s = excluded.angular_y_urad_per_s,
+                        angular_z_urad_per_s = excluded.angular_z_urad_per_s",
+                    params![
+                        body_id,
+                        body.mass_mg(),
+                        body.position_nm()[0],
+                        body.position_nm()[1],
+                        body.position_nm()[2],
+                        body.velocity_nm_per_s()[0],
+                        body.velocity_nm_per_s()[1],
+                        body.velocity_nm_per_s()[2],
+                        body.center_of_mass_offset_nm()[0],
+                        body.center_of_mass_offset_nm()[1],
+                        body.center_of_mass_offset_nm()[2],
+                        body.principal_inertia_mgm2()[0],
+                        body.principal_inertia_mgm2()[1],
+                        body.principal_inertia_mgm2()[2],
+                        body.angular_velocity_urad_per_s()[0],
+                        body.angular_velocity_urad_per_s()[1],
+                        body.angular_velocity_urad_per_s()[2],
+                    ],
+                )?;
+            }
             transaction.execute(
                 "INSERT INTO sleep_state (singleton, phase) VALUES (1, ?1)
                  ON CONFLICT(singleton) DO UPDATE SET phase = excluded.phase",
@@ -736,6 +853,71 @@ impl WorldEngine {
 
     pub fn organism(&self) -> Option<&OrganismState> {
         self.organism.as_ref()
+    }
+
+    /// Reads one durable body record; a row that cannot be
+    /// reconstructed as a valid rigid body is a typed corruption, not
+    /// silent garbage (INVARIANTS §42).
+    pub fn body(&self, body_id: &str) -> Result<Option<RigidBody>, ReadError> {
+        let row: Option<[i64; 16]> = self
+            ._connection
+            .query_row(
+                "SELECT mass_mg,
+                        position_x_nm, position_y_nm, position_z_nm,
+                        velocity_x_nm_per_s, velocity_y_nm_per_s, velocity_z_nm_per_s,
+                        com_offset_x_nm, com_offset_y_nm, com_offset_z_nm,
+                        inertia_x_mgm2, inertia_y_mgm2, inertia_z_mgm2,
+                        angular_x_urad_per_s, angular_y_urad_per_s, angular_z_urad_per_s
+                 FROM body_state WHERE body_id = ?1",
+                params![body_id],
+                |row| {
+                    Ok([
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                        row.get(5)?,
+                        row.get(6)?,
+                        row.get(7)?,
+                        row.get(8)?,
+                        row.get(9)?,
+                        row.get(10)?,
+                        row.get(11)?,
+                        row.get(12)?,
+                        row.get(13)?,
+                        row.get(14)?,
+                        row.get(15)?,
+                    ])
+                },
+            )
+            .optional()?;
+        let Some(values) = row else {
+            return Ok(None);
+        };
+        let mass = values[0];
+        let position = [values[1], values[2], values[3]];
+        let velocity = [values[4], values[5], values[6]];
+        let com_offset = [values[7], values[8], values[9]];
+        let inertia = [values[10], values[11], values[12]];
+        let angular = [values[13], values[14], values[15]];
+        RigidBody::new(mass, position, velocity, com_offset, inertia, angular)
+            .map(Some)
+            .map_err(|_| ReadError::CorruptBodyState)
+    }
+
+    /// Lists durable body identifiers in insertion order — stable
+    /// across restart because rows carry implicit rowids.
+    pub fn body_ids(&self) -> Result<Vec<String>, ReadError> {
+        let mut statement = self
+            ._connection
+            .prepare("SELECT body_id FROM body_state ORDER BY rowid ASC")?;
+        let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
+        let mut ids = Vec::new();
+        for row in rows {
+            ids.push(row?);
+        }
+        Ok(ids)
     }
 
     pub fn sleep_phase(&self) -> circadian::SleepPhase {
@@ -880,6 +1062,25 @@ CREATE TABLE IF NOT EXISTS sleep_debt (
 CREATE TABLE IF NOT EXISTS active_resolution (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     resolution_id TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS body_state (
+    body_id TEXT PRIMARY KEY,
+    mass_mg INTEGER NOT NULL,
+    position_x_nm INTEGER NOT NULL,
+    position_y_nm INTEGER NOT NULL,
+    position_z_nm INTEGER NOT NULL,
+    velocity_x_nm_per_s INTEGER NOT NULL,
+    velocity_y_nm_per_s INTEGER NOT NULL,
+    velocity_z_nm_per_s INTEGER NOT NULL,
+    com_offset_x_nm INTEGER NOT NULL,
+    com_offset_y_nm INTEGER NOT NULL,
+    com_offset_z_nm INTEGER NOT NULL,
+    inertia_x_mgm2 INTEGER NOT NULL,
+    inertia_y_mgm2 INTEGER NOT NULL,
+    inertia_z_mgm2 INTEGER NOT NULL,
+    angular_x_urad_per_s INTEGER NOT NULL,
+    angular_y_urad_per_s INTEGER NOT NULL,
+    angular_z_urad_per_s INTEGER NOT NULL
 );
 ";
 
