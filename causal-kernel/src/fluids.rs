@@ -27,6 +27,8 @@ pub enum FluidError {
     NonRepresentablePressure,
     #[error("buoyant force is not representable in whole mg·nm/s² units")]
     NonRepresentableForce,
+    #[error("puddle depth is not representable in whole nanometres")]
+    NonRepresentableDepth,
     #[error("checked arithmetic overflow in fluid statics")]
     Overflow,
 }
@@ -121,3 +123,146 @@ pub fn immersion_verdict(
     })
 }
 
+/// Declared liquid container: rigid, open-topped, with an exact
+/// capacity and current content in cubic millimetres (1 ml = 1000
+/// mm³). Pure accounting state — no pressure model inside this type;
+/// hydrostatics above covers depth-dependent quantities.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LiquidContainer {
+    capacity_mm3: i64,
+    content_mm3: i64,
+}
+
+impl LiquidContainer {
+    pub fn new(capacity_mm3: i64, content_mm3: i64) -> Result<Self, FluidError> {
+        if capacity_mm3 <= 0 || content_mm3 < 0 || content_mm3 > capacity_mm3 {
+            return Err(FluidError::InvalidParameters);
+        }
+        Ok(Self {
+            capacity_mm3,
+            content_mm3,
+        })
+    }
+
+    pub fn capacity_mm3(&self) -> i64 {
+        self.capacity_mm3
+    }
+    pub fn content_mm3(&self) -> i64 {
+        self.content_mm3
+    }
+    pub fn free_space_mm3(&self) -> i64 {
+        self.capacity_mm3 - self.content_mm3
+    }
+    pub fn is_full(&self) -> bool {
+        self.content_mm3 == self.capacity_mm3
+    }
+    pub fn is_empty(&self) -> bool {
+        self.content_mm3 == 0
+    }
+}
+
+/// Proposed pour cause: a positive volume bound in cubic millimetres.
+/// The request caps the transfer; it never invents liquid that the
+/// source does not hold (INVARIANTS §57).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PourRequest {
+    requested_mm3: i64,
+}
+
+impl PourRequest {
+    pub fn new(requested_mm3: i64) -> Result<Self, FluidError> {
+        if requested_mm3 <= 0 {
+            return Err(FluidError::InvalidParameters);
+        }
+        Ok(Self { requested_mm3 })
+    }
+
+    pub fn requested_mm3(&self) -> i64 {
+        self.requested_mm3
+    }
+}
+
+/// Exact outcome of one evaluated pour. Volume is conserved bit-exact
+/// across the boundary: source + target contents before equal next
+/// source + next target contents plus the spill. Spilling past the
+/// target rim is a first-class physical outcome — never an error and
+/// never a silent clamp.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PourOutcome {
+    next_source: LiquidContainer,
+    next_target: LiquidContainer,
+    transferred_mm3: i64,
+    spilled_mm3: i64,
+}
+
+impl PourOutcome {
+    pub fn next_source(&self) -> &LiquidContainer {
+        &self.next_source
+    }
+    pub fn next_target(&self) -> &LiquidContainer {
+        &self.next_target
+    }
+    pub fn transferred_mm3(&self) -> i64 {
+        self.transferred_mm3
+    }
+    /// Liquid that left the source but did not fit the target.
+    pub fn spilled_mm3(&self) -> i64 {
+        self.spilled_mm3
+    }
+}
+
+impl LiquidContainer {
+    /// Evaluates pouring `request` from this container into `target`.
+    /// Pure function of both containers and the request; repeated
+    /// evaluation yields identical outcomes.
+    pub fn pour_into(
+        &self,
+        target: &Self,
+        request: &PourRequest,
+    ) -> Result<PourOutcome, FluidError> {
+        if std::ptr::eq(self, target) {
+            return Err(FluidError::InvalidParameters);
+        }
+        let given = self.content_mm3.min(request.requested_mm3);
+        let accepted = given.min(target.free_space_mm3());
+        let spilled = given - accepted;
+
+        let next_source_content = self.content_mm3 - given;
+        let next_target_content = target
+            .content_mm3
+            .checked_add(accepted)
+            .ok_or(FluidError::Overflow)?;
+
+        Ok(PourOutcome {
+            next_source: Self {
+                capacity_mm3: self.capacity_mm3,
+                content_mm3: next_source_content,
+            },
+            next_target: Self {
+                capacity_mm3: target.capacity_mm3,
+                content_mm3: next_target_content,
+            },
+            transferred_mm3: accepted,
+            spilled_mm3: spilled,
+        })
+    }
+}
+
+/// Free-surface depth of a spilled puddle standing on a level floor
+/// footprint, in nanometres: h_nm = V_mm³ / A_mm² · 10⁶. A quotient
+/// that does not land on whole nanometres leaves the declared envelope
+/// instead of silently tilting or rounding the surface.
+pub fn puddle_depth_nm(volume_mm3: i64, footprint_area_mm2: i64) -> Result<i64, FluidError> {
+    if volume_mm3 <= 0 || footprint_area_mm2 <= 0 {
+        return Err(FluidError::InvalidParameters);
+    }
+    let scaled = i128::from(volume_mm3)
+        .checked_mul(1_000_000)
+        .ok_or(FluidError::Overflow)?;
+    if scaled % i128::from(footprint_area_mm2) != 0 {
+        return Err(FluidError::NonRepresentableDepth);
+    }
+    (scaled / i128::from(footprint_area_mm2))
+        .try_into()
+        .map_err(|_| FluidError::Overflow)
+}

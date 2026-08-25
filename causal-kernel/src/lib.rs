@@ -50,8 +50,8 @@ pub use contact::{
 };
 pub use digestion::ABSORPTION_RATE_UJ_PER_SECOND;
 pub use fluids::{
-    WATER_DENSITY_MG_PER_M3, FluidError, ImmersionVerdict, buoyant_force_mgnm_per_s2,
-    hydrostatic_pressure_npa, immersion_verdict,
+    FluidError, ImmersionVerdict, LiquidContainer, PourRequest, WATER_DENSITY_MG_PER_M3,
+    buoyant_force_mgnm_per_s2, hydrostatic_pressure_npa, immersion_verdict, puddle_depth_nm,
 };
 pub use interoception::{INITIAL_CHEMICAL_STORE_UJ, InteroceptionObservables, advance_sleep_debt};
 pub use morphotype::{
@@ -67,14 +67,14 @@ pub use physics_island::{
     ENVIRONMENT_FLOOR_Y_NM, IslandError, IslandLayout, RestSuspension, advance_awake_bodies,
     advance_island_members, layout_islands, resting_islands, resume_island, suspend_island,
 };
-pub use walk::{
-    COM_SHIFT_SPEED_NM_PER_S, STRIDE_LENGTH_NM, Side, WalkBlocker, WalkControlEpisode,
-    WalkError, WalkPhase, WalkStep, WalkerObservables, step_walk_episode,
-};
 pub use quantity::{Dimension, Quantity, QuantityError, ReservoirState, StateHash, UnitScale};
 pub use resolution::{ResolutionChanged, ResolutionError};
 pub use rigid_body::{GravityProposal, RigidBody, RigidBodyError};
 pub use thermal::{ReservoirPair, ThermalError, ThermalProposal, ThermalTransfer};
+pub use walk::{
+    COM_SHIFT_SPEED_NM_PER_S, STRIDE_LENGTH_NM, Side, WalkBlocker, WalkControlEpisode, WalkError,
+    WalkPhase, WalkStep, WalkerObservables, step_walk_episode,
+};
 
 const APPLICATION_ID: i32 = 0x4d4b_5631;
 const SCHEMA_VERSION: i32 = 1;
