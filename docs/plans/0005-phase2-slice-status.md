@@ -1,6 +1,6 @@
 # Phase 2 Slice Status — causal-kernel apartment physics
 
-## Status: IN PROGRESS — 16 из 10 плановых slices затронуто, electricity/water и acceptance scenario остаются
+## Status: IN PROGRESS — 17 из 10 плановых slices затронуто, cook/clean/dress episodes и acceptance scenario остаются
 
 План: [0003-phase2-apartment-embodiment.md](0003-phase2-apartment-embodiment.md).
 Evidence-детали каждого slice — в [coverage matrix](../coverage/phase0-coverage-matrix.md).
@@ -24,6 +24,7 @@ Evidence-детали каждого slice — в [coverage matrix](../coverage/
 | 6b. Pour/spill accounting | `1b02512` | `tests/liquid_pour.rs` |
 | 7a. Room atmosphere Compartment | `07c0ef7` | `tests/atmosphere.rs` |
 | 8. Point-source acoustics/light/odors | `d7805db` | `tests/propagation.rs` |
+| 9. Electricity/water networks | `30a8f34` | `tests/infrastructure.rs` |
 
 Новые механизмы сессии slices 9–14 наследуют дисциплину предыдущих: exact
 integer arithmetic, typed rejections вместо clamps, pure functions от входов,
@@ -35,7 +36,7 @@ hand-derived учебниковые якоря независимо от product
 |---|---|---|
 | walk через durable closed-loop control | ✅ в kernel | `WalkControlEpisode`: balance feedback, blockers, replanning, observed completion |
 | grasp через contact + friction feasibility | ✅ | friction cone + hold projection; carry pending |
-| cook/clean/dress episodes | ❌ | heat-связка есть (burner→µJ, pot↔air через shared port); сами multi-step episodes ждут slices 8–9 |
+| cook/clean/dress episodes | ❌ | prerequisites готовы: heat (burner→µJ, pot↔air port), power draw как physical delta с typed отключением, вода через pour/spill; сами multi-step ControlEpisodes — следующий slice |
 | spill с сохранением объёма | ✅ | pour/spill conservation bit-exact; liquid↔vapour мост в atmosphere; puddle-on-floor связка с contacts pending |
 | cook/clean/dress episodes | ❌ | требуют atmosphere/heat и infrastructure slices ниже |
 | Bodies persisted через `WorldEngine::commit` | ❌ | физика пока на kernel seam, без durable timeline записей |
@@ -47,13 +48,15 @@ hand-derived учебниковые якоря независимо от product
 
 Kernel покрывает physical embodiment ядро: metric rigid bodies с точной
 консервацией, контакты с трением, острова с физическим rest trigger, баланс,
-walk как durable closed-loop episode, жидкостный учёт со spill и room
+walk как durable closed-loop episode, жидкостный учёт со spill, room
 atmosphere с measured суховоздушной теплоёмкостью, конвекцией через shared
-thermal port (pot/organism coupling доказан тем же `ThermalProposal`) и точным
-liquid↔vapour массовым мостом. Walk ведёт foot/COM кинематику гайта; coupling
+thermal port (pot/organism coupling доказан тем же `ThermalProposal`), точным
+liquid↔vapour массовым мостом, point-source полями с declared затуханием и
+electricity/water сетями, где отключение питания останавливает нагрев typed
+rejection'ом без promised outcome. Walk ведёт foot/COM кинематику гайта;
+coupling
 joint torques к placement стоп объявлен вне текущего envelope; evaporation —
 mass-only без latent heat и saturation curve (declared gaps). До gate остаются
-acoustics/light/odors (8), electricity/water networks (9), cook/clean/dress
-episodes (10), persistирование тел через `WorldEngine::commit` и сквозной
-`apartment-v2` acceptance scenario с отрицательными тестами из §4 плана.
-Отдельный gate commit остаётся обязательным перед Phase 3.
+cook/clean/dress episodes (10), persistирование тел через `WorldEngine::commit`
+и сквозной `apartment-v2` acceptance scenario с отрицательными тестами из §4
+плана. Отдельный gate commit остаётся обязательным перед Phase 3.
