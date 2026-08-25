@@ -7,6 +7,7 @@ use thiserror::Error;
 
 mod articulation;
 mod artifact;
+mod atmosphere;
 mod balance;
 mod cell_cohort;
 mod circadian;
@@ -31,6 +32,11 @@ pub use articulation::{
 pub use artifact::{
     AdmissionError, AdmissionRecord, ArtifactBundle, ContractParseError, MechanismContract,
     ProgramAbi,
+};
+pub use atmosphere::{
+    AtmosphereError, DRY_AIR_DENSITY_MG_PER_M3, DRY_AIR_SPECIFIC_HEAT_CV_J_PER_KG_K,
+    FREE_CONVECTION_H_W_PER_M2_K, MAX_ROOM_TEMPERATURE_MK, MIN_ROOM_TEMPERATURE_MK, RoomAtmosphere,
+    convective_conductance_uj_per_mk_s, heater_energy_uj,
 };
 pub use balance::{BalanceAssessment, BalanceError, BalanceState, balance_assessment};
 pub use cell_cohort::{CellCohort, FineCell};
