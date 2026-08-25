@@ -13,6 +13,7 @@ mod circadian;
 mod cognitive;
 mod contact;
 mod digestion;
+mod fluids;
 mod interoception;
 mod morphotype;
 mod neural_population;
@@ -48,6 +49,10 @@ pub use contact::{
     resolve_collision,
 };
 pub use digestion::ABSORPTION_RATE_UJ_PER_SECOND;
+pub use fluids::{
+    WATER_DENSITY_MG_PER_M3, FluidError, ImmersionVerdict, buoyant_force_mgnm_per_s2,
+    hydrostatic_pressure_npa, immersion_verdict,
+};
 pub use interoception::{INITIAL_CHEMICAL_STORE_UJ, InteroceptionObservables, advance_sleep_debt};
 pub use morphotype::{
     AnatomyEdge, AnatomyNode, Morphotype, MorphotypeDefinition, MorphotypeError, OrganBinding,
