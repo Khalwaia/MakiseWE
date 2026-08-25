@@ -1,6 +1,6 @@
 # Phase 2 Slice Status — causal-kernel apartment physics
 
-## Status: IN PROGRESS — 19 из 10 плановых slices затронуто, acceptance scenario остаётся
+## Status: ACCEPTANCE COMPLETE — все slices и `apartment-v2` scenario доказаны; остался отдельный gate commit перед Phase 3
 
 План: [0003-phase2-apartment-embodiment.md](0003-phase2-apartment-embodiment.md).
 Evidence-детали каждого slice — в [coverage matrix](../coverage/phase0-coverage-matrix.md).
@@ -27,6 +27,7 @@ Evidence-детали каждого slice — в [coverage matrix](../coverage/
 | 9. Electricity/water networks | `30a8f34` | `tests/infrastructure.rs` |
 | 10. Cook/clean/dress episodes | `047ad2f` | `tests/episodes.rs` |
 | + Bodies persisted через `WorldEngine::commit` | `eb7aabf` | `tests/body_persistence.rs` |
+| + `apartment-v2` acceptance scenario | `0813af8` | `tests/apartment_v2.rs` |
 
 Новые механизмы сессии slices 9–14 наследуют дисциплину предыдущих: exact
 integer arithmetic, typed rejections вместо clamps, pure functions от входов,
@@ -41,7 +42,7 @@ hand-derived учебниковые якоря независимо от product
 | cook/clean/dress episodes | ✅ в kernel | `ControlEpisode`s поверх heat/power/water/spill; duration возникает из физики (10 секунд нагрева), interruption/partial/failure первичны |
 | spill с сохранением объёма | ✅ | pour/spill conservation bit-exact; liquid↔vapour мост в atmosphere; puddle-on-floor связка с contacts pending |
 | Bodies persisted через `WorldEngine::commit` | ✅ | `place_body` upsert через единственный mutation path; restart bit-exact; retry/conflict/stale-version typed; corruption typed на чтении |
-| Partition/restart/replay parity | ✅ наследовано | pure functions от observables + durable body records переживают reopen; полная matrix в acceptance scenario |
+| Partition/restart/replay parity | ✅ доказано | `apartment-v2`: identical event stream, bit-exact body restore, identical state hash и idempotent replay старых request id после reopen |
 | Invalid units/preconditions отклоняются | ✅ | typed failures во всех новых модулях |
 | Coverage matrix с фактическим evidence | ✅ | обновляется каждым slice |
 
@@ -61,6 +62,10 @@ metric body через единственный mutation path, reopen восст
 bit-exact, corruption читается как typed rejection. Walk ведёт foot/COM
 кинематику гайта; coupling
 joint torques к placement стоп объявлен вне текущего envelope; evaporation —
-mass-only без latent heat и saturation curve (declared gaps). До gate остаётся
-сквозной `apartment-v2` acceptance scenario с отрицательными тестами из §4
-плана. Отдельный gate commit остаётся обязательным перед Phase 3.
+mass-only без latent heat и saturation curve (declared gaps). Сквозной
+`apartment-v2` scenario прошёл: walk→grasp→fill→place→heat→spill→clean→dress
+на одном timeline с отрицательными тестами §4 плана — grasp без контакта и со
+слабым friction cone отклоняется, boil-over conserves total water bit-exact,
+отключение питания замораживает нагрев typed blocker'ом, dress-прерывание
+оставляет durable partial 1-of-2, reopen восстанавливает stream/bodies/hash.
+Остаётся отдельный gate commit перед Phase 3.
