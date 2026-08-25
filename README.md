@@ -87,10 +87,15 @@ flowchart TB
 - schema tests проверяют validation, conservation, lineage, observable continuity, morphotype isolation и запрет прямой LLM mutation;
 - заранее определён 24-часовой Human/Neko vertical scenario.
 
-Начат **Phase 1**: causal-kernel покрывает checked quantities, strict
+Завершён **Phase 1**: causal-kernel покрывает checked quantities, strict
 `MechanismContract` admission, organism slices, durable transition stream через
-`events()`, tamper detection и worker invariance. Отдельный gate commit остаётся
-обязательным перед Phase 2; план Phase 2 зафиксирован в
+`events()`, tamper detection и worker invariance; gate закрыт отдельным commit.
+
+Идёт **Phase 2** — apartment and physical embodiment: metric rigid bodies,
+контакты с Coulomb friction, physics islands с physical rest trigger, bipedal
+balance и durable walk `ControlEpisode`, fluid statics и pour/spill учёт.
+Прогресс по slices — в [docs/plans/0005-phase2-slice-status.md](docs/plans/0005-phase2-slice-status.md);
+план зафиксирован в
 [docs/plans/0003-phase2-apartment-embodiment.md](docs/plans/0003-phase2-apartment-embodiment.md).
 
 ## Что уже работает
@@ -108,7 +113,9 @@ flowchart TB
 - weather observations и deterministic environmental projections;
 - path guard, блокирующий доступ к защищённому внешнему runtime.
 - новый V1 `makise-causal-kernel`: quantities, artifact admission, thermal proposal,
-  идемпотентные commits и restart/replay persistence.
+  идемпотентные commits и restart/replay persistence; Phase 2 физика — metric
+  rigid bodies с exact conservation, contacts/friction, physics islands с rest
+  trigger, balance и walk `ControlEpisode`, fluid statics и pour/spill учёт.
 
 Этот код не является реализацией новой многомасштабной физиологии. Новая V1 получит отдельную timeline/DB и compatibility migration по [PROTO.md](PROTO.md).
 
@@ -117,8 +124,8 @@ flowchart TB
 Roadmap состоит из последовательных gates:
 
 1. **Phase 0:** contracts, schemas, fixtures и architecture — завершён.
-2. **Phase 1:** 24 часа Human/Neko; среда, минимальная физиология, сон, perception, scripted cortex и explicit `ResolutionChanged`.
-3. **Phase 2:** метрическая квартира, материалы, articulated bodies, contacts, fluids, heat, air, light, sound, electricity и water.
+2. **Phase 1:** 24 часа Human/Neko; среда, минимальная физиология, сон, perception, scripted cortex и explicit `ResolutionChanged` — завершён.
+3. **Phase 2:** метрическая квартира, материалы, articulated bodies, contacts, fluids, heat, air, light, sound, electricity и water — в процессе.
 4. **Phase 3:** everyday cardiovascular, respiratory, renal, digestive, endocrine, skin и musculoskeletal physiology.
 5. **Phase 4:** cells, immunity, infection, wounds, pathology, cancer, drugs, organ failure и death.
 6. **Phase 5:** genetics, reproduction, pregnancy, development, growth и aging.
@@ -246,6 +253,7 @@ Phase 0 tests дополнительно проверяют JSON Schemas, fixtur
 - [Phase 1 gate status](docs/plans/0002-phase1-gate-status.md) — текущее состояние organism slices и открытые gate criteria.
 - [Phase 2 plan](docs/plans/0003-phase2-apartment-embodiment.md) — apartment and physical embodiment implementation plan.
 - [Realism hardening record](docs/plans/0004-realism-hardening.md) — физиологический пересчёт констант kernel, причинные sleep/digestion механизмы и parameter guards.
+- [Phase 2 slice status](docs/plans/0005-phase2-slice-status.md) — выполненные embodiment slices, gate criteria и открытые gaps.
 - [STAGE_5.md](STAGE_5.md) — superseded historical plan; не является нормативной roadmap.
 
 ## Участие в разработке

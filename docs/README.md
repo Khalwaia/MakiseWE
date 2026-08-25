@@ -36,6 +36,7 @@
 - [Phase 1 gate status](plans/0002-phase1-gate-status.md) — текущее evidence и открытые пробелы перед Phase 2.
 - [Phase 2 apartment and physical embodiment](plans/0003-phase2-apartment-embodiment.md) — план метрической физики, articulated bodies и closed-loop действий.
 - [Realism hardening](plans/0004-realism-hardening.md) — evidence record: физиологический пересчёт констант causal-kernel, sleep/digestion как причинные процессы и parameter guards.
+- [Phase 2 slice status](plans/0005-phase2-slice-status.md) — выполненные embodiment slices, состояние gate criteria и открытые gaps.
 
 ## Архитектурные решения
 
