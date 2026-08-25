@@ -15,6 +15,7 @@ mod cognitive;
 mod contact;
 mod digestion;
 mod fluids;
+mod infrastructure;
 mod interoception;
 mod morphotype;
 mod neural_population;
@@ -59,6 +60,9 @@ pub use digestion::ABSORPTION_RATE_UJ_PER_SECOND;
 pub use fluids::{
     FluidError, ImmersionVerdict, LiquidContainer, PourRequest, WATER_DENSITY_MG_PER_M3,
     buoyant_force_mgnm_per_s2, hydrostatic_pressure_npa, immersion_verdict, puddle_depth_nm,
+};
+pub use infrastructure::{
+    BRANCH_BREAKER_W, InfrastructureError, KITCHEN_TAP_FLOW_MM3_PER_S, PowerNetwork, WaterNetwork,
 };
 pub use interoception::{INITIAL_CHEMICAL_STORE_UJ, InteroceptionObservables, advance_sleep_debt};
 pub use morphotype::{
