@@ -14,6 +14,7 @@ mod circadian;
 mod cognitive;
 mod contact;
 mod digestion;
+mod episodes;
 mod fluids;
 mod infrastructure;
 mod interoception;
@@ -57,6 +58,12 @@ pub use contact::{
     resolve_collision,
 };
 pub use digestion::ABSORPTION_RATE_UJ_PER_SECOND;
+pub use episodes::{
+    CleanBlocker, CleanControlEpisode, CleanObservables, CleanStep, ControlEpisodeError,
+    CookAction, CookBlocker, CookControlEpisode, CookObservables, CookPhase, CookStep,
+    DressBlocker, DressControlEpisode, DressObservables, DressStep, clean_step, cook_step,
+    dress_step,
+};
 pub use fluids::{
     FluidError, ImmersionVerdict, LiquidContainer, PourRequest, WATER_DENSITY_MG_PER_M3,
     buoyant_force_mgnm_per_s2, hydrostatic_pressure_npa, immersion_verdict, puddle_depth_nm,
