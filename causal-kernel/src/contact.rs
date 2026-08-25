@@ -10,6 +10,8 @@ pub enum ContactError {
     FrictionInfeasible,
     #[error("collider or grasp parameters are outside declared validity range")]
     InvalidParameters,
+    #[error("state is outside the declared validity range of this contact slice")]
+    OutsideValidityRange,
     #[error("friction product is not a whole number of force units")]
     NonRepresentableFriction,
     #[error("collision impulse quotient is not a whole velocity unit")]
@@ -225,10 +227,14 @@ pub fn hold_projection(
 
 /// Proposed collision-response cause: the restitution coefficient in
 /// micro fixed point, where 0 is perfectly plastic and 1_000_000 is
-/// perfectly elastic.
+/// perfectly elastic, plus an optional tangential Coulomb friction
+/// coefficient in the same fixed point. The friction coefficient is a
+/// caller-declared material pair property; until calibrated values
+/// exist its provenance stays `synthetic_fixture` per ADR-0014.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CollisionResponseProposal {
     restitution_micro: i64,
+    friction_coefficient_micro: i64,
 }
 
 impl CollisionResponseProposal {
@@ -236,23 +242,49 @@ impl CollisionResponseProposal {
         if !(0..=1_000_000).contains(&restitution_micro) {
             return Err(ContactError::InvalidParameters);
         }
-        Ok(Self { restitution_micro })
+        Ok(Self {
+            restitution_micro,
+            friction_coefficient_micro: 0,
+        })
+    }
+
+    /// Declares the tangential Coulomb coefficient µ of the contacting
+    /// material pair in micro fixed point. Zero (the default) resolves
+    /// a frictionless contact; values above unity would create energy
+    /// and are rejected at construction.
+    pub fn with_friction_coefficient(
+        self,
+        friction_coefficient_micro: i64,
+    ) -> Result<Self, ContactError> {
+        if !(0..=1_000_000).contains(&friction_coefficient_micro) {
+            return Err(ContactError::InvalidParameters);
+        }
+        Ok(Self {
+            friction_coefficient_micro,
+            ..self
+        })
     }
 
     pub fn restitution_micro(&self) -> i64 {
         self.restitution_micro
+    }
+
+    pub fn friction_coefficient_micro(&self) -> i64 {
+        self.friction_coefficient_micro
     }
 }
 
 /// Validated outcome of one collision resolution: impulse magnitude with
 /// the resulting body states plus exact kinetic energies on both sides
 /// of the interval boundary. Pair momentum is conserved bit-exact for
-/// every restitution; kinetic energy is conserved exactly at e = 1 and
-/// monotonically decreases otherwise.
+/// every restitution and friction coefficient; kinetic energy is
+/// conserved exactly at e = 1 without slip and monotonically decreases
+/// otherwise.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CollisionResolution {
     normal: [i64; 3],
     impulse_mg_nm_per_s: i64,
+    friction_impulse_mg_nm_per_s: i64,
     next_a: RigidBody,
     next_b: RigidBody,
     kinetic_energy_before_nj: i64,
@@ -265,6 +297,11 @@ impl CollisionResolution {
     }
     pub fn impulse_mg_nm_per_s(&self) -> i64 {
         self.impulse_mg_nm_per_s
+    }
+    /// Tangential Coulomb impulse actually applied to the contact, in
+    /// mg·nm/s; zero for frictionless proposals and separating bodies.
+    pub fn friction_impulse_mg_nm_per_s(&self) -> i64 {
+        self.friction_impulse_mg_nm_per_s
     }
     pub fn next_a(&self) -> &RigidBody {
         &self.next_a
@@ -295,13 +332,125 @@ fn translational_kinetic_energy_nj(body: &RigidBody) -> Result<i64, ContactError
         .map_err(|_| ContactError::Overflow)
 }
 
+/// Proposed tangential Coulomb response of one contact: `(axis, delta_a,
+/// delta_b, impulse)` where the deltas are the exact velocity changes on
+/// the single tangential axis carrying relative slip and `impulse` is
+/// the applied friction impulse in mg·nm/s.
+///
+/// The Coulomb bound is µ·|J_n|; the slip-stopping requirement is the
+/// reduced-mass impulse m₁m₂·Δv_t/(m₁+m₂). The cone verdict is decided
+/// by cross-multiplied integer comparison, never by rounding. Sticking
+/// removes the relative slip exactly; sliding applies exactly µ·|J_n|
+/// against the slip direction without reversing it. Slip along both
+/// tangential axes simultaneously is outside this slice's declared
+/// validity range (axis-aligned normals keep every direction exact) and
+/// is typed-rejected, never approximated.
+fn friction_response(
+    a: &RigidBody,
+    b: &RigidBody,
+    normal_axis: usize,
+    normal_impulse_mg_nm_per_s: i64,
+    friction_coefficient_micro: i64,
+) -> Result<(usize, i64, i64, i64), ContactError> {
+    let coefficient = i128::from(friction_coefficient_micro);
+    if coefficient == 0 {
+        return Ok((0, 0, 0, 0));
+    }
+    let tangential_axes = (0..3).filter(|&index| index != normal_axis);
+    let slipping_axes: Vec<usize> = tangential_axes
+        .filter(|&index| a.velocity_nm_per_s()[index] != b.velocity_nm_per_s()[index])
+        .collect();
+    let axis = match slipping_axes.as_slice() {
+        [] => return Ok((0, 0, 0, 0)),
+        [single] => *single,
+        [..] => return Err(ContactError::OutsideValidityRange),
+    };
+
+    let mass_a = i128::from(a.mass_mg());
+    let mass_b = i128::from(b.mass_mg());
+    let relative =
+        i128::from(a.velocity_nm_per_s()[axis]) - i128::from(b.velocity_nm_per_s()[axis]);
+    let sign = relative.signum();
+    let closing = relative.abs();
+
+    let bound_scaled = coefficient
+        .checked_mul(i128::from(normal_impulse_mg_nm_per_s))
+        .ok_or(ContactError::Overflow)?;
+    // Stick verdict: µ·J_n ≥ m_a·m_b·closing/(m_a+m_b), cross-multiplied.
+    let required_scaled = closing
+        .checked_mul(mass_a)
+        .and_then(|product| product.checked_mul(mass_b))
+        .ok_or(ContactError::Overflow)?;
+    let denominator = mass_a + mass_b;
+    let sticks = bound_scaled
+        .checked_mul(denominator)
+        .ok_or(ContactError::Overflow)?
+        >= required_scaled
+            .checked_mul(1_000_000)
+            .ok_or(ContactError::Overflow)?;
+
+    if sticks {
+        let numerator_a = closing.checked_mul(mass_b).ok_or(ContactError::Overflow)?;
+        let numerator_b = closing.checked_mul(mass_a).ok_or(ContactError::Overflow)?;
+        if numerator_a % denominator != 0 || numerator_b % denominator != 0 {
+            return Err(ContactError::NonRepresentableFriction);
+        }
+        let magnitude_a: i64 = (numerator_a / denominator)
+            .try_into()
+            .map_err(|_| ContactError::Overflow)?;
+        let magnitude_b: i64 = (numerator_b / denominator)
+            .try_into()
+            .map_err(|_| ContactError::Overflow)?;
+        let impulse = i128::from(magnitude_a)
+            .checked_mul(mass_a)
+            .and_then(|product| product.try_into().ok())
+            .ok_or(ContactError::Overflow)?;
+        let delta_a: i64 = (-sign * i128::from(magnitude_a))
+            .try_into()
+            .map_err(|_| ContactError::Overflow)?;
+        let delta_b: i64 = (sign * i128::from(magnitude_b))
+            .try_into()
+            .map_err(|_| ContactError::Overflow)?;
+        return Ok((axis, delta_a, delta_b, impulse));
+    }
+
+    if bound_scaled % 1_000_000 != 0 {
+        return Err(ContactError::NonRepresentableFriction);
+    }
+    let slide_impulse: i64 = (bound_scaled / 1_000_000)
+        .try_into()
+        .map_err(|_| ContactError::Overflow)?;
+    if slide_impulse == 0 {
+        return Ok((axis, 0, 0, 0));
+    }
+    let scaled_impulse = i128::from(slide_impulse);
+    if scaled_impulse % mass_a != 0 || scaled_impulse % mass_b != 0 {
+        return Err(ContactError::NonRepresentableFriction);
+    }
+    let magnitude_a: i64 = (scaled_impulse / mass_a)
+        .try_into()
+        .map_err(|_| ContactError::Overflow)?;
+    let magnitude_b: i64 = (scaled_impulse / mass_b)
+        .try_into()
+        .map_err(|_| ContactError::Overflow)?;
+    let delta_a: i64 = (-sign * i128::from(magnitude_a))
+        .try_into()
+        .map_err(|_| ContactError::Overflow)?;
+    let delta_b: i64 = (sign * i128::from(magnitude_b))
+        .try_into()
+        .map_err(|_| ContactError::Overflow)?;
+    Ok((axis, delta_a, delta_b, slide_impulse))
+}
+
 /// Resolves one overlapping contact: an impulse along the manifold normal
-/// when the bodies approach each other, then a mass-split positional
-/// correction. The correction gives `a` floor(d·m_b/(m_a+m_b)) of the
-/// depth and `b` the exact complement, so the split stays deterministic
-/// with at most one nanometre of declared bias instead of a silent
-/// rounding rule. Angular state is untouched — contacts act through the
-/// centre of mass this slice, mirroring torque-free gravity.
+/// when the bodies approach each other, a tangential Coulomb friction
+/// impulse bounded by µ·|J_n| when the proposal declares a coefficient,
+/// then a mass-split positional correction. The correction gives `a`
+/// floor(d·m_b/(m_a+m_b)) of the depth and `b` the exact complement, so
+/// the split stays deterministic with at most one nanometre of declared
+/// bias instead of a silent rounding rule. Angular state is untouched —
+/// contacts act through the centre of mass this slice, mirroring
+/// torque-free gravity.
 pub fn resolve_collision(
     a: &RigidBody,
     a_collider: &BoxCollider,
@@ -374,6 +523,19 @@ pub fn resolve_collision(
     velocity_b[axis] = i64::try_from(i128::from(velocity_b[axis]) + i128::from(velocity_delta_b))
         .map_err(|_| ContactError::Overflow)?;
 
+    // Tangential Coulomb response against the applied normal impulse.
+    let (friction_axis, friction_delta_a, friction_delta_b, friction_impulse) =
+        friction_response(a, b, axis, impulse, proposal.friction_coefficient_micro())?;
+    if friction_impulse > 0 {
+        let index = friction_axis;
+        velocity_a[index] =
+            i64::try_from(i128::from(velocity_a[index]) + i128::from(friction_delta_a))
+                .map_err(|_| ContactError::Overflow)?;
+        velocity_b[index] =
+            i64::try_from(i128::from(velocity_b[index]) + i128::from(friction_delta_b))
+                .map_err(|_| ContactError::Overflow)?;
+    }
+
     // Mass-split de-penetration along the same axis.
     let depth = i128::from(manifold.penetration_nm());
     let split_denominator = mass_a + mass_b;
@@ -408,6 +570,7 @@ pub fn resolve_collision(
     Ok(Some(CollisionResolution {
         normal: manifold.normal(),
         impulse_mg_nm_per_s: impulse,
+        friction_impulse_mg_nm_per_s: friction_impulse,
         next_a,
         next_b,
         kinetic_energy_before_nj: energy_before,

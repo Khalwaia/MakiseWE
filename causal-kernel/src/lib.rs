@@ -41,8 +41,8 @@ pub use cognitive::{
 };
 pub use contact::{
     BoxCollider, CollisionResolution, CollisionResponseProposal, ContactError, ContactManifold,
-    GraspAssessment, GraspRequest, HoldState, contact_proposal, grasp_proposal,
-    hold_projection, resolve_collision,
+    GraspAssessment, GraspRequest, HoldState, contact_proposal, grasp_proposal, hold_projection,
+    resolve_collision,
 };
 pub use digestion::ABSORPTION_RATE_UJ_PER_SECOND;
 pub use interoception::{INITIAL_CHEMICAL_STORE_UJ, InteroceptionObservables, advance_sleep_debt};
@@ -56,8 +56,8 @@ pub use organism::{
     REFERENCE_AMBIENT_TEMPERATURE_MK, REFERENCE_CORE_TEMPERATURE_MK,
 };
 pub use physics_island::{
-    IslandError, IslandLayout, RestSuspension, advance_awake_bodies, advance_island_members,
-    layout_islands, resume_island, suspend_island,
+    ENVIRONMENT_FLOOR_Y_NM, IslandError, IslandLayout, RestSuspension, advance_awake_bodies,
+    advance_island_members, layout_islands, resting_islands, resume_island, suspend_island,
 };
 pub use quantity::{Dimension, Quantity, QuantityError, ReservoirState, StateHash, UnitScale};
 pub use resolution::{ResolutionChanged, ResolutionError};
