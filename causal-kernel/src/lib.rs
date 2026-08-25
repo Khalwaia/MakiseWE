@@ -7,6 +7,7 @@ use thiserror::Error;
 
 mod articulation;
 mod artifact;
+mod balance;
 mod cell_cohort;
 mod circadian;
 mod cognitive;
@@ -29,6 +30,7 @@ pub use artifact::{
     AdmissionError, AdmissionRecord, ArtifactBundle, ContractParseError, MechanismContract,
     ProgramAbi,
 };
+pub use balance::{BalanceAssessment, BalanceError, BalanceState, balance_assessment};
 pub use cell_cohort::{CellCohort, FineCell};
 pub use circadian::{
     ASLEEP_METABOLISM_UJ_PER_SECOND, AWAKE_METABOLISM_UJ_PER_SECOND,
