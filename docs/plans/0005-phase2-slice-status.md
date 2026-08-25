@@ -1,6 +1,6 @@
 # Phase 2 Slice Status — causal-kernel apartment physics
 
-## Status: IN PROGRESS — 15 из 10 плановых slices затронуто, acoustics/electricity и acceptance scenario остаются
+## Status: IN PROGRESS — 16 из 10 плановых slices затронуто, electricity/water и acceptance scenario остаются
 
 План: [0003-phase2-apartment-embodiment.md](0003-phase2-apartment-embodiment.md).
 Evidence-детали каждого slice — в [coverage matrix](../coverage/phase0-coverage-matrix.md).
@@ -23,6 +23,7 @@ Evidence-детали каждого slice — в [coverage matrix](../coverage/
 | 6a. Fluid statics (measured ρ) | `ca581fa` | `tests/fluids.rs` |
 | 6b. Pour/spill accounting | `1b02512` | `tests/liquid_pour.rs` |
 | 7a. Room atmosphere Compartment | `07c0ef7` | `tests/atmosphere.rs` |
+| 8. Point-source acoustics/light/odors | `d7805db` | `tests/propagation.rs` |
 
 Новые механизмы сессии slices 9–14 наследуют дисциплину предыдущих: exact
 integer arithmetic, typed rejections вместо clamps, pure functions от входов,
