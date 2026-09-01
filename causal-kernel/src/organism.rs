@@ -209,7 +209,10 @@ impl OrganismState {
             ThermalProposal::one_second(&pair, self.morphotype.ambient_conductance_uj_per_mk_s())
                 .map_err(OrganismError::Thermal)?;
         let transfer = proposal.transfer();
-        self.core_internal_energy_uj += transfer.delta_hot_uj();
+        self.core_internal_energy_uj = self
+            .core_internal_energy_uj
+            .checked_add(transfer.delta_hot_uj())
+            .ok_or(OrganismError::Overflow)?;
         let new_ambient_energy = self
             .ambient_reservoir
             .internal_energy_microjoule()
@@ -230,7 +233,10 @@ impl OrganismState {
             return Err(OrganismError::ChemicalOverdraft);
         }
         self.chemical_store_uj -= demand_uj;
-        self.core_internal_energy_uj += demand_uj;
+        self.core_internal_energy_uj = self
+            .core_internal_energy_uj
+            .checked_add(demand_uj)
+            .ok_or(OrganismError::Overflow)?;
         Ok(())
     }
 
@@ -240,6 +246,9 @@ impl OrganismState {
 
     /// Adds absorbed chemical energy from digestion. Exact by construction.
     pub fn absorb_chemical_energy(&mut self, energy_uj: i64) {
-        self.chemical_store_uj += energy_uj;
+        self.chemical_store_uj = self
+            .chemical_store_uj
+            .checked_add(energy_uj)
+            .expect("absorb_chemical_energy overflow is typed at stage_ingestion");
     }
 }

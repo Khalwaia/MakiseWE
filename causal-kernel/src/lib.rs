@@ -258,6 +258,8 @@ pub struct CausalTransition {
     sequence: u64,
     interval_start_second: i64,
     interval_end_second: i64,
+    previous_state_hash: String,
+    resulting_state_hash: String,
 }
 
 impl CausalTransition {
@@ -271,6 +273,14 @@ impl CausalTransition {
 
     pub fn interval_end_second(&self) -> i64 {
         self.interval_end_second
+    }
+
+    pub fn previous_state_hash(&self) -> &str {
+        &self.previous_state_hash
+    }
+
+    pub fn resulting_state_hash(&self) -> &str {
+        &self.resulting_state_hash
     }
 }
 
@@ -627,30 +637,29 @@ impl WorldEngine {
             self.resolution_id = Some(resolution.to_resolution_id().to_owned());
         }
 
-        if request.sleep_intention {
-            self.sleep_intention_accepted = true;
-        }
+        let mut current_sleep_intention = self.sleep_intention_accepted || request.sleep_intention;
 
         let mut current = self.reservoirs.clone();
         let mut current_organism = self.organism.clone();
         let mut current_sleep_debt = self.sleep_debt_seconds;
+        let mut current_sleep_phase = self.sleep_phase;
         if current_organism.is_none() && request.ingest_uj.is_some() {
             current_organism = Some(initial_organism());
         }
         for _second in 0..request.advance_to_seconds.max(0) {
             let canonical_second = self.simulated_second + _second;
             match circadian::evaluate_sleep_transition(
-                self.sleep_phase,
-                self.sleep_intention_accepted,
+                current_sleep_phase,
+                current_sleep_intention,
                 current_sleep_debt,
                 canonical_second,
             ) {
                 circadian::SleepTransition::FallAsleep => {
-                    self.sleep_phase = circadian::SleepPhase::Asleep;
+                    current_sleep_phase = circadian::SleepPhase::Asleep;
                 }
                 circadian::SleepTransition::WakeUp => {
-                    self.sleep_phase = circadian::SleepPhase::Awake;
-                    self.sleep_intention_accepted = false;
+                    current_sleep_phase = circadian::SleepPhase::Awake;
+                    current_sleep_intention = false;
                 }
                 circadian::SleepTransition::None => {}
             }
@@ -666,7 +675,7 @@ impl WorldEngine {
                 organism
                     .apply_ambient_exchange()
                     .map_err(CommitError::MetabolismRejected)?;
-                let demand = if self.sleep_phase == circadian::SleepPhase::Asleep {
+                let demand = if current_sleep_phase == circadian::SleepPhase::Asleep {
                     circadian::metabolic_demand_uj_per_second(circadian::SleepPhase::Asleep)
                 } else {
                     circadian::awake_metabolism_for_second(self.simulated_second + _second)
@@ -676,7 +685,7 @@ impl WorldEngine {
                     .map_err(CommitError::MetabolismRejected)?;
             }
             current_sleep_debt =
-                interoception::advance_sleep_debt(current_sleep_debt, self.sleep_phase);
+                interoception::advance_sleep_debt(current_sleep_debt, current_sleep_phase);
         }
         if let (Some(energy), Some(organism)) = (request.ingest_uj, current_organism.as_mut()) {
             if energy <= 0 {
@@ -692,9 +701,20 @@ impl WorldEngine {
                     other => CommitError::MetabolismRejected(other),
                 })?;
         }
+        let previous_state_hash = self.compute_state_hash_for_previous();
+        let resulting_state_hash = compute_state_hash(
+            self.simulated_second + request.advance_to_seconds.max(0),
+            current_sleep_phase,
+            current_sleep_debt,
+            current_organism.as_ref(),
+            self.resolution_id.as_deref(),
+        );
+        let current_organism_for_self = current_organism.clone();
         self.reservoirs = current;
-        self.organism = current_organism;
+        self.organism = current_organism_for_self;
         self.sleep_debt_seconds = current_sleep_debt;
+        self.sleep_phase = current_sleep_phase;
+        self.sleep_intention_accepted = current_sleep_intention;
 
         self.simulated_second += request.advance_to_seconds.max(0);
 
@@ -707,12 +727,15 @@ impl WorldEngine {
             if request.advance_to_seconds > 0 {
                 transaction.execute(
                     "INSERT INTO causal_transitions
-                     (sequence, interval_start_second, interval_end_second)
-                     VALUES (?1, ?2, ?3)",
+                     (sequence, interval_start_second, interval_end_second,
+                      previous_state_hash, resulting_state_hash)
+                     VALUES (?1, ?2, ?3, ?4, ?5)",
                     params![
                         receipt.timeline_version as i64,
                         self.simulated_second - request.advance_to_seconds.max(0),
-                        self.simulated_second
+                        self.simulated_second,
+                        previous_state_hash,
+                        resulting_state_hash
                     ],
                 )?;
             }
@@ -720,9 +743,14 @@ impl WorldEngine {
                 if self.head_version == 0 {
                     transaction.execute(
                         "INSERT INTO causal_transitions
-                         (sequence, interval_start_second, interval_end_second)
-                         VALUES (1, ?1, ?1)",
-                        params![self.simulated_second],
+                         (sequence, interval_start_second, interval_end_second,
+                          previous_state_hash, resulting_state_hash)
+                         VALUES (1, ?1, ?1, ?2, ?3)",
+                        params![
+                            self.simulated_second,
+                            previous_state_hash,
+                            resulting_state_hash
+                        ],
                     )?;
                 } else {
                     let last_transition: i64 = transaction.query_row(
@@ -733,9 +761,15 @@ impl WorldEngine {
                     )?;
                     transaction.execute(
                         "INSERT INTO causal_transitions
-                         (sequence, interval_start_second, interval_end_second)
-                         VALUES (?1, ?2, ?2)",
-                        params![receipt.timeline_version as i64, last_transition],
+                         (sequence, interval_start_second, interval_end_second,
+                          previous_state_hash, resulting_state_hash)
+                         VALUES (?1, ?2, ?2, ?3, ?4)",
+                        params![
+                            receipt.timeline_version as i64,
+                            last_transition,
+                            previous_state_hash,
+                            resulting_state_hash
+                        ],
                     )?;
                 }
             }
@@ -811,6 +845,11 @@ impl WorldEngine {
                 "INSERT INTO sleep_intention (singleton, accepted) VALUES (1, ?1)
                  ON CONFLICT(singleton) DO UPDATE SET accepted = excluded.accepted",
                 params![i64::from(self.sleep_intention_accepted)],
+            )?;
+            transaction.execute(
+                "INSERT INTO sleep_debt (singleton, debt_seconds) VALUES (1, ?1)
+                 ON CONFLICT(singleton) DO UPDATE SET debt_seconds = excluded.debt_seconds",
+                params![self.sleep_debt_seconds],
             )?;
             if let Some(resolution_id) = self.resolution_id.as_deref() {
                 transaction.execute(
@@ -944,7 +983,8 @@ impl WorldEngine {
 
     pub fn events(&self, query: EventQuery) -> Result<EventPage, ReadError> {
         let mut statement = self._connection.prepare(
-            "SELECT sequence, interval_start_second, interval_end_second
+            "SELECT sequence, interval_start_second, interval_end_second,
+                    COALESCE(previous_state_hash,''), COALESCE(resulting_state_hash,'')
              FROM causal_transitions WHERE sequence > ?1 ORDER BY sequence ASC LIMIT ?2",
         )?;
         let rows =
@@ -953,6 +993,8 @@ impl WorldEngine {
                     sequence: row.get::<_, i64>(0)?.max(0) as u64,
                     interval_start_second: row.get(1)?,
                     interval_end_second: row.get(2)?,
+                    previous_state_hash: row.get(3)?,
+                    resulting_state_hash: row.get(4)?,
                 })
             })?;
         let mut events = Vec::new();
@@ -1024,7 +1066,11 @@ const RUNTIME_SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS causal_transitions (
     sequence INTEGER PRIMARY KEY,
     interval_start_second INTEGER NOT NULL,
-    interval_end_second INTEGER NOT NULL
+    interval_end_second INTEGER NOT NULL,
+    previous_state_hash TEXT NOT NULL DEFAULT '',
+    resulting_state_hash TEXT NOT NULL DEFAULT '',
+    mechanism_digest TEXT NOT NULL DEFAULT '',
+    conservation_report TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS request_receipts (
     request_id TEXT PRIMARY KEY,
@@ -1088,6 +1134,7 @@ fn ensure_runtime_tables(connection: &Connection) -> Result<(), rusqlite::Error>
     connection.execute_batch("BEGIN")?;
     connection.execute_batch(RUNTIME_SCHEMA)?;
     migrate_organism_state_columns(connection)?;
+    migrate_causal_transitions_columns(connection)?;
     connection.execute_batch("COMMIT")
 }
 
@@ -1123,6 +1170,28 @@ fn migrate_organism_state_columns(connection: &Connection) -> Result<(), rusqlit
         "10000000000",
     )?;
     ensure_column(&columns, connection, "digestion_buffer_uj", "0")?;
+    Ok(())
+}
+
+fn migrate_causal_transitions_columns(connection: &Connection) -> Result<(), rusqlite::Error> {
+    let columns: Vec<String> = {
+        let mut statement =
+            connection.prepare("SELECT name FROM pragma_table_info('causal_transitions')")?;
+        let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
+        rows.collect::<Result<Vec<_>, _>>()?
+    };
+    let ensure_text_column = |name: &str| -> Result<(), rusqlite::Error> {
+        if !columns.iter().any(|column| column == name) {
+            connection.execute_batch(&format!(
+                "ALTER TABLE causal_transitions ADD COLUMN {name} TEXT NOT NULL DEFAULT '';"
+            ))?;
+        }
+        Ok(())
+    };
+    ensure_text_column("previous_state_hash")?;
+    ensure_text_column("resulting_state_hash")?;
+    ensure_text_column("mechanism_digest")?;
+    ensure_text_column("conservation_report")?;
     Ok(())
 }
 
@@ -1240,9 +1309,53 @@ fn read_resolution_id(connection: &Connection) -> Option<String> {
         .flatten()
 }
 
+fn compute_state_hash(
+    simulated_second: i64,
+    sleep_phase: crate::circadian::SleepPhase,
+    sleep_debt_seconds: i64,
+    organism: Option<&OrganismState>,
+    resolution_id: Option<&str>,
+) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(b"makise-state-v1");
+    hasher.update(simulated_second.to_be_bytes());
+    hasher.update(sleep_phase.as_canonical_name().as_bytes());
+    hasher.update(sleep_debt_seconds.to_be_bytes());
+    if let Some(res) = resolution_id {
+        hasher.update(res.as_bytes());
+    }
+    if let Some(org) = organism {
+        hasher.update(org.chemical_store_uj().to_be_bytes());
+        hasher.update(org.digestion_buffer_uj().to_be_bytes());
+        hasher.update(org.core_internal_energy_uj().to_be_bytes());
+        hasher.update(org.ambient_internal_energy_uj().to_be_bytes());
+        hasher.update(
+            org.ambient_reservoir()
+                .heat_capacity_microjoule_per_millikelvin()
+                .to_be_bytes(),
+        );
+    }
+    let bytes: [u8; 32] = hasher.finalize().into();
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+impl WorldEngine {
+    fn compute_state_hash_for_previous(&self) -> String {
+        compute_state_hash(
+            self.simulated_second,
+            self.sleep_phase,
+            self.sleep_debt_seconds,
+            self.organism.as_ref(),
+            self.resolution_id.as_deref(),
+        )
+    }
+}
+
 fn verify_transition_chain(connection: &Connection) -> Result<(), rusqlite::Error> {
     let mut statement = connection.prepare(
-        "SELECT sequence, interval_start_second, interval_end_second
+        "SELECT sequence, interval_start_second, interval_end_second,
+                COALESCE(previous_state_hash,''), COALESCE(resulting_state_hash,'')
          FROM causal_transitions ORDER BY sequence ASC",
     )?;
     let rows = statement.query_map([], |row| {
@@ -1250,10 +1363,13 @@ fn verify_transition_chain(connection: &Connection) -> Result<(), rusqlite::Erro
             sequence: row.get::<_, i64>(0)?.max(0) as u64,
             interval_start_second: row.get(1)?,
             interval_end_second: row.get(2)?,
+            previous_state_hash: row.get(3)?,
+            resulting_state_hash: row.get(4)?,
         })
     })?;
 
     let mut previous_end_second: Option<i64> = None;
+    let mut previous_resulting_hash: Option<String> = None;
     let mut last_end_second = 0;
     for (expected_index, row) in (1u64..).zip(rows) {
         let transition = row?;
@@ -1266,6 +1382,17 @@ fn verify_transition_chain(connection: &Connection) -> Result<(), rusqlite::Erro
         }
         if transition.interval_end_second < transition.interval_start_second {
             return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+        // Expand-migration: legacy rows have empty hashes — skip check.
+        // New rows must form hash chain.
+        if !transition.previous_state_hash.is_empty() && !transition.resulting_state_hash.is_empty()
+        {
+            if let Some(prev_hash) = &previous_resulting_hash {
+                if &transition.previous_state_hash != prev_hash {
+                    return Err(rusqlite::Error::QueryReturnedNoRows);
+                }
+            }
+            previous_resulting_hash = Some(transition.resulting_state_hash.clone());
         }
         last_end_second = transition.interval_end_second;
         previous_end_second = Some(transition.interval_end_second);
