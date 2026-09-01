@@ -77,17 +77,50 @@ fn neko_fixture_binds_neko_runtime_parameters_not_human() {
 fn unknown_morphotype_id_is_rejected_without_silent_default() {
     let json = r#"{
         "schema_version": "makise.morphotype-definition.v1",
-        "root_definition": true,
         "morphotype_id": "unknown-x1",
+        "version": "0.1.0",
+        "content_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "root_definition": true,
         "anatomy_graph": {
             "nodes": [{ "node_id": "body", "kind": "mammalian-body", "count": 1 }],
             "edges": []
         },
-        "organ_bindings": []
+        "development": {
+            "program_id": "unknown-development-v1",
+            "artifact_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "validity_range": "test"
+        },
+        "organ_bindings": [{
+            "anatomy_node_id": "body",
+            "mechanism_id": "test.mechanism",
+            "mechanism_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "resolution_id": "cell-cohort-v1"
+        }],
+        "physiological_parameters": [
+            {
+              "parameter_id": "reference-core-temperature",
+              "value": 310.15,
+              "unit": "K",
+              "provenance_category": "expert_estimate",
+              "uncertainty": 1.0,
+              "validity_range": "test"
+            }
+        ],
+        "phenotypes": [{
+            "phenotype_id": "test-phenotype",
+            "sex": "female",
+            "parameter_overrides": []
+        }],
+        "shared_mechanism_refs": ["sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"],
+        "validation_fixtures": [{
+            "fixture_id": "test-fixture",
+            "evidence_kind": "schema_only",
+            "acceptance": "test"
+        }]
     }"#;
 
     let error = MorphotypeDefinition::from_fixture(json)
-        .expect_err("unregistered morphotype id must be rejected, never defaulted to human");
+        .expect_err("missing runtime parameters must be rejected, never defaulted to human");
     assert!(matches!(
         error,
         makise_causal_kernel::MorphotypeError::UnknownMorphotypeParameters(_)

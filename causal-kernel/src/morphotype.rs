@@ -226,7 +226,7 @@ impl MorphotypeDefinition {
             }
         }
 
-        let runtime_parameters = default_runtime_parameters_for(&morphotype_id)?
+        let runtime_parameters = parse_runtime_parameters(object)?
             .with_package(anatomy_nodes.clone(), organ_bindings.clone());
         Ok(Self {
             morphotype_id,
@@ -347,15 +347,40 @@ fn parse_anatomy_joints(
     Ok(joints)
 }
 
-/// Declared runtime parameters are keyed by morphotype identity. An
-/// unregistered id must fail admission instead of silently binding human
-/// baseline values.
-fn default_runtime_parameters_for(morphotype_id: &str) -> Result<Morphotype, MorphotypeError> {
-    match morphotype_id {
-        "human-v1" => Ok(Morphotype::human()),
-        "neko-v1" => Ok(Morphotype::neko()),
-        other => Err(MorphotypeError::UnknownMorphotypeParameters(
-            other.to_owned(),
-        )),
-    }
+fn parse_runtime_parameters(
+    object: &serde_json::Map<String, Value>,
+) -> Result<Morphotype, MorphotypeError> {
+    let params = object
+        .get("physiological_parameters")
+        .and_then(Value::as_array)
+        .ok_or(MorphotypeError::InvalidJson)?;
+    let find = |id: &str| -> Result<i64, MorphotypeError> {
+        let entry = params
+            .iter()
+            .find(|p| p.get("parameter_id").and_then(Value::as_str) == Some(id))
+            .ok_or_else(|| {
+                MorphotypeError::UnknownMorphotypeParameters(format!(
+                    "missing physiological parameter {id}"
+                ))
+            })?;
+        entry
+            .get("value")
+            .and_then(Value::as_f64)
+            .filter(|v| v.is_finite())
+            .map(|v| v as i64)
+            .filter(|v| *v > 0)
+            .ok_or(MorphotypeError::InvalidJson)
+    };
+    let awake = find("awake-metabolism-uj-per-s")?;
+    let asleep = find("asleep-metabolism-uj-per-s")?;
+    let night_awake = find("night-awake-metabolism-uj-per-s")?;
+    let heat_capacity = find("core-heat-capacity-uj-per-mk")?;
+    let conductance = find("ambient-conductance-uj-per-mk-s")?;
+    Ok(Morphotype::new(
+        awake,
+        asleep,
+        night_awake,
+        heat_capacity,
+        conductance,
+    ))
 }

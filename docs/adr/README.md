@@ -18,5 +18,6 @@ ADR фиксируют труднообратимые решения и прич
 - [ADR-0012: intentions запускают causal processes](0012-causal-processes-not-promised-outcomes.md) — accepted; semantic actions не обещают outcome.
 - [ADR-0013: diegetic technology и institutions](0013-diegetic-technology-and-institutions.md) — accepted; software, services и construction остаются внутри causal world.
 - [ADR-0014: fidelity envelope и validation evidence](0014-fidelity-envelope-and-validation-evidence.md) — accepted; realism claims требуют provenance, uncertainty и validation horizon.
+- [ADR-0015: data-driven morphotype runtime parameters](0015-data-driven-morphotype-runtime-parameters.md) — accepted; runtime параметры читаются из `physiological_parameters`, а не из закрытого `match`.
 
 Normative invariants находятся в [INVARIANTS.md](../../INVARIANTS.md); module boundary — в [ARCHITECTURE.md](../../ARCHITECTURE.md).

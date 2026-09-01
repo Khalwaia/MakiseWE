@@ -83,6 +83,46 @@
       "provenance_category": "expert_estimate",
       "uncertainty": 0.006,
       "validity_range": "Adult Neko schema fixture; uncalibrated"
+    },
+    {
+      "parameter_id": "awake-metabolism-uj-per-s",
+      "value": 55000000,
+      "unit": "uj_per_s",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 5000000,
+      "validity_range": "Neko fictional 55 W awake"
+    },
+    {
+      "parameter_id": "asleep-metabolism-uj-per-s",
+      "value": 45000000,
+      "unit": "uj_per_s",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 5000000,
+      "validity_range": "Neko fictional 45 W asleep"
+    },
+    {
+      "parameter_id": "night-awake-metabolism-uj-per-s",
+      "value": 50000000,
+      "unit": "uj_per_s",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 5000000,
+      "validity_range": "Neko fictional 50 W night awake"
+    },
+    {
+      "parameter_id": "core-heat-capacity-uj-per-mk",
+      "value": 104700000,
+      "unit": "uj_per_mk",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 10000000,
+      "validity_range": "30 kg fictional"
+    },
+    {
+      "parameter_id": "ambient-conductance-uj-per-mk-s",
+      "value": 3200,
+      "unit": "uj_per_mk_s",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 800,
+      "validity_range": "Fur-insulated 3.2 W/K"
     }
   ],
   "phenotypes": [

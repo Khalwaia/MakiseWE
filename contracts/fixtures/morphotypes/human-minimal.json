@@ -56,6 +56,46 @@
       "provenance_category": "expert_estimate",
       "uncertainty": 1.0,
       "validity_range": "Adult resting schema fixture only"
+    },
+    {
+      "parameter_id": "awake-metabolism-uj-per-s",
+      "value": 95000000,
+      "unit": "uj_per_s",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 5000000,
+      "validity_range": "Human baseline 95 W awake, docs/research/biology-realism.md"
+    },
+    {
+      "parameter_id": "asleep-metabolism-uj-per-s",
+      "value": 75000000,
+      "unit": "uj_per_s",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 5000000,
+      "validity_range": "Human baseline 75 W asleep"
+    },
+    {
+      "parameter_id": "night-awake-metabolism-uj-per-s",
+      "value": 88000000,
+      "unit": "uj_per_s",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 5000000,
+      "validity_range": "Human night awake 88 W"
+    },
+    {
+      "parameter_id": "core-heat-capacity-uj-per-mk",
+      "value": 216380000,
+      "unit": "uj_per_mk",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 10000000,
+      "validity_range": "3490 J/kgK * 62 kg"
+    },
+    {
+      "parameter_id": "ambient-conductance-uj-per-mk-s",
+      "value": 5600,
+      "unit": "uj_per_mk_s",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 1000,
+      "validity_range": "Whole-body passive 4-10 W/K band"
     }
   ],
   "phenotypes": [
