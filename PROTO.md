@@ -83,6 +83,8 @@ Timeline metadata связывает world specification, package manifest, arti
 
 Версионирование canonical physiology events и разделение request version/event sequence определяет [ADR-0016](docs/adr/0016-canonical-physiology-replay-format.md). Формат выбирается явно для новой timeline; несовместимый формат при reopen отклоняется до recovery writes. Принятие ADR не означает готовности его executable dependencies.
 
+Текущий expand prerequisite реализован через `OpenSpec::with_format`: metadata новых aggregate timelines хранит `aggregate-v1`, прежняя metadata без поля формата читается без его добавления. `CanonicalPhysiologyV2` пока зарезервирован и не создаётся; запрос этого формата не разрешает fallback. [Тесты формата](causal-kernel/tests/timeline_format.rs) проверяют typed rejection, byte preservation и прежние events, projection и retry receipt. Посекундное исполнение, новые units и event ranges остаются следующими этапами ADR-0016.
+
 ## 6. Compatibility migration
 
 Migration выполняется четырьмя обратимыми стадиями:

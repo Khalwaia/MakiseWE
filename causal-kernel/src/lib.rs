@@ -147,6 +147,15 @@ pub enum IdentifierError {
 pub struct OpenSpec {
     world_id: WorldId,
     timeline_id: TimelineId,
+    format: Option<TimelineFormat>,
+}
+
+/// Durable event/receipt semantics, independent of state-hash versions.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TimelineFormat {
+    AggregateV1,
+    /// Reserved by ADR-0016; creation remains unavailable until its runtime gates pass.
+    CanonicalPhysiologyV2,
 }
 
 impl OpenSpec {
@@ -154,7 +163,15 @@ impl OpenSpec {
         Self {
             world_id,
             timeline_id,
+            format: None,
         }
+    }
+
+    /// Require this format on reopen, or select it for a new timeline.
+    /// Without a requirement, reopen uses durable metadata; creation uses AggregateV1.
+    pub fn with_format(mut self, format: TimelineFormat) -> Self {
+        self.format = Some(format);
+        self
     }
 }
 
@@ -732,6 +749,13 @@ pub enum OpenError {
     CorruptTransitionChain,
     #[error("timeline identity does not match open specification")]
     IdentityMismatch,
+    #[error("requested timeline format {requested:?} differs from stored {stored:?}")]
+    FormatMismatch {
+        requested: TimelineFormat,
+        stored: TimelineFormat,
+    },
+    #[error("timeline format {0:?} is not executable by this kernel")]
+    UnsupportedTimelineFormat(TimelineFormat),
 }
 
 impl From<rusqlite::Error> for OpenError {
@@ -776,6 +800,11 @@ impl WorldEngine {
         spec: OpenSpec,
         storage: StorageLocation,
     ) -> Result<(Self, RecoveryReport), OpenError> {
+        if !storage.path().exists() && spec.format == Some(TimelineFormat::CanonicalPhysiologyV2) {
+            return Err(OpenError::UnsupportedTimelineFormat(
+                TimelineFormat::CanonicalPhysiologyV2,
+            ));
+        }
         let mut connection = Connection::open(storage.path())?;
         let application_id: i32 =
             connection.pragma_query_value(None, "application_id", |row| row.get(0))?;
@@ -785,6 +814,11 @@ impl WorldEngine {
         let status = if application_id == 0 && schema_version == 0 {
             if !is_pristine_storage(&connection)? {
                 return Err(OpenError::IncompatibleStorage);
+            }
+            if spec.format == Some(TimelineFormat::CanonicalPhysiologyV2) {
+                return Err(OpenError::UnsupportedTimelineFormat(
+                    TimelineFormat::CanonicalPhysiologyV2,
+                ));
             }
             create_timeline(&mut connection, &spec)?;
             RecoveryStatus::Created
@@ -2120,13 +2154,14 @@ fn create_timeline(connection: &mut Connection, spec: &OpenSpec) -> Result<(), O
         "CREATE TABLE timeline_metadata (
             singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
             world_id TEXT NOT NULL,
-            timeline_id TEXT NOT NULL
+            timeline_id TEXT NOT NULL,
+            timeline_format TEXT NOT NULL
         );",
     )?;
     transaction.execute_batch(RUNTIME_SCHEMA)?;
     transaction.execute(
-        "INSERT INTO timeline_metadata (singleton, world_id, timeline_id)
-         VALUES (1, ?1, ?2)",
+        "INSERT INTO timeline_metadata (singleton, world_id, timeline_id, timeline_format)
+         VALUES (1, ?1, ?2, 'aggregate-v1')",
         params![spec.world_id.0, spec.timeline_id.0],
     )?;
     let genesis_hash = initial_genesis_state_hash();
@@ -2460,18 +2495,34 @@ fn read_sleep_debt(connection: &Connection) -> i64 {
 }
 
 fn verify_identity(connection: &Connection, spec: &OpenSpec) -> Result<(), OpenError> {
-    let stored: Option<(String, String)> = connection
-        .query_row(
-            "SELECT world_id, timeline_id FROM timeline_metadata WHERE singleton = 1",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
+    // Absence is the historical schema, not permission to rewrite its metadata.
+    let has_format: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM pragma_table_info('timeline_metadata') WHERE name = 'timeline_format')",
+        [],
+        |row| row.get(0),
+    )?;
+    let query = if has_format {
+        "SELECT world_id, timeline_id, timeline_format FROM timeline_metadata WHERE singleton = 1"
+    } else {
+        "SELECT world_id, timeline_id, 'aggregate-v1' FROM timeline_metadata WHERE singleton = 1"
+    };
+    let stored: Option<(String, String, String)> = connection
+        .query_row(query, [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
         .optional()?;
 
     match stored {
-        Some((world_id, timeline_id))
+        Some((world_id, timeline_id, format))
             if world_id == spec.world_id.0 && timeline_id == spec.timeline_id.0 =>
         {
+            let stored = match format.as_str() {
+                "aggregate-v1" => TimelineFormat::AggregateV1,
+                _ => return Err(OpenError::IncompatibleStorage),
+            };
+            if let Some(requested) = spec.format
+                && requested != stored
+            {
+                return Err(OpenError::FormatMismatch { requested, stored });
+            }
             Ok(())
         }
         Some(_) => Err(OpenError::IdentityMismatch),
