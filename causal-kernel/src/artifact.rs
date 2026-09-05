@@ -134,6 +134,7 @@ pub enum AdmissionError {
     UnsupportedProgramAbi,
 }
 
+#[derive(Clone, Debug)]
 pub struct ArtifactBundle {
     contract: MechanismContract,
     program: Vec<u8>,
@@ -191,6 +192,19 @@ impl ArtifactBundle {
             mechanism_id: self.contract.mechanism_id.clone(),
             abi: self.abi,
         })
+    }
+
+    pub fn program_bytes(&self) -> &[u8] {
+        &self.program
+    }
+
+    pub fn mechanism_id(&self) -> &str {
+        self.contract.mechanism_id()
+    }
+
+    pub fn thermal_exchange_conductance_uj_per_mk_s(&self) -> Option<i64> {
+        let value: Value = serde_json::from_slice(&self.program).ok()?;
+        value.get("conductance_uj_per_mk_s").and_then(Value::as_i64)
     }
 
     pub fn mutate_last_program_byte(&mut self) {

@@ -61,3 +61,32 @@ fn stale_expected_version_is_rejected_without_mutation() {
 
     assert!(matches!(error, CommitError::ExpectedVersionConflict));
 }
+
+#[test]
+fn failed_durable_append_leaves_the_authoritative_state_unchanged() {
+    let (directory, mut engine) = open_engine();
+    let path = directory.path().join("t.sqlite");
+    let lock = rusqlite::Connection::open(path).expect("open competing SQLite connection");
+    lock.execute_batch("BEGIN IMMEDIATE")
+        .expect("hold the writer lock after the engine is open");
+
+    let request = advance_request("req-after-failed-append", 0, 3);
+    let error = engine
+        .commit(request.clone())
+        .expect_err("a blocked durable append must fail");
+    assert!(matches!(error, CommitError::Storage(_)));
+
+    let projection = engine
+        .project(makise_causal_kernel::ProjectionRequest::current())
+        .expect("project after rejected commit");
+    assert_eq!(projection.timeline_version(), 0);
+    assert_eq!(projection.simulated_second(), 0);
+
+    lock.execute_batch("ROLLBACK")
+        .expect("release competing writer lock");
+    let receipt = engine
+        .commit(request)
+        .expect("the same request commits once after storage recovers");
+    assert_eq!(receipt.timeline_version(), 1);
+    assert!(!receipt.replayed_request());
+}

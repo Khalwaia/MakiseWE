@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+use crate::blood::{BloodError, BloodState};
 use crate::morphotype::Morphotype;
 use crate::quantity::ReservoirState;
 use crate::thermal::{ReservoirPair, ThermalProposal};
@@ -14,6 +15,10 @@ pub enum OrganismError {
     DigestiveCapacityExceeded,
     #[error("checked arithmetic overflow in organism state")]
     Overflow,
+    #[error("arterial O₂ overdraft; no partial metabolism")]
+    OxygenOverdraft,
+    #[error("blood state invalid")]
+    Blood(#[from] BloodError),
 }
 
 /// Declared reference temperatures for baseline state construction and
@@ -40,10 +45,12 @@ pub struct OrganismState {
     core_internal_energy_uj: i64,
     ambient_reservoir: ReservoirState,
     morphotype: Morphotype,
+    blood: BloodState,
 }
 
 impl OrganismState {
     pub fn new(chemical_store_uj: i64, core_internal_energy_uj: i64) -> Self {
+        let morphotype = Morphotype::human();
         Self {
             chemical_store_uj,
             digestion_buffer_uj: 0,
@@ -52,7 +59,8 @@ impl OrganismState {
                 BASELINE_AMBIENT_INTERNAL_ENERGY_UJ,
                 AMBIENT_HEAT_CAPACITY_UJ_PER_MK,
             ),
-            morphotype: Morphotype::human(),
+            morphotype: morphotype.clone(),
+            blood: BloodState::from_morphotype(&morphotype),
         }
     }
 
@@ -68,6 +76,7 @@ impl OrganismState {
             core_internal_energy_uj,
             ambient_reservoir,
             morphotype: morphotype.clone(),
+            blood: BloodState::from_morphotype(morphotype),
         }
     }
 
@@ -76,12 +85,14 @@ impl OrganismState {
         core_internal_energy_uj: i64,
         ambient_reservoir: ReservoirState,
     ) -> Self {
+        let morphotype = Morphotype::human();
         Self {
             chemical_store_uj,
             digestion_buffer_uj: 0,
             core_internal_energy_uj,
             ambient_reservoir,
-            morphotype: Morphotype::human(),
+            morphotype: morphotype.clone(),
+            blood: BloodState::from_morphotype(&morphotype),
         }
     }
 
@@ -104,6 +115,7 @@ impl OrganismState {
                 AMBIENT_HEAT_CAPACITY_UJ_PER_MK,
             ),
             morphotype: morphotype.clone(),
+            blood: BloodState::from_morphotype(morphotype),
         }
     }
 
@@ -121,6 +133,48 @@ impl OrganismState {
         );
         organism.digestion_buffer_uj = digestion_buffer_uj;
         organism
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn with_blood_from_row(
+        chemical_store_uj: i64,
+        digestion_buffer_uj: i64,
+        core_internal_energy_uj: i64,
+        ambient_energy_uj: i64,
+        ambient_capacity_uj_per_mk: i64,
+        blood_volume_mm3: i64,
+        hb_tetramer_umol: i64,
+        arterial_o2_umol: i64,
+        venous_co2_umol: i64,
+        map_mpa: i64,
+        lung_diffusion_umol_per_s: i64,
+    ) -> Self {
+        // Derive morphotype from stored diffusion/blood params by matching known morphotypes.
+        // Fallback to human if unknown — migration preserves exact amounts anyway.
+        let morphotype = if blood_volume_mm3 == Morphotype::neko().blood_volume_mm3()
+            && hb_tetramer_umol == Morphotype::neko().hb_tetramer_umol()
+        {
+            Morphotype::neko()
+        } else {
+            Morphotype::human()
+        };
+        let blood = BloodState::new(
+            blood_volume_mm3,
+            hb_tetramer_umol,
+            arterial_o2_umol,
+            venous_co2_umol,
+            map_mpa,
+            lung_diffusion_umol_per_s,
+        )
+        .unwrap_or_else(|_| BloodState::from_morphotype(&morphotype));
+        Self {
+            chemical_store_uj,
+            digestion_buffer_uj,
+            core_internal_energy_uj,
+            ambient_reservoir: ReservoirState::new(ambient_energy_uj, ambient_capacity_uj_per_mk),
+            morphotype: morphotype.clone(),
+            blood,
+        }
     }
 
     pub fn chemical_store_uj(&self) -> i64 {
@@ -179,6 +233,46 @@ impl OrganismState {
 
     pub fn morphotype(&self) -> &Morphotype {
         &self.morphotype
+    }
+
+    // --- Blood gas proxies (Phase 3) ---
+
+    pub fn blood(&self) -> &BloodState {
+        &self.blood
+    }
+
+    pub fn blood_volume_mm3(&self) -> i64 {
+        self.blood.blood_volume_mm3()
+    }
+
+    pub fn blood_o2_capacity_umol(&self) -> i64 {
+        self.blood.o2_capacity_umol()
+    }
+
+    pub fn arterial_o2_umol(&self) -> i64 {
+        self.blood.arterial_o2_umol()
+    }
+
+    pub fn venous_co2_umol(&self) -> i64 {
+        self.blood.venous_co2_umol()
+    }
+
+    pub fn arterial_saturation_permille(&self) -> i64 {
+        self.blood.arterial_saturation_permille()
+    }
+
+    pub fn mean_arterial_pressure_mpa(&self) -> i64 {
+        self.blood.map_mpa()
+    }
+
+    /// One second of gas exchange at given metabolic demand. Typed rejection
+    /// without partial burn if O₂ insufficient. Caller must have already
+    /// validated chemical store availability if coupling to metabolism.
+    pub fn apply_gas_exchange_for_second(&mut self, demand_uj: i64) -> Result<(), OrganismError> {
+        self.blood.apply_one_second(demand_uj).map_err(|e| match e {
+            BloodError::OxygenOverdraft => OrganismError::OxygenOverdraft,
+            other => OrganismError::Blood(other),
+        })
     }
 
     /// Declared observable projection: core temperature in millikelvin.

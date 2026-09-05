@@ -2,7 +2,7 @@
   "schema_version": "makise.mechanism-contract.v1",
   "mechanism_id": "thermal.two-reservoir-exchange",
   "version": "0.1.0",
-  "content_digest": "sha256:6c08218c0b1b80a6c31cc2a482ece8c6e9e6a7bbe71d10bb4a8e222e82df7041",
+  "content_digest": "sha256:4c054e071d9e80003578190f7d18aebfe824ec80d79d249acd485ac80b13dfa9",
   "causal_inputs": [
     { "port_id": "hot-energy-input", "variable": "reservoir.hot.internal-energy", "unit": "uJ", "dimension_kind": "physical_quantity" }
   ],

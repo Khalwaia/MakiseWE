@@ -15,6 +15,10 @@ pub struct Morphotype {
     night_awake_metabolism_uj_per_second: i64,
     core_heat_capacity_uj_per_mk: i64,
     ambient_conductance_uj_per_mk_s: i64,
+    blood_volume_mm3: i64,
+    hb_tetramer_umol: i64,
+    mean_arterial_pressure_mpa: i64,
+    lung_diffusion_umol_per_s: i64,
     anatomy_nodes: Vec<AnatomyNode>,
     organ_bindings: Vec<OrganBinding>,
 }
@@ -33,6 +37,37 @@ impl Morphotype {
             night_awake_metabolism_uj_per_second,
             core_heat_capacity_uj_per_mk,
             ambient_conductance_uj_per_mk_s,
+            blood_volume_mm3: 5_000_000,
+            hb_tetramer_umol: 11_500,
+            mean_arterial_pressure_mpa: 12_400_000,
+            lung_diffusion_umol_per_s: 300,
+            anatomy_nodes: Vec::new(),
+            organ_bindings: Vec::new(),
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub const fn with_blood(
+        awake_metabolism_uj_per_second: i64,
+        asleep_metabolism_uj_per_second: i64,
+        night_awake_metabolism_uj_per_second: i64,
+        core_heat_capacity_uj_per_mk: i64,
+        ambient_conductance_uj_per_mk_s: i64,
+        blood_volume_mm3: i64,
+        hb_tetramer_umol: i64,
+        mean_arterial_pressure_mpa: i64,
+        lung_diffusion_umol_per_s: i64,
+    ) -> Self {
+        Self {
+            awake_metabolism_uj_per_second,
+            asleep_metabolism_uj_per_second,
+            night_awake_metabolism_uj_per_second,
+            core_heat_capacity_uj_per_mk,
+            ambient_conductance_uj_per_mk_s,
+            blood_volume_mm3,
+            hb_tetramer_umol,
+            mean_arterial_pressure_mpa,
+            lung_diffusion_umol_per_s,
             anatomy_nodes: Vec::new(),
             organ_bindings: Vec::new(),
         }
@@ -56,16 +91,38 @@ impl Morphotype {
     /// radiation + convection; metabolic rates from circadian.rs. The
     /// conductance is tuned so the passive equilibrium at a 20 °C room
     /// lands at ≈310.1 K.
+    /// Blood: 5 L, Hb 150 g/L → 11 500 µmol tetramer, MAP 93 mmHg, diffusion 300 µmol/s.
     pub fn human() -> Self {
-        Self::new(95_000_000, 75_000_000, 88_000_000, 216_380_000, 5_600)
+        Self::with_blood(
+            95_000_000,
+            75_000_000,
+            88_000_000,
+            216_380_000,
+            5_600,
+            5_000_000,
+            11_500,
+            12_400_000,
+            300,
+        )
     }
 
     /// Neko: fictional morphotype (`fictional_assumption` / `species_proxy`).
     /// Assumed ~30 kg body mass with fur-insulated surface. No empirical
     /// population exists; these magnitudes are declared placeholders whose
     /// only contract-tested properties are orderings relative to human.
+    /// Blood volume ~3 L, lower Hb and diffusion.
     pub fn neko() -> Self {
-        Self::new(55_000_000, 45_000_000, 50_000_000, 104_700_000, 3_200)
+        Self::with_blood(
+            55_000_000,
+            45_000_000,
+            50_000_000,
+            104_700_000,
+            3_200,
+            3_000_000,
+            6_900,
+            11_200_000,
+            180,
+        )
     }
 
     pub fn awake_metabolism_uj_per_second(&self) -> i64 {
@@ -86,6 +143,22 @@ impl Morphotype {
 
     pub fn ambient_conductance_uj_per_mk_s(&self) -> i64 {
         self.ambient_conductance_uj_per_mk_s
+    }
+
+    pub fn blood_volume_mm3(&self) -> i64 {
+        self.blood_volume_mm3
+    }
+
+    pub fn hb_tetramer_umol(&self) -> i64 {
+        self.hb_tetramer_umol
+    }
+
+    pub fn mean_arterial_pressure_mpa(&self) -> i64 {
+        self.mean_arterial_pressure_mpa
+    }
+
+    pub fn lung_diffusion_umol_per_s(&self) -> i64 {
+        self.lung_diffusion_umol_per_s
     }
 
     pub fn anatomy_nodes(&self) -> &[AnatomyNode] {
@@ -371,16 +444,34 @@ fn parse_runtime_parameters(
             .filter(|v| *v > 0)
             .ok_or(MorphotypeError::InvalidJson)
     };
+    let find_optional = |id: &str, default: i64| -> i64 {
+        params
+            .iter()
+            .find(|p| p.get("parameter_id").and_then(Value::as_str) == Some(id))
+            .and_then(|e| e.get("value").and_then(Value::as_f64))
+            .filter(|v| v.is_finite() && *v > 0.0)
+            .map(|v| v as i64)
+            .unwrap_or(default)
+    };
     let awake = find("awake-metabolism-uj-per-s")?;
     let asleep = find("asleep-metabolism-uj-per-s")?;
     let night_awake = find("night-awake-metabolism-uj-per-s")?;
     let heat_capacity = find("core-heat-capacity-uj-per-mk")?;
     let conductance = find("ambient-conductance-uj-per-mk-s")?;
-    Ok(Morphotype::new(
+    // Phase 3: blood params optional for backward compat with minimal fixtures.
+    let blood_volume = find_optional("blood-volume-mm3", 5_000_000);
+    let hb = find_optional("hb-tetramer-umol", 11_500);
+    let map = find_optional("mean-arterial-pressure-mpa", 12_400_000);
+    let diffusion = find_optional("lung-diffusion-umol-per-s", 300);
+    Ok(Morphotype::with_blood(
         awake,
         asleep,
         night_awake,
         heat_capacity,
         conductance,
+        blood_volume,
+        hb,
+        map,
+        diffusion,
     ))
 }

@@ -1,0 +1,104 @@
+{
+  "schema_version": "makise.mechanism-contract.v1",
+  "mechanism_id": "cardiorespiratory.gas-exchange",
+  "version": "0.1.0",
+  "content_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+  "causal_inputs": [
+    { "port_id": "metabolic-demand", "variable": "organism.metabolic-demand", "unit": "uj_per_s", "dimension_kind": "physical_quantity" },
+    { "port_id": "arterial-o2", "variable": "blood.arterial-o2-umol", "unit": "umol", "dimension_kind": "physical_quantity" },
+    { "port_id": "lung-diffusion", "variable": "blood.lung-diffusion-umol-per-s", "unit": "umol_per_s", "dimension_kind": "physical_quantity" }
+  ],
+  "causal_outputs": [
+    { "port_id": "arterial-o2-out", "variable": "blood.arterial-o2-umol", "unit": "umol", "dimension_kind": "physical_quantity" },
+    { "port_id": "venous-co2-out", "variable": "blood.venous-co2-umol", "unit": "umol", "dimension_kind": "physical_quantity" },
+    { "port_id": "o2-consumption", "variable": "blood.o2-consumed-umol", "unit": "umol", "dimension_kind": "physical_quantity" }
+  ],
+  "read_set": ["blood.arterial-o2-umol", "blood.venous-co2-umol", "blood.hb-tetramer-umol", "organism.chemical-store-uj"],
+  "write_set": ["blood.arterial-o2-umol", "blood.venous-co2-umol"],
+  "authoritative_state_variables": [
+    { "variable": "blood.arterial-o2-umol", "unit": "umol", "dimension_kind": "physical_quantity", "validity_range": { "min": 0, "max": 100000, "unit": "umol" } },
+    { "variable": "blood.venous-co2-umol", "unit": "umol", "dimension_kind": "physical_quantity", "validity_range": { "min": 0, "max": 200000, "unit": "umol" } },
+    { "variable": "blood.blood-volume-mm3", "unit": "mm3", "dimension_kind": "physical_quantity", "validity_range": { "min": 1000000, "max": 10000000, "unit": "mm3" } },
+    { "variable": "blood.map-mpa", "unit": "mPa", "dimension_kind": "physical_quantity", "validity_range": { "min": 8000000, "max": 16000000, "unit": "mPa" } }
+  ],
+  "resolution": {
+    "supported_resolution_ids": ["blood-coarse-v1", "blood-capillary-v1"],
+    "representation": "Compartment amounts independent of coarse vs capillary resolution; ports stable"
+  },
+  "scales": {
+    "spatial": { "min": 0.001, "max": 2.0, "unit": "m" },
+    "temporal": { "min": 1.0, "max": 1.0, "unit": "s" }
+  },
+  "canonical_scheduling": {
+    "boundary_rule": "Every canonical second; sleep phase determines demand via circadian table",
+    "partition_invariant": true,
+    "reduction_order": "Single organism per timeline; no cross-entity reduction"
+  },
+  "observable_projections": [
+    {
+      "observable_id": "arterial-saturation-permille",
+      "source_variables": ["blood.arterial-o2-umol", "blood.hb-tetramer-umol"],
+      "unit": "permille",
+      "error_bound": { "kind": "absolute", "bound": 5, "unit": "permille", "confidence": 0.95 }
+    },
+    {
+      "observable_id": "blood-volume-mm3",
+      "source_variables": ["blood.blood-volume-mm3"],
+      "unit": "mm3",
+      "error_bound": { "kind": "absolute", "bound": 1, "unit": "mm3", "confidence": 0.95 }
+    }
+  ],
+  "parameters": [
+    {
+      "parameter_id": "energy-per-umol-o2-uj",
+      "value": 470000,
+      "unit": "uj_per_umol",
+      "provenance_category": "expert_estimate",
+      "uncertainty": { "kind": "relative", "bound": 0.1, "unit": "1", "confidence": 0.95 },
+      "validity_range": { "min": 400000, "max": 540000, "unit": "uj_per_umol" }
+    },
+    {
+      "parameter_id": "respiratory-quotient",
+      "value": 0.85,
+      "unit": "1",
+      "provenance_category": "expert_estimate",
+      "uncertainty": { "kind": "absolute", "bound": 0.05, "unit": "1", "confidence": 0.95 },
+      "validity_range": { "min": 0.7, "max": 1.0, "unit": "1" }
+    },
+    {
+      "parameter_id": "lung-diffusion-umol-per-s",
+      "value": 300,
+      "unit": "umol_per_s",
+      "provenance_category": "expert_estimate",
+      "uncertainty": { "kind": "relative", "bound": 0.3, "unit": "1", "confidence": 0.95 },
+      "validity_range": { "min": 150, "max": 600, "unit": "umol_per_s" }
+    }
+  ],
+  "provenance_category": "expert_estimate",
+  "uncertainty_model": { "kind": "absolute", "bound": 5, "unit": "permille", "confidence": 0.95 },
+  "validity_range": {
+    "conditions": ["Resting and moderate activity; arterial O2 within capacity; venous CO2 < 200000 umol"],
+    "exclusions": ["Extreme hypoxia, hemorrhage, or lung failure outside validity"]
+  },
+  "conservation_rules": [
+    { "quantity": "blood.o2-plus-co2-amount", "unit": "umol", "tolerance": { "value": 1, "unit": "umol" } },
+    { "quantity": "organism.total-energy-uj", "unit": "uj", "tolerance": { "value": 1, "unit": "uj" } }
+  ],
+  "failure_policy": {
+    "non_convergence": "safe_stop",
+    "invalid_input": "reject_transition",
+    "missing_artifact": "safe_stop"
+  },
+  "resolution_upgrade_paths": [
+    {
+      "from_resolution_id": "blood-coarse-v1",
+      "to_resolution_id": "blood-capillary-v1",
+      "contract_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  ],
+  "validation_scenarios": [
+    { "scenario_id": "resting-saturation-95-99", "evidence_kind": "expert_estimate", "acceptance": "Arterial saturation stays 950..1000 permille over 60s awake rest" },
+    { "scenario_id": "oxygen-overdraft-rejects", "evidence_kind": "expert_estimate", "acceptance": "Demand exceeding arterial pool returns OxygenOverdraft without partial burn" },
+    { "scenario_id": "partition-invariance-60s", "evidence_kind": "expert_estimate", "acceptance": "1x60s and 60x1s give identical blood amounts and state hash" }
+  ]
+}
