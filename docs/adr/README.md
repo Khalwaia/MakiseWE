@@ -19,5 +19,6 @@ ADR фиксируют труднообратимые решения и прич
 - [ADR-0013: diegetic technology и institutions](0013-diegetic-technology-and-institutions.md) — accepted; software, services и construction остаются внутри causal world.
 - [ADR-0014: fidelity envelope и validation evidence](0014-fidelity-envelope-and-validation-evidence.md) — accepted; realism claims требуют provenance, uncertainty и validation horizon.
 - [ADR-0015: data-driven morphotype runtime parameters](0015-data-driven-morphotype-runtime-parameters.md) — accepted; runtime параметры читаются из `physiological_parameters`, а не из закрытого `match`.
+- [ADR-0016: canonical physiology replay format](0016-canonical-physiology-replay-format.md) — accepted; посекундные transitions, отдельные request versions, executable artifacts и совместимость прежних timelines.
 
 Normative invariants находятся в [INVARIANTS.md](../../INVARIANTS.md); module boundary — в [ARCHITECTURE.md](../../ARCHITECTURE.md).

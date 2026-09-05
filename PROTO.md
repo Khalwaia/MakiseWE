@@ -81,6 +81,8 @@ Partitioning, worker count и wall-clock mode не являются event semant
 
 Timeline metadata связывает world specification, package manifest, artifact roots, schema versions и parent/fork provenance. Schema не ограничивает entity count. Storage admission возвращает явный `CapacityExceeded` до partial commit.
 
+Версионирование canonical physiology events и разделение request version/event sequence определяет [ADR-0016](docs/adr/0016-canonical-physiology-replay-format.md). Формат выбирается явно для новой timeline; несовместимый формат при reopen отклоняется до recovery writes. Принятие ADR не означает готовности его executable dependencies.
+
 ## 6. Compatibility migration
 
 Migration выполняется четырьмя обратимыми стадиями:
