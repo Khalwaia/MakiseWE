@@ -46,9 +46,13 @@ Gate: walk, grasp, carry, cook, spill, heat, clean и dress развиваютс
 
 ## Phase 3 — everyday physiology
 
+Статус: в работе. Coarse реализации slices 3.1 `cardiorespiratory.gas-exchange` и 3.2 `renal.fluid-electrolyte` имеют focused tests, но system gates ещё не закрыты. Текущее evidence, ограничения replay и следующий acceptance slice — в [плане Phase 3](docs/plans/0006-phase3-everyday-physiology.md).
+
 Вертикально добавлять cardiovascular/respiratory, renal/fluids/electrolytes, digestive/liver/metabolism, endocrine, thermoregulation/skin, musculoskeletal/fatigue/pain, excretion/hygiene/microbiome.
 
 Gate каждого system: `MechanismContract`, reference observables, upgrade path и focused validation.
+
+Для закрытия 3.2 дополнительно обязательны executable renal resolution upgrade и независимые эмпирические time-series; synthetic integration tests не заменяют этот gate. Решения пользователя от 2026-09-07 и границы validation закреплены в [плане Phase 3](docs/plans/0006-phase3-everyday-physiology.md#обязательная-эмпирическая-приёмка-32).
 
 ## Phase 4 — cells, immunity, pathology and drugs
 

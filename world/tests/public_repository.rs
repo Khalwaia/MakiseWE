@@ -357,7 +357,18 @@ fn resolve_markdown_target(root: &Path, parent: &Path, target: &str) -> Option<P
     if root.join(&resolved).is_dir() {
         resolved = resolved.join("README.md");
     }
-    (resolved.extension().and_then(|value| value.to_str()) == Some("md")
-        && root.join(&resolved).is_file())
-    .then_some(resolved)
+    if resolved.extension().and_then(|value| value.to_str()) != Some("md")
+        || !root.join(&resolved).is_file()
+    {
+        return None;
+    }
+    // Relative backlink cycles must identify the same document; otherwise
+    // docs/../README.md and docs/../docs/../README.md grow the queue forever.
+    let canonical_root = root.canonicalize().ok()?;
+    root.join(resolved)
+        .canonicalize()
+        .ok()?
+        .strip_prefix(canonical_root)
+        .ok()
+        .map(Path::to_path_buf)
 }

@@ -107,6 +107,23 @@ impl BloodState {
     pub fn lung_diffusion_umol_per_s(&self) -> i64 {
         self.lung_diffusion_umol_per_s
     }
+    pub fn adjust_volume_and_map(&mut self, delta_mm3: i64) -> Result<(), BloodError> {
+        let blood_volume_mm3 = self
+            .blood_volume_mm3
+            .checked_add(delta_mm3)
+            .ok_or(BloodError::Overflow)?;
+        let map_delta_mpa = delta_mm3.checked_mul(8).ok_or(BloodError::Overflow)?;
+        let map_mpa = self
+            .map_mpa
+            .checked_add(map_delta_mpa)
+            .ok_or(BloodError::Overflow)?;
+        if blood_volume_mm3 <= 0 || map_mpa <= 0 {
+            return Err(BloodError::InvalidState);
+        }
+        self.blood_volume_mm3 = blood_volume_mm3;
+        self.map_mpa = map_mpa;
+        Ok(())
+    }
     pub fn o2_capacity_umol(&self) -> i64 {
         self.hb_tetramer_umol * 4
     }

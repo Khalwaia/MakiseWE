@@ -370,7 +370,7 @@ fn local_markdown_links_resolve() {
         if path.components().any(|component| {
             matches!(
                 component.as_os_str().to_str(),
-                Some(".git" | ".agents" | "target")
+                Some(".git" | ".agents" | "graphify-out" | "target")
             )
         }) {
             continue;

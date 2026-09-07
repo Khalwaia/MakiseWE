@@ -41,7 +41,7 @@ Fast replay применяет committed deltas, проверяя units, `before
 
 Conservation evidence нового формата содержит отдельные результаты для воды body+urine (`mm3`), натрия plasma+urine (`umol`), энергии chemical+digestive+core+ambient (`uJ`) и объявленных O2/CO2 boundary/reaction fluxes (`umol`). Для exact integer transfers residual равен нулю; rounding и стехиометрические допуски gas exchange должны быть явно выведены и проверены в contract до его admission. Одного water report или `NotEvaluated` для всего advance недостаточно. Новые conservation поля требуют versioned reader; старые single-report records остаются читаемыми.
 
-Дополнительный compatibility defect: текущий encoder помечает renal sodium deltas как `centi_umol`, хотя `RenalState` хранит значения в `umol` без пересчёта масштаба. Новые records обязаны использовать согласованный `umol` contract. Старые bytes нельзя исправлять или молча переобозначать при чтении; reader сохраняет исходную запись, а dimensional validation должна явно сообщать несовместимость. Успешный нынешний replay hash сам по себе не доказывает корректность units. Исправление writer/reader требует отдельного red/green этапа и compatibility fixture до заявления о полной поддержке нового формата.
+Дополнительный compatibility defect исходного encoder: renal sodium deltas помечены как `centi_umol`, хотя `RenalState` хранит значения в `umol` без пересчёта масштаба. Новые records обязаны использовать согласованный `umol` contract. Старые bytes нельзя исправлять или молча переобозначать при чтении; reader сохраняет исходную запись, а dimensional validation должна явно сообщать несовместимость. Успешный replay hash сам по себе не доказывает корректность units. Исправление writer/reader требует отдельного red/green этапа и compatibility fixture до заявления о полной поддержке нового формата; evidence этого этапа записано в [плане Phase 3](../plans/0006-phase3-everyday-physiology.md#исправление-units-renal-sodium).
 
 ## Acceptance и граница среза
 
@@ -55,7 +55,7 @@ Public seams: `open`, `commit`, `events`, `project`, `fast_replay`, `audit_repla
 - Сбой последнего шага большого запроса не оставляет committed prefix; сохранённый старый архив остаётся byte-identical и читаемым.
 - 1/N workers предлагают работу одной timeline, writer канонически валидирует и редуцирует её. Запуск N независимых engines и сравнение только часов не считается worker parity. Пока такой режим не реализован, этот пункт остаётся открытым, без фиктивной настройки worker count.
 
-Новые органы, hormones, fine nephron solver, изменение physiological coefficients и performance optimization не входят в срез. Новые schemas, fixtures, readers и runtime проходят отдельные red/green этапы внутри Phase 3.2; gate 3.2 остаётся открытым до полного evidence.
+Новые органы, hormones, изменение physiological coefficients и performance optimization не входят в replay срез. Пользовательское решение от 2026-09-07 включает executable renal resolution upgrade в общий scope 3.2; его acceptance boundary записана в [плане Phase 3](../plans/0006-phase3-everyday-physiology.md#расширение-scope-32-от-2026-09-07). Оно не меняет этот replay contract и не разрешает обход artifact admission/activation. Новые schemas, fixtures, readers и runtime проходят отдельные red/green этапы внутри Phase 3.2; gate 3.2 остаётся открытым до полного evidence.
 
 ## Migration и rollback
 

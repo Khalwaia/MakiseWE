@@ -6,7 +6,7 @@
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](https://spdx.org/licenses/AGPL-3.0-only.html)
 [![Rust 1.97](https://img.shields.io/badge/Rust-1.97-orange.svg)](rust-toolchain.toml)
 
-> Проект находится на архитектурной стадии. Текущий исполнимый World Engine — проверяемое legacy-compatible ядро; целевая биология V1 ещё не реализована.
+> Текущая разработка — Phase 3 в `makise-causal-kernel`: ограниченные физиологические срезы с объявленным `FidelityEnvelope`. `makise-world` остаётся legacy-compatible runtime; полная целевая биология V1 ещё не реализована. Статус и пробелы: [план Phase 3](docs/plans/0006-phase3-everyday-physiology.md).
 
 ## Что такое MakiseWE
 
@@ -104,6 +104,11 @@ cook/clean/dress `ControlEpisode`s и durable body records через
 план зафиксирован в
 [docs/plans/0003-phase2-apartment-embodiment.md](docs/plans/0003-phase2-apartment-embodiment.md).
 
+**Phase 3** — everyday physiology — в работе. Coarse `BloodState`/`RenalState`
+имеют focused tests; system gates и полный replay физиологических цепей остаются
+открытыми. Точная граница evidence и следующий срез — в
+[плане Phase 3](docs/plans/0006-phase3-everyday-physiology.md).
+
 ## Что уже работает
 
 Репозиторий содержит исполнимое legacy-compatible ядро, необходимое для безопасной миграции:
@@ -123,7 +128,7 @@ cook/clean/dress `ControlEpisode`s и durable body records через
   rigid bodies с exact conservation, contacts/friction, physics islands с rest
   trigger, balance и walk `ControlEpisode`, fluid statics и pour/spill учёт.
 
-Этот код не является реализацией новой многомасштабной физиологии. Новая V1 получит отдельную timeline/DB и compatibility migration по [PROTO.md](PROTO.md).
+Legacy-compatible `makise-world` не является реализацией целевой физиологии V1. Новый `makise-causal-kernel` развивается в отдельной timeline/DB; compatibility path определён в [PROTO.md](PROTO.md).
 
 ## Целевой охват V1
 
@@ -132,7 +137,7 @@ Roadmap состоит из последовательных gates:
 1. **Phase 0:** contracts, schemas, fixtures и architecture — завершён.
 2. **Phase 1:** 24 часа Human/Neko; среда, минимальная физиология, сон, perception, scripted cortex и explicit `ResolutionChanged` — завершён.
 3. **Phase 2:** метрическая квартира, материалы, articulated bodies, contacts, fluids, heat, air, light, sound, electricity и water — завершён.
-4. **Phase 3:** everyday cardiovascular, respiratory, renal, digestive, endocrine, skin и musculoskeletal physiology — не начат; требуется отдельный план.
+4. **Phase 3:** everyday cardiovascular, respiratory, renal, digestive, endocrine, skin и musculoskeletal physiology — в работе; coarse реализации 3.1–3.2, evidence и незакрытые gates описаны в [плане Phase 3](docs/plans/0006-phase3-everyday-physiology.md).
 5. **Phase 4:** cells, immunity, infection, wounds, pathology, cancer, drugs, organ failure и death.
 6. **Phase 5:** genetics, reproduction, pregnancy, development, growth и aging.
 7. **Phase 6:** replaceable neural resolution, neurotransmission, autonomic/endocrine coupling, learning и memory consolidation.
@@ -260,6 +265,7 @@ Phase 0 tests дополнительно проверяют JSON Schemas, fixtur
 - [Phase 2 plan](docs/plans/0003-phase2-apartment-embodiment.md) — apartment and physical embodiment implementation plan.
 - [Realism hardening record](docs/plans/0004-realism-hardening.md) — физиологический пересчёт констант kernel, причинные sleep/digestion механизмы и parameter guards.
 - [Phase 2 slice status](docs/plans/0005-phase2-slice-status.md) — выполненные embodiment slices, gate criteria и открытые gaps.
+- [Phase 3 everyday physiology](docs/plans/0006-phase3-everyday-physiology.md) — 7 вертикальных слайсов, FidelityEnvelope, текущее evidence и открытые gaps.
 - [STAGE_5.md](STAGE_5.md) — superseded historical plan; не является нормативной roadmap.
 
 ## Участие в разработке

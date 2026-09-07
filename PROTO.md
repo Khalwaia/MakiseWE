@@ -83,7 +83,9 @@ Timeline metadata связывает world specification, package manifest, arti
 
 Версионирование canonical physiology events и разделение request version/event sequence определяет [ADR-0016](docs/adr/0016-canonical-physiology-replay-format.md). Формат выбирается явно для новой timeline; несовместимый формат при reopen отклоняется до recovery writes. Принятие ADR не означает готовности его executable dependencies.
 
-Текущий expand prerequisite реализован через `OpenSpec::with_format`: metadata новых aggregate timelines хранит `aggregate-v1`, прежняя metadata без поля формата читается без его добавления. `CanonicalPhysiologyV2` пока зарезервирован и не создаётся; запрос этого формата не разрешает fallback. [Тесты формата](causal-kernel/tests/timeline_format.rs) проверяют typed rejection, byte preservation и прежние events, projection и retry receipt. Посекундное исполнение, новые units и event ranges остаются следующими этапами ADR-0016.
+Текущий expand prerequisite реализован через `OpenSpec::with_format`: metadata новых aggregate timelines хранит `aggregate-v1`, прежняя metadata без поля формата читается без его добавления. `CanonicalPhysiologyV2` пока зарезервирован и не создаётся; запрос этого формата не разрешает fallback. [Тесты формата](causal-kernel/tests/timeline_format.rs) проверяют typed rejection, byte preservation и прежние events, projection и retry receipt. Посекундное исполнение и event ranges остаются следующими этапами ADR-0016.
+
+Renal sodium deltas новых записей используют `umol`, согласованный с authoritative amounts. `events` сохраняет исходные units старых записей; `fast_replay` возвращает `IncompatibleQuantityUnit` для несовместимых units, `audit_replay` также сохраняет `SafeStop`. Чтение старых events, snapshot projection и retry receipt не означает успешную dimensional validation. [Compatibility tests](causal-kernel/tests/renal_units.rs) проверяют эти границы и byte preservation до diagnostic write.
 
 ## 6. Compatibility migration
 

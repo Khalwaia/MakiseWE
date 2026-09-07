@@ -28,6 +28,7 @@
 - [Phase 0 coverage matrix](coverage/phase0-coverage-matrix.md) фиксирует текущие contracts, evidence, unknowns и planned upgrades.
 - [24-hour Human/Neko scenario](scenarios/phase1-24h-human-neko.md) задаёт первый runtime vertical slice до начала Phase 1.
 - [Аудит биологической реалистичности](research/biology-realism.md) отделяет runtime evidence от целевой архитектуры и сверяет допущения с первичными источниками.
+- [Renal validation evidence](research/renal-validation-evidence.md) фиксирует первичные human water/sodium loading experiments, ограничения input ports и независимость datasets для gate 3.2.
 - [Contract schemas and fixtures](../contracts) являются machine-readable Phase 0 artifacts.
 
 ## Implementation plans
@@ -37,6 +38,7 @@
 - [Phase 2 apartment and physical embodiment](plans/0003-phase2-apartment-embodiment.md) — план метрической физики, articulated bodies и closed-loop действий.
 - [Realism hardening](plans/0004-realism-hardening.md) — evidence record: физиологический пересчёт констант causal-kernel, sleep/digestion как причинные процессы и parameter guards.
 - [Phase 2 slice status](plans/0005-phase2-slice-status.md) — выполненные embodiment slices, состояние gate criteria и открытые gaps.
+- [Phase 3 everyday physiology](plans/0006-phase3-everyday-physiology.md) — порядок 7 вертикальных слайсов, evidence и открытые gaps; coarse реализации 3.1–3.2 ещё не закрывают system gates.
 
 ## Архитектурные решения
 

@@ -3,6 +3,7 @@ use thiserror::Error;
 use crate::blood::{BloodError, BloodState};
 use crate::morphotype::Morphotype;
 use crate::quantity::ReservoirState;
+use crate::renal::{RenalError, RenalState};
 use crate::thermal::{ReservoirPair, ThermalProposal};
 
 #[derive(Clone, Copy, Debug, Error, Eq, PartialEq)]
@@ -19,6 +20,8 @@ pub enum OrganismError {
     OxygenOverdraft,
     #[error("blood state invalid")]
     Blood(#[from] BloodError),
+    #[error("renal state rejected: {0}")]
+    Renal(#[from] RenalError),
 }
 
 /// Declared reference temperatures for baseline state construction and
@@ -46,6 +49,7 @@ pub struct OrganismState {
     ambient_reservoir: ReservoirState,
     morphotype: Morphotype,
     blood: BloodState,
+    renal: RenalState,
 }
 
 impl OrganismState {
@@ -61,6 +65,7 @@ impl OrganismState {
             ),
             morphotype: morphotype.clone(),
             blood: BloodState::from_morphotype(&morphotype),
+            renal: RenalState::baseline(),
         }
     }
 
@@ -77,6 +82,7 @@ impl OrganismState {
             ambient_reservoir,
             morphotype: morphotype.clone(),
             blood: BloodState::from_morphotype(morphotype),
+            renal: RenalState::baseline(),
         }
     }
 
@@ -93,6 +99,7 @@ impl OrganismState {
             ambient_reservoir,
             morphotype: morphotype.clone(),
             blood: BloodState::from_morphotype(&morphotype),
+            renal: RenalState::baseline(),
         }
     }
 
@@ -116,6 +123,7 @@ impl OrganismState {
             ),
             morphotype: morphotype.clone(),
             blood: BloodState::from_morphotype(morphotype),
+            renal: RenalState::baseline(),
         }
     }
 
@@ -148,6 +156,11 @@ impl OrganismState {
         venous_co2_umol: i64,
         map_mpa: i64,
         lung_diffusion_umol_per_s: i64,
+        total_body_water_mm3: i64,
+        plasma_mm3: i64,
+        plasma_sodium_umol: i64,
+        urine_water_mm3: i64,
+        urine_sodium_umol: i64,
     ) -> Self {
         // Derive morphotype from stored diffusion/blood params by matching known morphotypes.
         // Fallback to human if unknown — migration preserves exact amounts anyway.
@@ -167,6 +180,14 @@ impl OrganismState {
             lung_diffusion_umol_per_s,
         )
         .unwrap_or_else(|_| BloodState::from_morphotype(&morphotype));
+        let renal = RenalState::new(
+            total_body_water_mm3,
+            plasma_mm3,
+            plasma_sodium_umol,
+            urine_water_mm3,
+            urine_sodium_umol,
+        )
+        .unwrap_or_else(|_| RenalState::baseline());
         Self {
             chemical_store_uj,
             digestion_buffer_uj,
@@ -174,6 +195,7 @@ impl OrganismState {
             ambient_reservoir: ReservoirState::new(ambient_energy_uj, ambient_capacity_uj_per_mk),
             morphotype: morphotype.clone(),
             blood,
+            renal,
         }
     }
 
@@ -263,6 +285,47 @@ impl OrganismState {
 
     pub fn mean_arterial_pressure_mpa(&self) -> i64 {
         self.blood.map_mpa()
+    }
+
+    pub fn total_body_water_mm3(&self) -> i64 {
+        self.renal.total_body_water_mm3()
+    }
+    pub fn plasma_sodium_mmol_per_l_milli(&self) -> i64 {
+        self.renal.plasma_sodium_mmol_per_l_milli()
+    }
+    pub fn urine_water_mm3(&self) -> i64 {
+        self.renal.urine_water_mm3()
+    }
+    pub fn renal(&self) -> &RenalState {
+        &self.renal
+    }
+
+    pub fn stage_fluid_intake(
+        &mut self,
+        water_mm3: i64,
+        sodium_umol: i64,
+    ) -> Result<(), RenalError> {
+        let mut next_renal = self.renal.clone();
+        let mut next_blood = self.blood.clone();
+        next_renal.stage_intake(water_mm3, sodium_umol)?;
+        next_blood
+            .adjust_volume_and_map(water_mm3)
+            .map_err(|_| RenalError::OutsideValidityRange)?;
+        self.renal = next_renal;
+        self.blood = next_blood;
+        Ok(())
+    }
+
+    pub fn apply_renal_for_second(&mut self) -> Result<(), RenalError> {
+        let mut next_renal = self.renal.clone();
+        let mut next_blood = self.blood.clone();
+        let water_loss = next_renal.excrete_one_second()?;
+        next_blood
+            .adjust_volume_and_map(-water_loss)
+            .map_err(|_| RenalError::OutsideValidityRange)?;
+        self.renal = next_renal;
+        self.blood = next_blood;
+        Ok(())
     }
 
     /// One second of gas exchange at given metabolic demand. Typed rejection

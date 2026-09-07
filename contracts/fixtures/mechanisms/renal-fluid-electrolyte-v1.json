@@ -1,0 +1,47 @@
+{
+  "schema_version": "makise.mechanism-contract.v1",
+  "mechanism_id": "renal.fluid-electrolyte",
+  "version": "0.1.0",
+  "content_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+  "causal_inputs": [
+    { "port_id": "water-intake", "variable": "organism.fluid-intake", "unit": "mm3", "dimension_kind": "physical_quantity" },
+    { "port_id": "sodium-intake", "variable": "organism.sodium-intake", "unit": "umol", "dimension_kind": "physical_quantity" },
+    { "port_id": "map", "variable": "blood.map-mpa", "unit": "mPa", "dimension_kind": "physical_quantity" }
+  ],
+  "causal_outputs": [
+    { "port_id": "urine-water", "variable": "renal.urine-water-mm3", "unit": "mm3", "dimension_kind": "physical_quantity" },
+    { "port_id": "plasma-sodium", "variable": "renal.plasma-sodium-umol", "unit": "umol", "dimension_kind": "physical_quantity" }
+  ],
+  "read_set": ["renal.total-body-water-mm3", "renal.plasma-mm3", "renal.plasma-sodium-umol", "blood.map-mpa"],
+  "write_set": ["renal.total-body-water-mm3", "renal.plasma-mm3", "renal.plasma-sodium-umol", "renal.urine-water-mm3", "renal.urine-sodium-umol", "blood.map-mpa"],
+  "authoritative_state_variables": [
+    { "variable": "renal.total-body-water-mm3", "unit": "mm3", "dimension_kind": "physical_quantity", "validity_range": { "min": 40000000, "max": 45000000, "unit": "mm3" } },
+    { "variable": "renal.plasma-sodium-umol", "unit": "umol", "dimension_kind": "physical_quantity", "validity_range": { "min": 400000, "max": 510000, "unit": "umol" } },
+    { "variable": "renal.urine-water-mm3", "unit": "mm3", "dimension_kind": "physical_quantity", "validity_range": { "min": 0, "max": 3000000, "unit": "mm3" } }
+  ],
+  "resolution": { "supported_resolution_ids": ["renal-coarse-v1", "renal-nephron-v1"], "representation": "Whole-body water and plasma sodium amounts with a urine boundary" },
+  "scales": { "spatial": { "min": 0.001, "max": 2.0, "unit": "m" }, "temporal": { "min": 1, "max": 1, "unit": "s" } },
+  "canonical_scheduling": { "boundary_rule": "Every canonical second after circulation", "partition_invariant": true, "reduction_order": "Single organism deterministic order" },
+  "observable_projections": [
+    { "observable_id": "plasma-sodium-mmol-per-l", "source_variables": ["renal.plasma-sodium-centi-umol", "renal.plasma-mm3"], "unit": "mmol_per_l", "error_bound": { "kind": "absolute", "bound": 0.001, "unit": "mmol_per_l", "confidence": 0.95 } }
+  ],
+  "parameters": [
+    { "parameter_id": "max-corrective-urine-water-mm3-per-s", "value": 17, "unit": "mm3_per_s", "provenance_category": "expert_estimate", "uncertainty": { "kind": "relative", "bound": 0.2, "unit": "1", "confidence": 0.95 }, "validity_range": { "min": 14, "max": 20, "unit": "mm3_per_s" } },
+    { "parameter_id": "max-corrective-urine-sodium-umol-per-s", "value": 1, "unit": "umol_per_s", "provenance_category": "expert_estimate", "uncertainty": { "kind": "relative", "bound": 0.2, "unit": "1", "confidence": 0.95 }, "validity_range": { "min": 1, "max": 2, "unit": "umol_per_s" } }
+  ],
+  "provenance_category": "expert_estimate",
+  "uncertainty_model": { "kind": "interval", "bound": 0.2, "unit": "1", "confidence": 0.95 },
+  "validity_range": { "conditions": ["Resting baseline adult; 24 h water intake within 0..2 L; no renal disease or hormonal disturbance"], "exclusions": ["Hemorrhage, dehydration, edema, endocrine control, renal pathology"] },
+  "conservation_rules": [
+    { "quantity": "water.body-plus-urine", "unit": "mm3", "tolerance": { "value": 0, "unit": "mm3" } },
+    { "quantity": "sodium.plasma-plus-urine", "unit": "umol", "tolerance": { "value": 0, "unit": "umol" } }
+  ],
+  "failure_policy": { "non_convergence": "safe_stop", "invalid_input": "reject_transition", "missing_artifact": "safe_stop" },
+  "resolution_upgrade_paths": [
+    { "from_resolution_id": "renal-coarse-v1", "to_resolution_id": "renal-nephron-v1", "contract_digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666" }
+  ],
+  "validation_scenarios": [
+    { "scenario_id": "baseline-24h-water-sodium", "evidence_kind": "expert_estimate", "acceptance": "1.5 L water and 86.4 mmol Na input keep water within 200 ml and plasma Na at 135..145 mmol/L" },
+    { "scenario_id": "fluid-bolus-map", "evidence_kind": "expert_estimate", "acceptance": "500 ml bolus changes coarse MAP by 3..5 kPa" }
+  ]
+}

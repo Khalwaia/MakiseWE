@@ -1,0 +1,54 @@
+{
+  "status": "candidate_not_admitted_for_validation",
+  "source": {
+    "authors": "Pedersen EB, Thomsen IM, Lauridsen TG",
+    "title": "Abnormal function of the vasopressin-cyclic-AMP-aquaporin2 axis during urine concentrating and diluting in patients with reduced renal function. A case control study",
+    "doi": "10.1186/1471-2369-11-26",
+    "pmcid": "PMC2965705",
+    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2965705/",
+    "license": "CC-BY-2.0",
+    "copyright": "2010 Pedersen et al; licensee BioMed Central Ltd.",
+    "locator": "Table 2, UV (ml/min), Group 1",
+    "extracted_table_file": "pedersen-2010-table2.xml",
+    "extracted_table_sha256": "2685249a24978a02588ee2d2bfa54f83ebac4817c39d9dbe3e483f96efb4eb2e",
+    "extraction": "Manual transcription of published XML table; decimal comma 4,1 normalized to 4.1; no figure digitization",
+    "retrieved_date": "2026-09-07"
+  },
+  "population": {
+    "group": "healthy controls only",
+    "n": 10,
+    "women": 5,
+    "men": 5,
+    "age_years_median": 41,
+    "age_years_range": [30, 54]
+  },
+  "protocol": {
+    "route": "oral",
+    "water_dose_ml_per_kg": 20,
+    "administration_minutes": 15,
+    "conditions": "Overnight fasting and thirsting, supine except voiding, light toast/jam meal before water load",
+    "baseline": "Mean of two 60-minute control periods according to Table 2 footnote"
+  },
+  "observable": "urine_volume_rate",
+  "unit": "ml/min",
+  "central_statistic": "median",
+  "dispersion_statistic": "interquartile_range_width",
+  "baseline": {"median": 0.8, "iqr": 0.4},
+  "intervals_minutes_after_load_start": [
+    {"start": 0, "end": 60, "median": 2.4, "iqr": 3.0},
+    {"start": 60, "end": 120, "median": 10.7, "iqr": 6.3},
+    {"start": 120, "end": 180, "median": 7.4, "iqr": 4.2},
+    {"start": 180, "end": 240, "median": 2.1, "iqr": 4.1},
+    {"start": 240, "end": 300, "median": 1.2, "iqr": 1.5}
+  ],
+  "calibration_or_holdout_assignment": "unassigned",
+  "acceptance_threshold": null,
+  "limitations": [
+    "IQR width does not determine Q1/Q3, confidence interval or measurement error",
+    "Participant-level series and absorption flux are unavailable in this extracted table",
+    "Sum of interval group medians is not a participant trajectory or median cumulative output",
+    "Preparation and oral route are not represented by current instantaneous plasma intake",
+    "No sodium excretion time-series in this extracted endpoint",
+    "No biological validation pass is claimed"
+  ]
+}
