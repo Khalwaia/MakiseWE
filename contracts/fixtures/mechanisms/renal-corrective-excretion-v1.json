@@ -1,0 +1,261 @@
+{
+  "schema_version": "makise.mechanism-contract.v1",
+  "mechanism_id": "renal.fluid-electrolyte",
+  "version": "0.2.0",
+  "content_digest": "sha256:93943247446634d41b205d42ece973121571279f885ba55f1ae03f00ad9e207f",
+  "causal_inputs": [
+    {
+      "variable": "renal.total-body-water-mm3",
+      "dimension_kind": "physical_quantity",
+      "unit": "mm3",
+      "port_id": "renal-state"
+    }
+  ],
+  "causal_outputs": [
+    {
+      "port_id": "urine-water",
+      "variable": "renal.urine-water-mm3",
+      "unit": "mm3",
+      "dimension_kind": "physical_quantity"
+    },
+    {
+      "port_id": "plasma-sodium",
+      "variable": "renal.plasma-sodium-umol",
+      "unit": "umol",
+      "dimension_kind": "physical_quantity"
+    },
+    {
+      "variable": "renal.urine-sodium-umol",
+      "unit": "umol",
+      "port_id": "urine-sodium",
+      "dimension_kind": "physical_quantity"
+    }
+  ],
+  "read_set": [
+    "renal.total-body-water-mm3",
+    "renal.plasma-mm3",
+    "renal.plasma-sodium-umol",
+    "renal.urine-water-mm3",
+    "renal.urine-sodium-umol"
+  ],
+  "write_set": [
+    "renal.total-body-water-mm3",
+    "renal.plasma-mm3",
+    "renal.plasma-sodium-umol",
+    "renal.urine-water-mm3",
+    "renal.urine-sodium-umol"
+  ],
+  "authoritative_state_variables": [
+    {
+      "variable": "renal.total-body-water-mm3",
+      "dimension_kind": "physical_quantity",
+      "unit": "mm3",
+      "validity_range": {
+        "unit": "mm3",
+        "max": 45000000,
+        "min": 40000000
+      }
+    },
+    {
+      "variable": "renal.plasma-mm3",
+      "dimension_kind": "physical_quantity",
+      "unit": "mm3",
+      "validity_range": {
+        "unit": "mm3",
+        "max": 5000000,
+        "min": 2000000
+      }
+    },
+    {
+      "variable": "renal.plasma-sodium-umol",
+      "dimension_kind": "physical_quantity",
+      "unit": "umol",
+      "validity_range": {
+        "unit": "umol",
+        "max": 510000,
+        "min": 400000
+      }
+    },
+    {
+      "variable": "renal.urine-water-mm3",
+      "dimension_kind": "physical_quantity",
+      "unit": "mm3",
+      "validity_range": {
+        "unit": "mm3",
+        "max": 9223372036854775807,
+        "min": 0
+      }
+    },
+    {
+      "variable": "renal.urine-sodium-umol",
+      "dimension_kind": "physical_quantity",
+      "unit": "umol",
+      "validity_range": {
+        "unit": "umol",
+        "max": 9223372036854775807,
+        "min": 0
+      }
+    }
+  ],
+  "resolution": {
+    "supported_resolution_ids": [
+      "renal-coarse-v1"
+    ],
+    "representation": "Whole-body water and plasma sodium amounts with a urine boundary"
+  },
+  "scales": {
+    "spatial": {
+      "min": 0.001,
+      "max": 2.0,
+      "unit": "m"
+    },
+    "temporal": {
+      "min": 1,
+      "max": 1,
+      "unit": "s"
+    }
+  },
+  "canonical_scheduling": {
+    "boundary_rule": "One corrective excretion proposal per canonical second; caller couples blood volume separately",
+    "partition_invariant": true,
+    "reduction_order": "Single organism deterministic order"
+  },
+  "observable_projections": [
+    {
+      "observable_id": "plasma-sodium-mmol-per-l",
+      "source_variables": [
+        "renal.plasma-sodium-umol",
+        "renal.plasma-mm3"
+      ],
+      "unit": "mmol_per_l",
+      "error_bound": {
+        "kind": "absolute",
+        "bound": 0.001,
+        "unit": "mmol_per_l",
+        "confidence": 0.95
+      }
+    }
+  ],
+  "parameters": [
+    {
+      "parameter_id": "max-corrective-urine-water-mm3-per-s",
+      "value": 17,
+      "unit": "mm3_per_s",
+      "provenance_category": "expert_estimate",
+      "uncertainty": {
+        "kind": "relative",
+        "bound": 0.2,
+        "unit": "1",
+        "confidence": 0.95
+      },
+      "validity_range": {
+        "min": 14,
+        "max": 20,
+        "unit": "mm3_per_s"
+      }
+    },
+    {
+      "parameter_id": "max-corrective-urine-sodium-umol-per-s",
+      "value": 1,
+      "unit": "umol_per_s",
+      "provenance_category": "expert_estimate",
+      "uncertainty": {
+        "kind": "relative",
+        "bound": 0.2,
+        "unit": "1",
+        "confidence": 0.95
+      },
+      "validity_range": {
+        "min": 1,
+        "max": 2,
+        "unit": "umol_per_s"
+      }
+    },
+    {
+      "value": 42000000,
+      "parameter_id": "baseline-body-water-mm3",
+      "unit": "mm3",
+      "provenance_category": "synthetic_fixture",
+      "uncertainty": {
+        "unit": "mm3",
+        "confidence": 1,
+        "kind": "absolute",
+        "bound": 0
+      },
+      "validity_range": {
+        "max": 42000000,
+        "unit": "mm3",
+        "min": 42000000
+      }
+    },
+    {
+      "value": 420000,
+      "parameter_id": "baseline-sodium-umol",
+      "unit": "umol",
+      "provenance_category": "synthetic_fixture",
+      "uncertainty": {
+        "unit": "umol",
+        "confidence": 1,
+        "kind": "absolute",
+        "bound": 0
+      },
+      "validity_range": {
+        "max": 420000,
+        "unit": "umol",
+        "min": 420000
+      }
+    }
+  ],
+  "provenance_category": "synthetic_fixture",
+  "uncertainty_model": {
+    "kind": "interval",
+    "bound": 0.2,
+    "unit": "1",
+    "confidence": 0.95
+  },
+  "validity_range": {
+    "exclusions": [
+      "No empirical validation, filtration, basal outflow, absorption, hormone control or blood coupling"
+    ],
+    "conditions": [
+      "Synthetic resting corrective excretion only; paired body/plasma water amounts inside declared bounds"
+    ]
+  },
+  "conservation_rules": [
+    {
+      "quantity": "water.body-plus-urine",
+      "unit": "mm3",
+      "tolerance": {
+        "value": 0,
+        "unit": "mm3"
+      }
+    },
+    {
+      "quantity": "sodium.plasma-plus-urine",
+      "unit": "umol",
+      "tolerance": {
+        "value": 0,
+        "unit": "umol"
+      }
+    }
+  ],
+  "failure_policy": {
+    "non_convergence": "safe_stop",
+    "invalid_input": "reject_transition",
+    "missing_artifact": "safe_stop"
+  },
+  "resolution_upgrade_paths": [
+    {
+      "from_resolution_id": "renal-coarse-v1",
+      "to_resolution_id": "renal-nephron-v1",
+      "contract_digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+    }
+  ],
+  "validation_scenarios": [
+    {
+      "evidence_kind": "expert_estimate",
+      "acceptance": "250000 mm3 water and 35000 umol sodium excess: one second produces 17 mm3 and 1 umol urine; archived 14 mm3/s rate produces 14 mm3 urine",
+      "scenario_id": "renal-archived-rates"
+    }
+  ]
+}

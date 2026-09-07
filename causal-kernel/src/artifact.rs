@@ -7,6 +7,7 @@ const CONTRACT_SCHEMA: &str = "makise.mechanism-contract.v1";
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProgramAbi {
     ThermalExchangeV1,
+    RenalFluidV1,
     Unknown,
 }
 
@@ -23,6 +24,7 @@ impl ProgramAbi {
             {
                 Self::ThermalExchangeV1
             }
+            Ok(value) if renal_parameters(&value).is_some() => Self::RenalFluidV1,
             _ => Self::Unknown,
         }
     }
@@ -30,6 +32,7 @@ impl ProgramAbi {
     fn canonical_name(self) -> &'static str {
         match self {
             Self::ThermalExchangeV1 => "thermal-exchange-v1",
+            Self::RenalFluidV1 => "renal-fluid-v1",
             Self::Unknown => "unknown",
         }
     }
@@ -142,6 +145,8 @@ pub enum AdmissionError {
     ProgramDigestMismatch,
     #[error("program ABI is not supported by this kernel")]
     UnsupportedProgramAbi,
+    #[error("renal proposal violates its amount bounds or overflows")]
+    InvalidRenalProposal,
 }
 
 #[derive(Clone, Debug)]
@@ -208,6 +213,43 @@ impl ArtifactBundle {
         if !schema.is_valid(&contract) {
             return Err(AdmissionError::InvalidContract);
         }
+        if self.abi == ProgramAbi::RenalFluidV1 {
+            let program: Value = serde_json::from_slice(&self.program)
+                .map_err(|_| AdmissionError::UnsupportedProgramAbi)?;
+            let (water, sodium, _, _) =
+                renal_parameters(&program).ok_or(AdmissionError::UnsupportedProgramAbi)?;
+            let parameter_matches = |id: &str, unit: &str, value: i64| {
+                contract["parameters"].as_array().is_some_and(|parameters| {
+                    parameters.iter().any(|parameter| {
+                        parameter["parameter_id"] == id
+                            && parameter["unit"] == unit
+                            && parameter["value"].as_i64() == Some(value)
+                    })
+                })
+            };
+            if self.mechanism_id() != "renal.fluid-electrolyte"
+                || !parameter_matches("max-corrective-urine-water-mm3-per-s", "mm3_per_s", water)
+                || !parameter_matches(
+                    "max-corrective-urine-sodium-umol-per-s",
+                    "umol_per_s",
+                    sodium,
+                )
+            {
+                return Err(AdmissionError::InvalidContract);
+            }
+            // This ABI supports the complete bounded reference contract only.
+            // Parameter alternatives retain all other declared semantics.
+            let mut reference: Value = serde_json::from_slice(include_bytes!(
+                "../../contracts/fixtures/mechanisms/renal-corrective-excretion-v1.json"
+            ))
+            .expect("embedded renal contract is JSON");
+            reference["content_digest"] = contract["content_digest"].clone();
+            reference["parameters"][0]["value"] = water.into();
+            reference["parameters"][1]["value"] = sodium.into();
+            if contract != reference {
+                return Err(AdmissionError::InvalidContract);
+            }
+        }
         let contract_digest: [u8; 32] = Sha256::digest(self.contract.json_text.as_bytes()).into();
         Ok(AdmissionRecord {
             contract_digest,
@@ -219,6 +261,34 @@ impl ArtifactBundle {
 
     pub fn program_bytes(&self) -> &[u8] {
         &self.program
+    }
+
+    /// Produces a candidate only; authoritative application remains in commit.
+    pub fn propose_renal_second(
+        &self,
+        state: &crate::renal::RenalState,
+    ) -> Result<crate::renal::RenalState, AdmissionError> {
+        self.admit()?;
+        let program: Value = serde_json::from_slice(&self.program)
+            .map_err(|_| AdmissionError::UnsupportedProgramAbi)?;
+        let (water_rate, sodium_rate, water_baseline, sodium_baseline) =
+            renal_parameters(&program).ok_or(AdmissionError::UnsupportedProgramAbi)?;
+        let water = (state.total_body_water_mm3() - water_baseline).clamp(0, water_rate);
+        let sodium = (state.plasma_sodium_umol() - sodium_baseline).clamp(0, sodium_rate);
+        crate::renal::RenalState::new(
+            state.total_body_water_mm3() - water,
+            state.plasma_mm3() - water,
+            state.plasma_sodium_umol() - sodium,
+            state
+                .urine_water_mm3()
+                .checked_add(water)
+                .ok_or(AdmissionError::InvalidRenalProposal)?,
+            state
+                .urine_sodium_umol()
+                .checked_add(sodium)
+                .ok_or(AdmissionError::InvalidRenalProposal)?,
+        )
+        .map_err(|_| AdmissionError::InvalidRenalProposal)
     }
 
     pub fn mechanism_id(&self) -> &str {
@@ -235,4 +305,24 @@ impl ArtifactBundle {
             *last = last.wrapping_add(1);
         }
     }
+}
+
+fn renal_parameters(value: &Value) -> Option<(i64, i64, i64, i64)> {
+    let object = value.as_object()?;
+    if object.len() != 5 || object.get("abi")?.as_str()? != "renal-fluid-v1" {
+        return None;
+    }
+    let water = object.get("water_rate_mm3_per_s")?.as_i64()?;
+    let sodium = object.get("sodium_rate_umol_per_s")?.as_i64()?;
+    let water_baseline = object.get("baseline_body_water_mm3")?.as_i64()?;
+    let sodium_baseline = object.get("baseline_sodium_umol")?.as_i64()?;
+    // ABI v1 is the bounded resting compatibility model, not a general solver.
+    if !(14..=20).contains(&water)
+        || !(1..=2).contains(&sodium)
+        || water_baseline != crate::renal::BASELINE_TOTAL_BODY_WATER_MM3
+        || sodium_baseline != crate::renal::BASELINE_PLASMA_SODIUM_UMOL
+    {
+        return None;
+    }
+    Some((water, sodium, water_baseline, sodium_baseline))
 }
