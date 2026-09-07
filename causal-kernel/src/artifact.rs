@@ -11,10 +11,15 @@ pub enum ProgramAbi {
 }
 
 impl ProgramAbi {
-    fn from_program_bytes(program: &[u8]) -> Self {
+    pub(crate) fn from_program_bytes(program: &[u8]) -> Self {
         match serde_json::from_slice::<Value>(program) {
             Ok(Value::Object(object))
-                if object.get("abi").and_then(Value::as_str) == Some("thermal-exchange-v1") =>
+                if object.get("abi").and_then(Value::as_str) == Some("thermal-exchange-v1")
+                    && object.len() == 2
+                    && object
+                        .get("conductance_uj_per_mk_s")
+                        .and_then(Value::as_i64)
+                        .is_some_and(|value| value > 0) =>
             {
                 Self::ThermalExchangeV1
             }
@@ -72,7 +77,10 @@ impl MechanismContract {
         let mechanism_id = require_string(object, "mechanism_id")?;
         let content_digest = require_string(object, "content_digest")?;
 
-        if !content_digest.starts_with("sha256:") || content_digest.len() != 7 + 64 {
+        if !content_digest.starts_with("sha256:")
+            || content_digest.len() != 7 + 64
+            || !content_digest.is_ascii()
+        {
             return Err(ContractParseError::MalformedContentDigest);
         }
         let mut digest = [0u8; 32];
@@ -128,6 +136,8 @@ fn require_string(
 
 #[derive(Clone, Copy, Debug, Error, Eq, PartialEq)]
 pub enum AdmissionError {
+    #[error("mechanism contract does not conform to the complete versioned schema")]
+    InvalidContract,
     #[error("program bytes do not match contract content_digest")]
     ProgramDigestMismatch,
     #[error("program ABI is not supported by this kernel")]
@@ -184,6 +194,19 @@ impl ArtifactBundle {
             || ProgramAbi::from_program_bytes(&self.program) != self.abi
         {
             return Err(AdmissionError::UnsupportedProgramAbi);
+        }
+        static SCHEMA: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
+        let schema = SCHEMA.get_or_init(|| {
+            let schema: Value = serde_json::from_str(include_str!(
+                "../../contracts/schemas/mechanism-contract-v1.schema.json"
+            ))
+            .expect("embedded mechanism schema is JSON");
+            jsonschema::validator_for(&schema).expect("embedded mechanism schema is valid")
+        });
+        let contract: Value = serde_json::from_str(&self.contract.json_text)
+            .map_err(|_| AdmissionError::InvalidContract)?;
+        if !schema.is_valid(&contract) {
+            return Err(AdmissionError::InvalidContract);
         }
         let contract_digest: [u8; 32] = Sha256::digest(self.contract.json_text.as_bytes()).into();
         Ok(AdmissionRecord {

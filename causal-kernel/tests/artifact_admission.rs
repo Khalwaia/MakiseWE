@@ -5,37 +5,13 @@ use makise_causal_kernel::{
 const PROGRAM_ABI: ProgramAbi = ProgramAbi::ThermalExchangeV1;
 
 fn contract_json() -> String {
-    String::from(
-        r#"{
-  "schema_version": "makise.mechanism-contract.v1",
-  "mechanism_id": "thermal.two-reservoir-exchange",
-  "version": "0.1.0",
-  "content_digest": "PLACEHOLDER",
-  "causal_inputs": [
-    { "port_id": "hot-energy-input", "variable": "reservoir.hot.internal-energy", "unit": "uJ", "dimension_kind": "physical_quantity" }
-  ],
-  "causal_outputs": [
-    { "port_id": "cold-energy-output", "variable": "reservoir.cold.internal-energy", "unit": "uJ", "dimension_kind": "physical_quantity" }
-  ],
-  "read_set": ["reservoir.hot.internal-energy", "reservoir.cold.internal-energy"],
-  "write_set": ["reservoir.hot.internal-energy", "reservoir.cold.internal-energy"],
-  "conservation_rules": [
-    { "quantity": "energy.total", "unit": "uJ", "tolerance": { "value": 0, "unit": "uJ" } }
-  ],
-  "validity_range": {
-    "conditions": ["Two finite thermal reservoirs with positive heat capacity"],
-    "exclusions": ["No biological realism claim"]
-  },
-  "failure_policy": {
-    "invalid_input": "reject_transition"
-  },
-  "validation_scenarios": [
-    { "scenario_id": "schema-conservation-example", "evidence_kind": "schema_only" }
-  ]
-}"#,
-    )
+    let mut value: serde_json::Value = serde_json::from_slice(include_bytes!(
+        "../../contracts/fixtures/mechanisms/two-reservoir-thermal-exchange.json"
+    ))
+    .expect("reference contract");
+    value["content_digest"] = "PLACEHOLDER".into();
+    serde_json::to_string_pretty(&value).expect("contract JSON")
 }
-
 fn program_bytes() -> Vec<u8> {
     br#"{"abi":"thermal-exchange-v1","conductance_uj_per_mk_s":1000}"#.to_vec()
 }
@@ -95,12 +71,12 @@ fn wrong_declared_contract_digest_is_rejected() {
 #[test]
 fn incomplete_contract_without_conservation_is_rejected() {
     let program = program_bytes();
-    let contract_json = contract_json()
-        .replace("PLACEHOLDER", &program_digest_hex(&program))
-        .replace(
-            "  \"conservation_rules\": [\n    { \"quantity\": \"energy.total\", \"unit\": \"uJ\", \"tolerance\": { \"value\": 0, \"unit\": \"uJ\" } }\n  ],\n",
-            "",
-        );
+    let mut value: serde_json::Value = serde_json::from_str(
+        &contract_json().replace("PLACEHOLDER", &program_digest_hex(&program)),
+    )
+    .unwrap();
+    value.as_object_mut().unwrap().remove("conservation_rules");
+    let contract_json = value.to_string();
     let error = MechanismContract::from_json(contract_json.as_bytes())
         .expect_err("missing conservation must be rejected at parse");
 

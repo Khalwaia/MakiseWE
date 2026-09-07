@@ -120,3 +120,66 @@ fn digest_mismatched_archived_bytes_durably_safe_stop() {
     assert!(engine.audit_replay().is_err());
     assert!(engine.safe_stop().expect("read safe stop").is_some());
 }
+
+#[test]
+fn audit_rejects_unknown_program_fields_even_with_valid_digest() {
+    use sha2::{Digest, Sha256};
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("timeline.sqlite");
+    let specification = spec("unknown-program-fields");
+    let (mut engine, _) =
+        WorldEngine::open(specification.clone(), StorageLocation::sqlite(&path)).unwrap();
+    engine
+        .commit(CommitRequest::thermal_exchange(
+            "exchange",
+            0,
+            pair(),
+            bundle(),
+        ))
+        .unwrap();
+    let fast = engine.fast_replay().unwrap();
+    drop(engine);
+    let bytes = br#"{"abi":"thermal-exchange-v1","conductance_uj_per_mk_s":1000,"unknown":true}"#;
+    let digest = format!("sha256:{:x}", Sha256::digest(bytes));
+    let connection = rusqlite::Connection::open(&path).unwrap();
+    connection
+        .execute(
+            "UPDATE artifact_archive SET digest=?1, program_bytes=?2",
+            rusqlite::params![digest, bytes.as_slice()],
+        )
+        .unwrap();
+    // The shared execution index is absent in earlier aggregate databases.
+    let has_execution_index: bool = connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='mechanism_execution')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    if has_execution_index {
+        connection
+            .execute(
+                "UPDATE mechanism_execution SET artifact_digest=?1",
+                [&digest],
+            )
+            .unwrap();
+    }
+    connection
+        .execute("UPDATE thermal_execution SET artifact_digest=?1", [&digest])
+        .unwrap();
+    connection
+        .execute(
+            "UPDATE causal_transitions SET artifact_digests=?1",
+            [serde_json::json!([digest]).to_string()],
+        )
+        .unwrap();
+    drop(connection);
+    let (mut engine, _) =
+        WorldEngine::open(specification.clone(), StorageLocation::sqlite(&path)).unwrap();
+    assert_eq!(engine.fast_replay().unwrap(), fast);
+    assert!(engine.audit_replay().is_err());
+    assert_eq!(engine.fast_replay().unwrap(), fast);
+    drop(engine);
+    let (engine, _) = WorldEngine::open(specification, StorageLocation::sqlite(&path)).unwrap();
+    assert!(engine.safe_stop().unwrap().is_some());
+}

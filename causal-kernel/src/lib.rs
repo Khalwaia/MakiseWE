@@ -965,6 +965,12 @@ impl WorldEngine {
                 self.durable_safe_stop("missing_or_mismatched_artifact")?;
                 return Err(ReadError::CorruptTransitionEvidence);
             }
+            if bytes.as_deref().map(ProgramAbi::from_program_bytes)
+                != Some(ProgramAbi::ThermalExchangeV1)
+            {
+                self.durable_safe_stop("unsupported_program_abi")?;
+                return Err(ReadError::CorruptTransitionEvidence);
+            }
             let archived_conductance = bytes
                 .as_deref()
                 .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(bytes).ok())
