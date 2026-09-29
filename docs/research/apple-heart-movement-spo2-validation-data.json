@@ -1,0 +1,55 @@
+{
+  "citation": {
+    "title": "Pulse oximetry values from 33,080 participants in the Apple Heart & Movement Study",
+    "authors": "Bent B, Cho PJ, April M, Kellogg RA, Allen NB, Williams JA, Yarostski J, Dunn JP",
+    "journal": "npj Digital Medicine",
+    "volume": 6,
+    "pages": 132,
+    "year": 2023,
+    "doi": "10.1038/s41746-023-00851-6",
+    "license": "CC BY 4.0"
+  },
+  "dataset": {
+    "total_measurements": 72000000,
+    "unique_participants": 33080,
+    "device": "Apple Watch Series 6 or later",
+    "measurement_method": "Photoplethysmography (PPG)",
+    "collection_period": "naturalistic conditions (daily life)",
+    "population": "US adults with Apple Watch"
+  },
+  "circadian_patterns": {
+    "description": "24-hour SpO2 profiles approximately sinusoidal",
+    "nadir": "near midnight local time",
+    "zenith": "near noon local time",
+    "overnight_reduction": {
+      "mean_decrease_percent": 0.8,
+      "description": "mean SpO2 approximately 0.8% lower during overnight hours vs daytime"
+    },
+    "typical_range": {
+      "healthy_adults": "95-100%",
+      "note": "Published aggregate patterns, not individual time-series"
+    }
+  },
+  "demographic_stratification": {
+    "variables": ["age", "sex", "BMI", "home_altitude"],
+    "description": "Similar circadian patterns observed across all demographic groups",
+    "individual_traces": "not publicly available"
+  },
+  "validation_envelope": {
+    "scope": "healthy adult SpO2 circadian patterns and population ranges",
+    "applicable_to": "face validity checks for resting SpO2 levels",
+    "not_applicable_to": ["exercise response", "controlled desaturation", "individual time-series validation", "Neko (fictional species)"],
+    "usable_for": "qualitative circadian pattern validation, resting baseline range checks"
+  },
+  "provenance_tier": "tier_3_expert_estimate",
+  "uncertainty_type": "aggregate_population_statistics",
+  "extracted_by": "Claude Opus 5.5",
+  "extraction_date": "2026-09-22",
+  "notes": [
+    "Large-scale observational data (72M measurements) provides robust population ranges",
+    "Naturalistic conditions (not controlled exercise protocols)",
+    "Individual time-series not available - aggregate patterns only",
+    "Suitable for face validity: resting SpO2 should remain 95-100% in healthy baseline",
+    "Cannot be used for parameter calibration or individual trace validation"
+  ]
+}

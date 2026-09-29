@@ -1,0 +1,76 @@
+{
+  "citation": {
+    "title": "Effect of volume expansion with hypertonic- and isotonic saline and isotonic glucose on sodium and water transport in the principal cells in the kidney",
+    "authors": "Jensen JM, Mose FH, Bech JN, Nielsen S, Pedersen EB",
+    "journal": "BMC Nephrology",
+    "year": 2013,
+    "doi": "10.1186/1471-2369-14-202",
+    "pmid": "24067081",
+    "license": "CC BY 2.0"
+  },
+  "protocol": {
+    "population": "23 healthy subjects",
+    "design": "randomized crossover",
+    "interventions": ["isotonic_saline", "hypertonic_saline", "isotonic_glucose"],
+    "dietary_prep": "4 days standard diet: 120 mmol sodium/day, 2500 ml water/day, overnight fast",
+    "additional_water": "175 ml oral water every 30 min during examination (including prep)",
+    "note": "Oral water intake during protocol complicates renal-only boundary validation"
+  },
+  "isotonic_saline_arm": {
+    "infusion": {
+      "composition": "0.9% NaCl",
+      "volume_ml": "not explicitly stated, estimated from protocol",
+      "duration_min": 60,
+      "interval": "90-150 min"
+    },
+    "urine_flow_ml_per_min": {
+      "baseline_0_90min": {"mean": 6.90, "sd": 1.33, "n": 23},
+      "infusion_90_150min": {"mean": 8.75, "sd": 1.76, "n": 23},
+      "post1_150_180min": {"mean": 7.95, "sd": 2.31, "n": 23},
+      "post2_180_210min": {"mean": 7.39, "sd": 2.36, "n": 23},
+      "post3_210_240min": {"mean": 8.12, "sd": 2.26, "n": 23},
+      "units": "ml/min",
+      "source": "Table 2"
+    },
+    "urinary_sodium_excretion": {
+      "note": "Table 3 units require verification: u-Na listed as mmol/min with baseline 1.24 at FENa 1.26%, plasma Na 138.1 mmol/L, GFR 98.1 ml/min/1.73m2. Expected: (FENa × GFR × plasma_Na) = 0.0126 × 98.1 × 138.1 = 170.7 mmol/min, not 1.24. Possible units: µmol/min or µmol/s.",
+      "baseline_u_na_table3": 1.24,
+      "infusion_u_na_table3": 10.06,
+      "units_stated": "mmol/min",
+      "units_suspected": "µmol/min or data error",
+      "validation_status": "UNVERIFIED - marked for caution"
+    },
+    "plasma_sodium_mmol_per_L": {
+      "baseline_0_90min": {"mean": 138.1, "sd": 1.5, "n": 23},
+      "infusion_90_150min": {"mean": 139.6, "sd": 1.5, "n": 23},
+      "post_150_240min": {"mean": 139.4, "sd": 1.6, "n": 23},
+      "source": "Table 4"
+    },
+    "blood_pressure_mmHg": {
+      "systolic_baseline": {"mean": 123, "sd": 10, "n": 23},
+      "systolic_infusion": {"mean": 128, "sd": 11, "n": 23},
+      "systolic_post": {"mean": 126, "sd": 11, "n": 23},
+      "diastolic_baseline": {"mean": 72, "sd": 8, "n": 23},
+      "diastolic_infusion": {"mean": 75, "sd": 7, "n": 23},
+      "diastolic_post": {"mean": 74, "sd": 8, "n": 23},
+      "source": "Table 4"
+    }
+  },
+  "validation_envelope": {
+    "scope": "isotonic saline IV with concurrent oral water intake",
+    "applicable_to": "adult healthy resting human",
+    "not_applicable_to": ["Neko (fictional species)", "pure renal-only (oral water confounds)", "sodium excretion (units unverified)"],
+    "usable_for": "urine flow response qualitative pattern, plasma sodium stability within normal range"
+  },
+  "provenance_tier": "tier_3_expert_estimate",
+  "uncertainty_type": "standard_deviation",
+  "extracted_by": "Claude Opus 5.5",
+  "extraction_date": "2026-09-22",
+  "notes": [
+    "Oral water intake (175ml/30min) during protocol means input boundary not purely IV",
+    "Urine flow data usable for qualitative response pattern validation",
+    "Sodium excretion units unverified - Table 3 values inconsistent with calculated FENa",
+    "Published group means suitable for tier 3 face validity checks",
+    "Individual traces not available - cannot perform calibration or holdout validation"
+  ]
+}
