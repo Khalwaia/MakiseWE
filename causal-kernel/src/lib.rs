@@ -63,7 +63,7 @@ pub use contact::{
     GraspAssessment, GraspRequest, HoldState, contact_proposal, grasp_proposal, hold_projection,
     resolve_collision,
 };
-pub use digestion::ABSORPTION_RATE_UJ_PER_SECOND;
+pub use digestion::{ABSORPTION_RATE_UJ_PER_SECOND, absorb_one_second, liver_buffer_one_second, consume_glucose_for_metabolism};
 pub use episodes::{
     CleanBlocker, CleanControlEpisode, CleanObservables, CleanStep, ControlEpisodeError,
     CookAction, CookBlocker, CookControlEpisode, CookObservables, CookPhase, CookStep,
@@ -1660,6 +1660,7 @@ impl WorldEngine {
             }
             if let Some(organism) = current_organism.as_mut() {
                 crate::digestion::absorb_one_second(organism);
+                crate::digestion::liver_buffer_one_second(organism);
                 organism
                     .apply_ambient_exchange()
                     .map_err(CommitError::MetabolismRejected)?;
@@ -1676,6 +1677,9 @@ impl WorldEngine {
                 organism
                     .apply_renal_for_second()
                     .map_err(|error| CommitError::MetabolismRejected(error.into()))?;
+                // Substrate tracking (glucose consumed, parallel accounting)
+                let _glucose_consumed = crate::digestion::consume_glucose_for_metabolism(organism, demand);
+                // Chemical store metabolism (full demand, glucose already included)
                 organism
                     .apply_metabolism(demand)
                     .map_err(CommitError::MetabolismRejected)?;
@@ -2051,8 +2055,8 @@ impl WorldEngine {
             }
             if let Some(organism) = &current_organism {
                 transaction.execute(
-                "INSERT INTO organism_state (singleton, chemical_store_uj, digestion_buffer_uj, core_internal_energy_uj, ambient_internal_energy_uj, ambient_heat_capacity_uj_per_mk, blood_volume_mm3, hb_tetramer_umol, arterial_o2_umol, venous_co2_umol, map_mpa, lung_diffusion_umol_per_s, total_body_water_mm3, plasma_mm3, plasma_sodium_umol, urine_water_mm3, urine_sodium_umol)
-                 VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+                "INSERT INTO organism_state (singleton, chemical_store_uj, digestion_buffer_uj, core_internal_energy_uj, ambient_internal_energy_uj, ambient_heat_capacity_uj_per_mk, blood_volume_mm3, hb_tetramer_umol, arterial_o2_umol, venous_co2_umol, map_mpa, lung_diffusion_umol_per_s, total_body_water_mm3, plasma_mm3, plasma_sodium_umol, urine_water_mm3, urine_sodium_umol, plasma_glucose_mmol, liver_glycogen_mmol, fecal_dry_mass_mg)
+                 VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
                  ON CONFLICT(singleton) DO UPDATE SET
                     chemical_store_uj = excluded.chemical_store_uj,
                     digestion_buffer_uj = excluded.digestion_buffer_uj,
@@ -2069,7 +2073,10 @@ impl WorldEngine {
                     plasma_mm3 = excluded.plasma_mm3,
                     plasma_sodium_umol = excluded.plasma_sodium_umol,
                     urine_water_mm3 = excluded.urine_water_mm3,
-                    urine_sodium_umol = excluded.urine_sodium_umol",
+                    urine_sodium_umol = excluded.urine_sodium_umol,
+                    plasma_glucose_mmol = excluded.plasma_glucose_mmol,
+                    liver_glycogen_mmol = excluded.liver_glycogen_mmol,
+                    fecal_dry_mass_mg = excluded.fecal_dry_mass_mg",
                 params![
                     organism.chemical_store_uj(),
                     organism.digestion_buffer_uj(),
@@ -2089,6 +2096,9 @@ impl WorldEngine {
                     organism.renal().plasma_sodium_umol(),
                     organism.renal().urine_water_mm3(),
                     organism.renal().urine_sodium_umol(),
+                    organism.plasma_glucose_mmol(),
+                    organism.liver_glycogen_mmol(),
+                    organism.fecal_dry_mass_mg(),
                 ],
             )?;
             }
@@ -3137,6 +3147,9 @@ fn renal_state_after(
         value("organism.renal.plasma_sodium")?,
         value("organism.renal.urine_water")?,
         value("organism.renal.urine_sodium")?,
+        value("organism.plasma_glucose").unwrap_or(15_000),
+        value("organism.liver_glycogen").unwrap_or(400_000),
+        value("organism.fecal_dry_mass").unwrap_or(0),
     );
     // The compatibility row reader can supply defaults for old snapshots.
     // Replay must reject any such substitution for committed quantities.
@@ -3419,6 +3432,9 @@ CREATE TABLE IF NOT EXISTS organism_state (
     ,plasma_sodium_umol INTEGER NOT NULL DEFAULT 420000
     ,urine_water_mm3 INTEGER NOT NULL DEFAULT 0
     ,urine_sodium_umol INTEGER NOT NULL DEFAULT 0
+    ,plasma_glucose_mmol INTEGER NOT NULL DEFAULT 15000
+    ,liver_glycogen_mmol INTEGER NOT NULL DEFAULT 400000
+    ,fecal_dry_mass_mg INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS sleep_debt (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
@@ -3500,6 +3516,9 @@ fn migrate_organism_state_columns(connection: &Connection) -> Result<(), rusqlit
     ensure_column(&columns, connection, "plasma_sodium_umol", "420000")?;
     ensure_column(&columns, connection, "urine_water_mm3", "0")?;
     ensure_column(&columns, connection, "urine_sodium_umol", "0")?;
+    ensure_column(&columns, connection, "plasma_glucose_mmol", "15000")?;
+    ensure_column(&columns, connection, "liver_glycogen_mmol", "400000")?;
+    ensure_column(&columns, connection, "fecal_dry_mass_mg", "0")?;
     Ok(())
 }
 
@@ -3602,7 +3621,10 @@ fn read_organism(connection: &Connection) -> Option<OrganismState> {
                     COALESCE(plasma_mm3, 3000000),
                     COALESCE(plasma_sodium_umol, 420000),
                     COALESCE(urine_water_mm3, 0),
-                    COALESCE(urine_sodium_umol, 0)
+                    COALESCE(urine_sodium_umol, 0),
+                    COALESCE(plasma_glucose_mmol, 15000),
+                    COALESCE(liver_glycogen_mmol, 400000),
+                    COALESCE(fecal_dry_mass_mg, 0)
              FROM organism_state WHERE singleton = 1",
         [],
         |row| {
@@ -3623,6 +3645,9 @@ fn read_organism(connection: &Connection) -> Option<OrganismState> {
                 row.get(13)?,
                 row.get(14)?,
                 row.get(15)?,
+                row.get(16)?,
+                row.get(17)?,
+                row.get(18)?,
             ))
         },
     );

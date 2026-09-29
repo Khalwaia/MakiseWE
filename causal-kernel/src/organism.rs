@@ -50,6 +50,10 @@ pub struct OrganismState {
     morphotype: Morphotype,
     blood: BloodState,
     renal: RenalState,
+    // Phase 3.3 substrate compartments
+    plasma_glucose_mmol: i64,
+    liver_glycogen_mmol: i64,
+    fecal_dry_mass_mg: i64,
 }
 
 impl OrganismState {
@@ -66,6 +70,9 @@ impl OrganismState {
             morphotype: morphotype.clone(),
             blood: BloodState::from_morphotype(&morphotype),
             renal: RenalState::baseline(),
+            plasma_glucose_mmol: 15_000, // 5.0 mmol/L × 3L plasma = 15 mmol
+            liver_glycogen_mmol: 400_000, // ~400 mmol glucose equivalents
+            fecal_dry_mass_mg: 0,
         }
     }
 
@@ -83,6 +90,9 @@ impl OrganismState {
             morphotype: morphotype.clone(),
             blood: BloodState::from_morphotype(morphotype),
             renal: RenalState::baseline(),
+            plasma_glucose_mmol: 15_000,
+            liver_glycogen_mmol: 400_000,
+            fecal_dry_mass_mg: 0,
         }
     }
 
@@ -100,6 +110,9 @@ impl OrganismState {
             morphotype: morphotype.clone(),
             blood: BloodState::from_morphotype(&morphotype),
             renal: RenalState::baseline(),
+            plasma_glucose_mmol: 15_000,
+            liver_glycogen_mmol: 400_000,
+            fecal_dry_mass_mg: 0,
         }
     }
 
@@ -124,6 +137,9 @@ impl OrganismState {
             morphotype: morphotype.clone(),
             blood: BloodState::from_morphotype(morphotype),
             renal: RenalState::baseline(),
+            plasma_glucose_mmol: 15_000,
+            liver_glycogen_mmol: 400_000,
+            fecal_dry_mass_mg: 0,
         }
     }
 
@@ -140,6 +156,9 @@ impl OrganismState {
             ReservoirState::new(ambient_energy_uj, ambient_capacity_uj_per_mk),
         );
         organism.digestion_buffer_uj = digestion_buffer_uj;
+        organism.plasma_glucose_mmol = 15_000;
+        organism.liver_glycogen_mmol = 400_000;
+        organism.fecal_dry_mass_mg = 0;
         organism
     }
 
@@ -161,6 +180,9 @@ impl OrganismState {
         plasma_sodium_umol: i64,
         urine_water_mm3: i64,
         urine_sodium_umol: i64,
+        plasma_glucose_mmol: i64,
+        liver_glycogen_mmol: i64,
+        fecal_dry_mass_mg: i64,
     ) -> Self {
         // Derive morphotype from stored diffusion/blood params by matching known morphotypes.
         // Fallback to human if unknown — migration preserves exact amounts anyway.
@@ -196,6 +218,9 @@ impl OrganismState {
             morphotype: morphotype.clone(),
             blood,
             renal,
+            plasma_glucose_mmol,
+            liver_glycogen_mmol,
+            fecal_dry_mass_mg,
         }
     }
 
@@ -298,6 +323,46 @@ impl OrganismState {
     }
     pub fn renal(&self) -> &RenalState {
         &self.renal
+    }
+
+    // --- Phase 3.3 substrate compartments ---
+
+    pub fn plasma_glucose_mmol(&self) -> i64 {
+        self.plasma_glucose_mmol
+    }
+
+    pub fn liver_glycogen_mmol(&self) -> i64 {
+        self.liver_glycogen_mmol
+    }
+
+    pub fn fecal_dry_mass_mg(&self) -> i64 {
+        self.fecal_dry_mass_mg
+    }
+
+    pub(crate) fn absorb_glucose(&mut self, mmol: i64) {
+        self.plasma_glucose_mmol = self.plasma_glucose_mmol.saturating_add(mmol);
+    }
+
+    pub(crate) fn consume_plasma_glucose(&mut self, mmol: i64) {
+        debug_assert!(self.plasma_glucose_mmol >= mmol);
+        self.plasma_glucose_mmol = self.plasma_glucose_mmol.saturating_sub(mmol);
+    }
+
+    pub(crate) fn synthesize_glycogen(&mut self, mmol: i64) {
+        self.liver_glycogen_mmol = self.liver_glycogen_mmol.saturating_add(mmol);
+    }
+
+    pub(crate) fn breakdown_glycogen(&mut self, mmol: i64) {
+        debug_assert!(self.liver_glycogen_mmol >= mmol);
+        self.liver_glycogen_mmol = self.liver_glycogen_mmol.saturating_sub(mmol);
+    }
+
+    pub(crate) fn accumulate_fecal_mass(&mut self, mg: i64) {
+        self.fecal_dry_mass_mg = self.fecal_dry_mass_mg.saturating_add(mg);
+    }
+
+    pub(crate) fn clear_fecal_mass(&mut self) {
+        self.fecal_dry_mass_mg = 0;
     }
 
     pub fn stage_fluid_intake(
