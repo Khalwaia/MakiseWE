@@ -4,7 +4,9 @@
     "contracts/fixtures/mechanisms/two-reservoir-thermal-exchange.json",
     "contracts/fixtures/mechanisms/cardiorespiratory-gas-exchange-v1.json",
     "contracts/fixtures/mechanisms/renal-fluid-electrolyte-v1.json",
-    "contracts/fixtures/mechanisms/renal-corrective-excretion-v1.json"
+    "contracts/fixtures/mechanisms/renal-corrective-excretion-v1.json",
+    "contracts/fixtures/mechanisms/renal-intake-v1.json",
+    "contracts/fixtures/mechanisms/renal-blood-volume-v1.json"
   ],
   "makise.resolution-contract.v1": [
     "contracts/fixtures/resolutions/cohort-to-individual-cell.json",

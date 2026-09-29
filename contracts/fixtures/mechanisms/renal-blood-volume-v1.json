@@ -1,0 +1,212 @@
+{
+  "schema_version": "makise.mechanism-contract.v1",
+  "mechanism_id": "renal.blood-volume-coupling",
+  "version": "0.1.0",
+  "content_digest": "sha256:2e2d3451549fe89bc7e34202cb600f80fa28bf62aec2fe1ed3888c5dd138cc66",
+  "causal_inputs": [
+    {
+      "port_id": "plasma-volume-change",
+      "variable": "renal.plasma-volume-change",
+      "unit": "mm3",
+      "dimension_kind": "physical_quantity"
+    }
+  ],
+  "causal_outputs": [
+    {
+      "port_id": "blood-volume",
+      "variable": "blood.volume-mm3",
+      "unit": "mm3",
+      "dimension_kind": "physical_quantity"
+    },
+    {
+      "port_id": "map",
+      "variable": "blood.map-mpa",
+      "unit": "mPa",
+      "dimension_kind": "physical_quantity"
+    }
+  ],
+  "read_set": [
+    "blood.volume-mm3",
+    "blood.hb-tetramer-umol",
+    "blood.arterial-o2-umol",
+    "blood.venous-co2-umol",
+    "blood.map-mpa",
+    "blood.lung-diffusion-umol-per-s"
+  ],
+  "write_set": [
+    "blood.volume-mm3",
+    "blood.map-mpa"
+  ],
+  "authoritative_state_variables": [
+    {
+      "variable": "blood.volume-mm3",
+      "dimension_kind": "physical_quantity",
+      "unit": "mm3",
+      "validity_range": {
+        "min": 1,
+        "max": 9223372036854775807,
+        "unit": "mm3"
+      }
+    },
+    {
+      "variable": "blood.hb-tetramer-umol",
+      "dimension_kind": "physical_quantity",
+      "unit": "umol",
+      "validity_range": {
+        "min": 1,
+        "max": 9223372036854775807,
+        "unit": "umol"
+      }
+    },
+    {
+      "variable": "blood.arterial-o2-umol",
+      "dimension_kind": "physical_quantity",
+      "unit": "umol",
+      "validity_range": {
+        "min": 0,
+        "max": 9223372036854775807,
+        "unit": "umol"
+      }
+    },
+    {
+      "variable": "blood.venous-co2-umol",
+      "dimension_kind": "physical_quantity",
+      "unit": "umol",
+      "validity_range": {
+        "min": 0,
+        "max": 9223372036854775807,
+        "unit": "umol"
+      }
+    },
+    {
+      "variable": "blood.map-mpa",
+      "dimension_kind": "physical_quantity",
+      "unit": "mPa",
+      "validity_range": {
+        "min": 1,
+        "max": 9223372036854775807,
+        "unit": "mPa"
+      }
+    },
+    {
+      "variable": "blood.lung-diffusion-umol-per-s",
+      "dimension_kind": "physical_quantity",
+      "unit": "umol_per_s",
+      "validity_range": {
+        "min": 1,
+        "max": 9223372036854775807,
+        "unit": "umol_per_s"
+      }
+    }
+  ],
+  "resolution": {
+    "supported_resolution_ids": [
+      "blood-coarse-v1"
+    ],
+    "representation": "Coarse blood volume and linear MAP response; gas pools, haemoglobin and lung diffusion pass through unchanged"
+  },
+  "scales": {
+    "spatial": {
+      "min": 0.001,
+      "max": 2.0,
+      "unit": "m"
+    },
+    "temporal": {
+      "min": 0,
+      "max": 0,
+      "unit": "s"
+    }
+  },
+  "canonical_scheduling": {
+    "boundary_rule": "After a renal intake or excretion proposal, apply exactly its plasma-volume delta; caller must accept both candidates atomically",
+    "partition_invariant": true,
+    "reduction_order": "Single organism deterministic order"
+  },
+  "observable_projections": [
+    {
+      "observable_id": "mean-arterial-pressure",
+      "source_variables": [
+        "blood.map-mpa"
+      ],
+      "unit": "mPa",
+      "error_bound": {
+        "kind": "absolute",
+        "bound": 0,
+        "unit": "mPa",
+        "confidence": 1
+      }
+    }
+  ],
+  "parameters": [
+    {
+      "parameter_id": "pressure-response-mpa-per-mm3",
+      "value": 8,
+      "unit": "mPa_per_mm3",
+      "provenance_category": "synthetic_fixture",
+      "uncertainty": {
+        "kind": "absolute",
+        "bound": 0,
+        "unit": "mPa_per_mm3",
+        "confidence": 1
+      },
+      "validity_range": {
+        "min": 8,
+        "max": 8,
+        "unit": "mPa_per_mm3"
+      }
+    }
+  ],
+  "provenance_category": "synthetic_fixture",
+  "uncertainty_model": {
+    "kind": "absolute",
+    "bound": 0,
+    "unit": "mPa",
+    "confidence": 1
+  },
+  "validity_range": {
+    "conditions": [
+      "Synthetic compatibility response only: delta MAP = 8 mPa/mm3 times plasma-volume delta; integer exactness is not biological certainty",
+      "Input and output satisfy BloodState positivity and oxygen-capacity constraints; checked arithmetic must fit i64"
+    ],
+    "exclusions": [
+      "No cardiovascular dynamics, gas exchange, hormone control, clinical pressure envelope or empirical validation"
+    ]
+  },
+  "conservation_rules": [
+    {
+      "quantity": "blood.volume-minus-plasma-transfer",
+      "unit": "mm3",
+      "tolerance": {
+        "value": 0,
+        "unit": "mm3"
+      }
+    },
+    {
+      "quantity": "blood.hb-and-gas-pools",
+      "unit": "umol",
+      "tolerance": {
+        "value": 0,
+        "unit": "umol"
+      }
+    }
+  ],
+  "failure_policy": {
+    "non_convergence": "safe_stop",
+    "invalid_input": "reject_transition",
+    "missing_artifact": "safe_stop"
+  },
+  "resolution_upgrade_paths": [
+    {
+      "from_resolution_id": "blood-coarse-v1",
+      "to_resolution_id": "blood-capillary-v1",
+      "contract_digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+    }
+  ],
+  "validation_scenarios": [
+    {
+      "scenario_id": "renal-blood-volume-anchor",
+      "evidence_kind": "expert_estimate",
+      "acceptance": "Synthetic compatibility anchor: 250000 mm3 input changes 5000000 mm3 and 12000000 mPa to 5250000 mm3 and 14000000 mPa; -17 mm3 gives 5249983 mm3 and 13999864 mPa; gas pools unchanged. Overflow or nonpositive output yields no candidate."
+    }
+  ]
+}

@@ -1,0 +1,232 @@
+{
+  "schema_version": "makise.mechanism-contract.v1",
+  "mechanism_id": "renal.boundary-intake",
+  "version": "0.1.0",
+  "content_digest": "sha256:22283ee17dba8bdb24eb1a7d053e4f1ccc67efa62de45c18284e0fc75d42c7d5",
+  "causal_inputs": [
+    {
+      "port_id": "water-intake",
+      "variable": "organism.fluid-intake",
+      "unit": "mm3",
+      "dimension_kind": "physical_quantity"
+    },
+    {
+      "port_id": "sodium-intake",
+      "variable": "organism.sodium-intake",
+      "unit": "umol",
+      "dimension_kind": "physical_quantity"
+    }
+  ],
+  "causal_outputs": [
+    {
+      "port_id": "body-water",
+      "variable": "renal.total-body-water-mm3",
+      "unit": "mm3",
+      "dimension_kind": "physical_quantity"
+    },
+    {
+      "port_id": "plasma-water",
+      "variable": "renal.plasma-mm3",
+      "unit": "mm3",
+      "dimension_kind": "physical_quantity"
+    },
+    {
+      "port_id": "plasma-sodium",
+      "variable": "renal.plasma-sodium-umol",
+      "unit": "umol",
+      "dimension_kind": "physical_quantity"
+    }
+  ],
+  "read_set": [
+    "renal.total-body-water-mm3",
+    "renal.plasma-mm3",
+    "renal.plasma-sodium-umol",
+    "renal.urine-water-mm3",
+    "renal.urine-sodium-umol"
+  ],
+  "write_set": [
+    "renal.total-body-water-mm3",
+    "renal.plasma-mm3",
+    "renal.plasma-sodium-umol"
+  ],
+  "authoritative_state_variables": [
+    {
+      "variable": "renal.total-body-water-mm3",
+      "dimension_kind": "physical_quantity",
+      "unit": "mm3",
+      "validity_range": {
+        "unit": "mm3",
+        "max": 45000000,
+        "min": 40000000
+      }
+    },
+    {
+      "variable": "renal.plasma-mm3",
+      "dimension_kind": "physical_quantity",
+      "unit": "mm3",
+      "validity_range": {
+        "unit": "mm3",
+        "max": 5000000,
+        "min": 2000000
+      }
+    },
+    {
+      "variable": "renal.plasma-sodium-umol",
+      "dimension_kind": "physical_quantity",
+      "unit": "umol",
+      "validity_range": {
+        "unit": "umol",
+        "max": 510000,
+        "min": 400000
+      }
+    },
+    {
+      "variable": "renal.urine-water-mm3",
+      "dimension_kind": "physical_quantity",
+      "unit": "mm3",
+      "validity_range": {
+        "unit": "mm3",
+        "max": 9223372036854775807,
+        "min": 0
+      }
+    },
+    {
+      "variable": "renal.urine-sodium-umol",
+      "dimension_kind": "physical_quantity",
+      "unit": "umol",
+      "validity_range": {
+        "unit": "umol",
+        "max": 9223372036854775807,
+        "min": 0
+      }
+    }
+  ],
+  "resolution": {
+    "supported_resolution_ids": [
+      "renal-coarse-v1"
+    ],
+    "representation": "Whole-body water and plasma sodium amounts with a urine boundary"
+  },
+  "scales": {
+    "spatial": {
+      "min": 0.001,
+      "max": 2.0,
+      "unit": "m"
+    },
+    "temporal": {
+      "min": 0,
+      "max": 0,
+      "unit": "s"
+    }
+  },
+  "canonical_scheduling": {
+    "boundary_rule": "One instantaneous intake proposal at the current canonical boundary, preserving stimulus order; no time advance",
+    "partition_invariant": true,
+    "reduction_order": "Single organism deterministic order"
+  },
+  "observable_projections": [
+    {
+      "observable_id": "plasma-sodium-mmol-per-l",
+      "source_variables": [
+        "renal.plasma-sodium-umol",
+        "renal.plasma-mm3"
+      ],
+      "unit": "mmol_per_l",
+      "error_bound": {
+        "kind": "absolute",
+        "bound": 0.001,
+        "unit": "mmol_per_l",
+        "confidence": 0.95
+      }
+    }
+  ],
+  "parameters": [
+    {
+      "parameter_id": "max-water-intake-mm3",
+      "value": 2000000,
+      "unit": "mm3",
+      "provenance_category": "synthetic_fixture",
+      "uncertainty": {
+        "kind": "absolute",
+        "bound": 0,
+        "unit": "mm3",
+        "confidence": 1
+      },
+      "validity_range": {
+        "min": 1,
+        "max": 2000000,
+        "unit": "mm3"
+      }
+    },
+    {
+      "parameter_id": "max-sodium-intake-umol",
+      "value": 90000,
+      "unit": "umol",
+      "provenance_category": "synthetic_fixture",
+      "uncertainty": {
+        "kind": "absolute",
+        "bound": 0,
+        "unit": "umol",
+        "confidence": 1
+      },
+      "validity_range": {
+        "min": 1,
+        "max": 90000,
+        "unit": "umol"
+      }
+    }
+  ],
+  "provenance_category": "synthetic_fixture",
+  "uncertainty_model": {
+    "kind": "absolute",
+    "bound": 0,
+    "unit": "mm3",
+    "confidence": 1
+  },
+  "validity_range": {
+    "conditions": [
+      "Synthetic instantaneous plasma-boundary input; water and sodium nonnegative, at least one positive; full RenalState bounds apply",
+      "Admission limits are synthetic input budgets, not physiological thresholds; smaller archived budgets may reject more requests"
+    ],
+    "exclusions": [
+      "No oral absorption, hormones, disease, empirical validation or blood coupling"
+    ]
+  },
+  "conservation_rules": [
+    {
+      "quantity": "water.body-plus-urine-minus-input",
+      "unit": "mm3",
+      "tolerance": {
+        "value": 0,
+        "unit": "mm3"
+      }
+    },
+    {
+      "quantity": "sodium.plasma-plus-urine-minus-input",
+      "unit": "umol",
+      "tolerance": {
+        "value": 0,
+        "unit": "umol"
+      }
+    }
+  ],
+  "failure_policy": {
+    "non_convergence": "safe_stop",
+    "invalid_input": "reject_transition",
+    "missing_artifact": "safe_stop"
+  },
+  "resolution_upgrade_paths": [
+    {
+      "from_resolution_id": "renal-coarse-v1",
+      "to_resolution_id": "renal-nephron-v1",
+      "contract_digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+    }
+  ],
+  "validation_scenarios": [
+    {
+      "scenario_id": "renal-plasma-intake-anchor",
+      "evidence_kind": "expert_estimate",
+      "acceptance": "Synthetic exact transfer: 250000 mm3 water and 35000 umol sodium at baseline yield body 42250000 mm3, plasma 3250000 mm3 and 455000 umol; urine unchanged. Negative, zero-total, overflow and out-of-envelope inputs yield no candidate."
+    }
+  ]
+}

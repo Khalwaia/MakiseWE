@@ -1,0 +1,5 @@
+{
+  "abi": "renal-intake-v1",
+  "max_water_intake_mm3": 2000000,
+  "max_sodium_intake_umol": 90000
+}

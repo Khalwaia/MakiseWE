@@ -328,6 +328,14 @@ impl OrganismState {
         Ok(())
     }
 
+    /// Applies already validated renal and blood candidates as one writer
+    /// operation.  The candidates are produced by an admitted executable
+    /// artifact; this seam deliberately performs no additional derivation.
+    pub(crate) fn apply_renal_blood_candidates(&mut self, renal: RenalState, blood: BloodState) {
+        self.renal = renal;
+        self.blood = blood;
+    }
+
     /// One second of gas exchange at given metabolic demand. Typed rejection
     /// without partial burn if O₂ insufficient. Caller must have already
     /// validated chemical store availability if coupling to metabolism.

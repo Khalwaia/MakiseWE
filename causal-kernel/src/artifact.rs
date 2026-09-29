@@ -8,6 +8,8 @@ const CONTRACT_SCHEMA: &str = "makise.mechanism-contract.v1";
 pub enum ProgramAbi {
     ThermalExchangeV1,
     RenalFluidV1,
+    RenalIntakeV1,
+    RenalBloodVolumeV1,
     Unknown,
 }
 
@@ -25,6 +27,8 @@ impl ProgramAbi {
                 Self::ThermalExchangeV1
             }
             Ok(value) if renal_parameters(&value).is_some() => Self::RenalFluidV1,
+            Ok(value) if renal_intake_parameters(&value).is_some() => Self::RenalIntakeV1,
+            Ok(value) if renal_blood_response(&value).is_some() => Self::RenalBloodVolumeV1,
             _ => Self::Unknown,
         }
     }
@@ -33,6 +37,8 @@ impl ProgramAbi {
         match self {
             Self::ThermalExchangeV1 => "thermal-exchange-v1",
             Self::RenalFluidV1 => "renal-fluid-v1",
+            Self::RenalIntakeV1 => "renal-intake-v1",
+            Self::RenalBloodVolumeV1 => "renal-blood-volume-v1",
             Self::Unknown => "unknown",
         }
     }
@@ -147,6 +153,8 @@ pub enum AdmissionError {
     UnsupportedProgramAbi,
     #[error("renal proposal violates its amount bounds or overflows")]
     InvalidRenalProposal,
+    #[error("blood volume proposal violates its state constraints or overflows")]
+    InvalidBloodVolumeProposal,
 }
 
 #[derive(Clone, Debug)]
@@ -250,6 +258,32 @@ impl ArtifactBundle {
                 return Err(AdmissionError::InvalidContract);
             }
         }
+        if self.abi == ProgramAbi::RenalIntakeV1 {
+            let program: Value = serde_json::from_slice(&self.program)
+                .map_err(|_| AdmissionError::UnsupportedProgramAbi)?;
+            let (water_limit, sodium_limit) =
+                renal_intake_parameters(&program).ok_or(AdmissionError::UnsupportedProgramAbi)?;
+            let mut reference: Value = serde_json::from_slice(include_bytes!(
+                "../../contracts/fixtures/mechanisms/renal-intake-v1.json"
+            ))
+            .expect("embedded renal intake contract is JSON");
+            reference["content_digest"] = contract["content_digest"].clone();
+            reference["parameters"][0]["value"] = water_limit.into();
+            reference["parameters"][1]["value"] = sodium_limit.into();
+            if contract != reference {
+                return Err(AdmissionError::InvalidContract);
+            }
+        }
+        if self.abi == ProgramAbi::RenalBloodVolumeV1 {
+            let mut reference: Value = serde_json::from_slice(include_bytes!(
+                "../../contracts/fixtures/mechanisms/renal-blood-volume-v1.json"
+            ))
+            .expect("embedded renal blood volume contract is JSON");
+            reference["content_digest"] = contract["content_digest"].clone();
+            if contract != reference {
+                return Err(AdmissionError::InvalidContract);
+            }
+        }
         let contract_digest: [u8; 32] = Sha256::digest(self.contract.json_text.as_bytes()).into();
         Ok(AdmissionRecord {
             contract_digest,
@@ -295,6 +329,79 @@ impl ArtifactBundle {
         self.contract.mechanism_id()
     }
 
+    /// Proposes an instantaneous plasma-boundary input, not oral absorption.
+    /// The caller must couple blood volume before authoritative application.
+    pub fn propose_renal_intake(
+        &self,
+        state: &crate::renal::RenalState,
+        water_mm3: i64,
+        sodium_umol: i64,
+    ) -> Result<crate::renal::RenalState, AdmissionError> {
+        self.admit()?;
+        let program: Value = serde_json::from_slice(&self.program)
+            .map_err(|_| AdmissionError::UnsupportedProgramAbi)?;
+        let (water_limit, sodium_limit) =
+            renal_intake_parameters(&program).ok_or(AdmissionError::UnsupportedProgramAbi)?;
+        if water_mm3 < 0
+            || sodium_umol < 0
+            || (water_mm3 == 0 && sodium_umol == 0)
+            || water_mm3 > water_limit
+            || sodium_umol > sodium_limit
+        {
+            return Err(AdmissionError::InvalidRenalProposal);
+        }
+        crate::renal::RenalState::new(
+            state
+                .total_body_water_mm3()
+                .checked_add(water_mm3)
+                .ok_or(AdmissionError::InvalidRenalProposal)?,
+            state
+                .plasma_mm3()
+                .checked_add(water_mm3)
+                .ok_or(AdmissionError::InvalidRenalProposal)?,
+            state
+                .plasma_sodium_umol()
+                .checked_add(sodium_umol)
+                .ok_or(AdmissionError::InvalidRenalProposal)?,
+            state.urine_water_mm3(),
+            state.urine_sodium_umol(),
+        )
+        .map_err(|_| AdmissionError::InvalidRenalProposal)
+    }
+
+    /// Couples a proposed renal plasma-volume delta to blood volume and MAP.
+    /// This pure compatibility ABI does not perform gas exchange or mutate a
+    /// timeline. The writer must apply the renal and blood candidates together.
+    pub fn propose_blood_volume(
+        &self,
+        state: &crate::blood::BloodState,
+        delta_mm3: i64,
+    ) -> Result<crate::blood::BloodState, AdmissionError> {
+        self.admit()?;
+        let program: Value = serde_json::from_slice(&self.program)
+            .map_err(|_| AdmissionError::UnsupportedProgramAbi)?;
+        let response =
+            renal_blood_response(&program).ok_or(AdmissionError::UnsupportedProgramAbi)?;
+        let pressure_delta = delta_mm3
+            .checked_mul(response)
+            .ok_or(AdmissionError::InvalidBloodVolumeProposal)?;
+        crate::blood::BloodState::new(
+            state
+                .blood_volume_mm3()
+                .checked_add(delta_mm3)
+                .ok_or(AdmissionError::InvalidBloodVolumeProposal)?,
+            state.hb_tetramer_umol(),
+            state.arterial_o2_umol(),
+            state.venous_co2_umol(),
+            state
+                .map_mpa()
+                .checked_add(pressure_delta)
+                .ok_or(AdmissionError::InvalidBloodVolumeProposal)?,
+            state.lung_diffusion_umol_per_s(),
+        )
+        .map_err(|_| AdmissionError::InvalidBloodVolumeProposal)
+    }
+
     pub fn thermal_exchange_conductance_uj_per_mk_s(&self) -> Option<i64> {
         let value: Value = serde_json::from_slice(&self.program).ok()?;
         value.get("conductance_uj_per_mk_s").and_then(Value::as_i64)
@@ -325,4 +432,27 @@ fn renal_parameters(value: &Value) -> Option<(i64, i64, i64, i64)> {
         return None;
     }
     Some((water, sodium, water_baseline, sodium_baseline))
+}
+
+fn renal_intake_parameters(value: &Value) -> Option<(i64, i64)> {
+    let object = value.as_object()?;
+    if object.len() != 3 || object.get("abi")?.as_str()? != "renal-intake-v1" {
+        return None;
+    }
+    let water_limit = object.get("max_water_intake_mm3")?.as_i64()?;
+    let sodium_limit = object.get("max_sodium_intake_umol")?.as_i64()?;
+    if !(1..=2_000_000).contains(&water_limit) || !(1..=90_000).contains(&sodium_limit) {
+        return None;
+    }
+    Some((water_limit, sodium_limit))
+}
+
+fn renal_blood_response(value: &Value) -> Option<i64> {
+    let object = value.as_object()?;
+    if object.len() != 2 || object.get("abi")?.as_str()? != "renal-blood-volume-v1" {
+        return None;
+    }
+    let response = object.get("pressure_response_mpa_per_mm3")?.as_i64()?;
+    // Preserve the existing synthetic linear response, not a clinical model.
+    (response == 8).then_some(response)
 }

@@ -111,6 +111,19 @@ const APPLICATION_ID: i32 = 0x4d4b_5631;
 const SCHEMA_VERSION: i32 = 1;
 const RENAL_ARTIFACT_BYTES: &[u8] =
     include_bytes!("../../contracts/fixtures/mechanisms/renal-fluid-electrolyte-v1.json");
+const RENAL_CORRECTIVE_CONTRACT_BYTES: &[u8] =
+    include_bytes!("../../contracts/fixtures/mechanisms/renal-corrective-excretion-v1.json");
+const RENAL_CORRECTIVE_PROGRAM_BYTES: &[u8] = include_bytes!(
+    "../../contracts/fixtures/mechanisms/renal-corrective-excretion-v1.program.json"
+);
+const RENAL_INTAKE_CONTRACT_BYTES: &[u8] =
+    include_bytes!("../../contracts/fixtures/mechanisms/renal-intake-v1.json");
+const RENAL_INTAKE_PROGRAM_BYTES: &[u8] =
+    include_bytes!("../../contracts/fixtures/mechanisms/renal-intake-v1.program.json");
+const RENAL_BLOOD_CONTRACT_BYTES: &[u8] =
+    include_bytes!("../../contracts/fixtures/mechanisms/renal-blood-volume-v1.json");
+const RENAL_BLOOD_PROGRAM_BYTES: &[u8] =
+    include_bytes!("../../contracts/fixtures/mechanisms/renal-blood-volume-v1.program.json");
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WorldId(String);
@@ -409,11 +422,16 @@ pub enum ConservationReport {
     NotEvaluated {
         reason: String,
     },
+    /// Multiple independently conserved quantities recorded on one
+    /// canonical transition (for example body water and sodium).
+    VerifiedMany {
+        reports: Vec<ConservationReport>,
+    },
 }
 
 impl ConservationReport {
     pub fn is_verified(&self) -> bool {
-        matches!(self, Self::Verified { .. })
+        matches!(self, Self::Verified { .. } | Self::VerifiedMany { .. })
     }
 }
 
@@ -736,6 +754,9 @@ impl CommitRequest {
 pub struct CommitReceipt {
     timeline_version: u64,
     replayed_request: bool,
+    first_event_sequence: u64,
+    last_event_sequence: u64,
+    resulting_state_hash: String,
 }
 
 impl CommitReceipt {
@@ -745,6 +766,18 @@ impl CommitReceipt {
 
     pub fn replayed_request(&self) -> bool {
         self.replayed_request
+    }
+
+    pub fn first_event_sequence(&self) -> u64 {
+        self.first_event_sequence
+    }
+
+    pub fn last_event_sequence(&self) -> u64 {
+        self.last_event_sequence
+    }
+
+    pub fn resulting_state_hash(&self) -> &str {
+        &self.resulting_state_hash
     }
 }
 
@@ -776,6 +809,10 @@ pub enum CommitError {
     SafeStopped(String),
     #[error("artifact admission failed: {0}")]
     ArtifactRejected(#[from] AdmissionError),
+    #[error("canonical physiology request is invalid")]
+    InvalidCanonicalRequest,
+    #[error("canonical physiology advance must be non-negative")]
+    InvalidCanonicalAdvance,
 }
 
 impl RecoveryReport {
@@ -821,6 +858,7 @@ pub struct WorldEngine {
     sleep_debt_seconds: i64,
     simulated_second: i64,
     resolution_id: Option<String>,
+    format: TimelineFormat,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -840,16 +878,21 @@ pub struct ReplayResult {
     resulting_state_hash: String,
 }
 
+impl ReplayResult {
+    pub fn timeline_version(&self) -> u64 {
+        self.timeline_version
+    }
+
+    pub fn resulting_state_hash(&self) -> &str {
+        &self.resulting_state_hash
+    }
+}
+
 impl WorldEngine {
     pub fn open(
         spec: OpenSpec,
         storage: StorageLocation,
     ) -> Result<(Self, RecoveryReport), OpenError> {
-        if !storage.path().exists() && spec.format == Some(TimelineFormat::CanonicalPhysiologyV2) {
-            return Err(OpenError::UnsupportedTimelineFormat(
-                TimelineFormat::CanonicalPhysiologyV2,
-            ));
-        }
         let mut connection = Connection::open(storage.path())?;
         let application_id: i32 =
             connection.pragma_query_value(None, "application_id", |row| row.get(0))?;
@@ -859,11 +902,6 @@ impl WorldEngine {
         let status = if application_id == 0 && schema_version == 0 {
             if !is_pristine_storage(&connection)? {
                 return Err(OpenError::IncompatibleStorage);
-            }
-            if spec.format == Some(TimelineFormat::CanonicalPhysiologyV2) {
-                return Err(OpenError::UnsupportedTimelineFormat(
-                    TimelineFormat::CanonicalPhysiologyV2,
-                ));
             }
             create_timeline(&mut connection, &spec)?;
             RecoveryStatus::Created
@@ -891,6 +929,7 @@ impl WorldEngine {
         let sleep_debt_seconds = read_sleep_debt(&connection);
         let resolution_id = read_resolution_id(&connection);
         let reservoirs = read_thermal_reservoirs(&connection);
+        let format = read_timeline_format(&connection)?;
 
         Ok((
             Self {
@@ -905,6 +944,7 @@ impl WorldEngine {
                 sleep_debt_seconds,
                 simulated_second,
                 resolution_id,
+                format,
             },
             RecoveryReport { status },
         ))
@@ -939,6 +979,9 @@ impl WorldEngine {
     }
 
     pub fn fast_replay(&self) -> Result<ReplayResult, ReadError> {
+        if self.format == TimelineFormat::CanonicalPhysiologyV2 {
+            return self.fast_replay_canonical();
+        }
         let rows = self._connection.prepare("SELECT t.resulting_state_hash, t.unit_deltas, x.mechanism_id, x.input_json, e.hot_capacity_uj_per_mk, e.cold_capacity_uj_per_mk FROM causal_transitions t LEFT JOIN mechanism_execution x ON x.sequence=t.sequence LEFT JOIN thermal_execution e ON e.sequence=t.sequence ORDER BY t.sequence")?.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, Option<String>>(2)?, row.get::<_, Option<String>>(3)?, row.get::<_, Option<i64>>(4)?, row.get::<_, Option<i64>>(5)?)))?.collect::<Result<Vec<_>, _>>()?;
         let mut last = initial_genesis_state_hash();
         let mut renal_organism = None;
@@ -993,7 +1036,113 @@ impl WorldEngine {
         })
     }
 
+    fn fast_replay_canonical(&self) -> Result<ReplayResult, ReadError> {
+        let rows = {
+            let mut statement = self._connection.prepare("SELECT t.previous_state_hash, t.resulting_state_hash, t.unit_deltas, t.artifact_digests, t.causes, t.uncertainty, t.conservation_report, x.mechanism_id, x.input_json, t.interval_end_second FROM causal_transitions t LEFT JOIN mechanism_execution x ON x.sequence=t.sequence ORDER BY t.sequence")?;
+            statement
+                .query_map([], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, String>(4)?,
+                        row.get::<_, String>(5)?,
+                        row.get::<_, String>(6)?,
+                        row.get::<_, Option<String>>(7)?,
+                        row.get::<_, Option<String>>(8)?,
+                        row.get::<_, i64>(9)?,
+                    ))
+                })?
+                .collect::<Result<Vec<_>, _>>()?
+        };
+        let mut last = initial_genesis_state_hash();
+        let mut organism = None;
+        for (
+            previous,
+            stored,
+            deltas,
+            artifacts,
+            causes,
+            uncertainty,
+            conservation,
+            mechanism,
+            input,
+            end,
+        ) in rows
+        {
+            if previous != last
+                || mechanism.as_deref() != Some("canonical.renal-fluid-electrolyte-v2")
+            {
+                return Err(ReadError::CorruptTransitionEvidence);
+            }
+            let input_value: serde_json::Value = serde_json::from_str(
+                input
+                    .as_deref()
+                    .ok_or(ReadError::CorruptTransitionEvidence)?,
+            )
+            .map_err(|_| ReadError::CorruptTransitionEvidence)?;
+            let kind = input_value
+                .get("kind")
+                .and_then(serde_json::Value::as_str)
+                .ok_or(ReadError::CorruptTransitionEvidence)?;
+            let expected = if kind == "intake" {
+                vec![
+                    sha256_digest(RENAL_INTAKE_PROGRAM_BYTES),
+                    sha256_digest(RENAL_BLOOD_PROGRAM_BYTES),
+                ]
+            } else if kind == "advance" {
+                vec![
+                    sha256_digest(RENAL_CORRECTIVE_PROGRAM_BYTES),
+                    sha256_digest(RENAL_BLOOD_PROGRAM_BYTES),
+                ]
+            } else {
+                return Err(ReadError::CorruptTransitionEvidence);
+            };
+            let actual: Vec<String> = serde_json::from_str(&artifacts)
+                .map_err(|_| ReadError::CorruptTransitionEvidence)?;
+            if actual != expected || !canonical_archives_match(&self._connection, &actual)? {
+                return Err(ReadError::CorruptTransitionEvidence);
+            }
+            let evidence = decode_transition_evidence(
+                &causes,
+                &deltas,
+                &artifacts,
+                &uncertainty,
+                &conservation,
+            )
+            .map_err(|_| ReadError::CorruptTransitionEvidence)?
+            .ok_or(ReadError::CorruptTransitionEvidence)?;
+            if !canonical_conservation_valid(&evidence.conservation_report) {
+                return Err(ReadError::CorruptTransitionEvidence);
+            }
+            let next = renal_state_after(&deltas, organism.as_ref())?;
+            let hash = compute_state_hash_v4(
+                end,
+                circadian::SleepPhase::Awake,
+                false,
+                0,
+                Some(&next),
+                None,
+                &BTreeMap::new(),
+                None,
+            );
+            if hash != stored {
+                return Err(ReadError::CorruptTransitionEvidence);
+            }
+            last = hash;
+            organism = Some(next);
+        }
+        Ok(ReplayResult {
+            timeline_version: self.head_version,
+            resulting_state_hash: last,
+        })
+    }
+
     pub fn audit_replay(&mut self) -> Result<ReplayResult, ReadError> {
+        if self.format == TimelineFormat::CanonicalPhysiologyV2 {
+            return self.audit_replay_canonical();
+        }
         let rows = self._connection.prepare("SELECT t.resulting_state_hash, t.unit_deltas, t.conservation_report, COALESCE(x.mechanism_id, 'thermal.two-reservoir-exchange'), COALESCE(x.artifact_digest, e.artifact_digest), x.input_json, e.hot_energy_uj, e.hot_capacity_uj_per_mk, e.cold_energy_uj, e.cold_capacity_uj_per_mk, e.conductance_uj_per_mk_s, t.artifact_digests FROM causal_transitions t LEFT JOIN mechanism_execution x ON x.sequence=t.sequence LEFT JOIN thermal_execution e ON e.sequence=t.sequence ORDER BY t.sequence")?.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, String>(3)?, row.get::<_, Option<String>>(4)?, row.get::<_, Option<String>>(5)?, row.get::<_, Option<i64>>(6)?, row.get::<_, Option<i64>>(7)?, row.get::<_, Option<i64>>(8)?, row.get::<_, Option<i64>>(9)?, row.get::<_, Option<i64>>(10)?, row.get::<_, String>(11)?)))?.collect::<Result<Vec<_>, _>>()?;
         let mut last = initial_genesis_state_hash();
         let mut renal_organism: Option<OrganismState> = None;
@@ -1203,6 +1352,174 @@ impl WorldEngine {
         })
     }
 
+    fn audit_replay_canonical(&mut self) -> Result<ReplayResult, ReadError> {
+        let rows = {
+            let mut statement = self._connection.prepare("SELECT t.previous_state_hash, t.resulting_state_hash, t.unit_deltas, t.artifact_digests, t.causes, t.uncertainty, t.conservation_report, x.mechanism_id, x.input_json, t.interval_end_second FROM causal_transitions t LEFT JOIN mechanism_execution x ON x.sequence=t.sequence ORDER BY t.sequence")?;
+            statement
+                .query_map([], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, String>(4)?,
+                        row.get::<_, String>(5)?,
+                        row.get::<_, String>(6)?,
+                        row.get::<_, Option<String>>(7)?,
+                        row.get::<_, Option<String>>(8)?,
+                        row.get::<_, i64>(9)?,
+                    ))
+                })?
+                .collect::<Result<Vec<_>, _>>()?
+        };
+        let mut last = initial_genesis_state_hash();
+        let mut organism = None;
+        for (
+            previous,
+            stored,
+            deltas,
+            artifacts,
+            causes,
+            uncertainty,
+            conservation,
+            mechanism,
+            input,
+            end,
+        ) in rows
+        {
+            let fail = |engine: &mut Self, reason: &str| -> Result<ReplayResult, ReadError> {
+                engine.durable_safe_stop(reason)?;
+                Err(ReadError::CorruptTransitionEvidence)
+            };
+            if previous != last
+                || mechanism.as_deref() != Some("canonical.renal-fluid-electrolyte-v2")
+            {
+                return fail(self, "canonical_hash_chain_mismatch");
+            }
+            let input_text = input
+                .as_deref()
+                .ok_or(ReadError::CorruptTransitionEvidence)?;
+            let value: serde_json::Value = serde_json::from_str(input_text)
+                .map_err(|_| ReadError::CorruptTransitionEvidence)?;
+            let kind = value
+                .get("kind")
+                .and_then(serde_json::Value::as_str)
+                .ok_or(ReadError::CorruptTransitionEvidence)?;
+            let (contract_bytes, abi, expected) = if kind == "intake" {
+                (
+                    RENAL_INTAKE_CONTRACT_BYTES,
+                    ProgramAbi::RenalIntakeV1,
+                    vec![
+                        sha256_digest(RENAL_INTAKE_PROGRAM_BYTES),
+                        sha256_digest(RENAL_BLOOD_PROGRAM_BYTES),
+                    ],
+                )
+            } else if kind == "advance" {
+                (
+                    RENAL_CORRECTIVE_CONTRACT_BYTES,
+                    ProgramAbi::RenalFluidV1,
+                    vec![
+                        sha256_digest(RENAL_CORRECTIVE_PROGRAM_BYTES),
+                        sha256_digest(RENAL_BLOOD_PROGRAM_BYTES),
+                    ],
+                )
+            } else {
+                return fail(self, "canonical_unknown_input");
+            };
+            let actual: Vec<String> = serde_json::from_str(&artifacts)
+                .map_err(|_| ReadError::CorruptTransitionEvidence)?;
+            if actual != expected || !canonical_archives_match(&self._connection, &actual)? {
+                return fail(self, "missing_or_mismatched_artifact");
+            }
+            let archived: Vec<u8> = self._connection.query_row(
+                "SELECT program_bytes FROM artifact_archive WHERE digest=?1",
+                params![actual[0]],
+                |row| row.get(0),
+            )?;
+            let bundle = Self::canonical_bundle(contract_bytes, &archived, abi)
+                .map_err(|_| ReadError::CorruptTransitionEvidence)?;
+            let blood_bytes: Vec<u8> = self._connection.query_row(
+                "SELECT program_bytes FROM artifact_archive WHERE digest=?1",
+                params![actual[1]],
+                |row| row.get(0),
+            )?;
+            let blood = Self::canonical_bundle(
+                RENAL_BLOOD_CONTRACT_BYTES,
+                &blood_bytes,
+                ProgramAbi::RenalBloodVolumeV1,
+            )
+            .map_err(|_| ReadError::CorruptTransitionEvidence)?;
+            let before = organism.clone().unwrap_or_else(initial_organism);
+            let (water, sodium, after_renal) = if kind == "intake" {
+                let water = value
+                    .get("water_mm3")
+                    .and_then(serde_json::Value::as_i64)
+                    .ok_or(ReadError::CorruptTransitionEvidence)?;
+                let sodium = value
+                    .get("sodium_umol")
+                    .and_then(serde_json::Value::as_i64)
+                    .ok_or(ReadError::CorruptTransitionEvidence)?;
+                (
+                    water,
+                    sodium,
+                    bundle
+                        .propose_renal_intake(before.renal(), water, sodium)
+                        .map_err(|_| ReadError::CorruptTransitionEvidence)?,
+                )
+            } else {
+                (
+                    0,
+                    0,
+                    bundle
+                        .propose_renal_second(before.renal())
+                        .map_err(|_| ReadError::CorruptTransitionEvidence)?,
+                )
+            };
+            let delta = after_renal.plasma_mm3() - before.renal().plasma_mm3();
+            let after_blood = blood
+                .propose_blood_volume(before.blood(), delta)
+                .map_err(|_| ReadError::CorruptTransitionEvidence)?;
+            let mut after = before.clone();
+            after.apply_renal_blood_candidates(after_renal, after_blood);
+            let reconstructed = renal_state_after(&deltas, organism.as_ref())?;
+            if reconstructed != after {
+                return fail(self, "canonical_delta_mismatch");
+            }
+            let evidence = decode_transition_evidence(
+                &causes,
+                &deltas,
+                &artifacts,
+                &uncertainty,
+                &conservation,
+            )
+            .map_err(|_| ReadError::CorruptTransitionEvidence)?
+            .ok_or(ReadError::CorruptTransitionEvidence)?;
+            if !canonical_conservation_valid(&evidence.conservation_report) {
+                return fail(self, "canonical_conservation_mismatch");
+            }
+            let hash = compute_state_hash_v4(
+                end,
+                circadian::SleepPhase::Awake,
+                false,
+                0,
+                Some(&after),
+                None,
+                &BTreeMap::new(),
+                None,
+            );
+            if hash != stored {
+                return fail(self, "canonical_hash_mismatch");
+            }
+            let _ = (water, sodium);
+            last = hash;
+            organism = Some(after);
+        }
+        Ok(ReplayResult {
+            timeline_version: self.head_version,
+            resulting_state_hash: last,
+        })
+    }
+
     fn durable_safe_stop(&mut self, reason: &str) -> Result<(), ReadError> {
         self._connection.execute("INSERT INTO timeline_safe_stop (singleton, reason) VALUES (1, ?1) ON CONFLICT(singleton) DO UPDATE SET reason = excluded.reason", params![reason])?;
         Ok(())
@@ -1266,6 +1583,9 @@ impl WorldEngine {
             let mut replay = CommitReceipt {
                 timeline_version: stored_version.max(0) as u64,
                 replayed_request: false,
+                first_event_sequence: stored_version.max(0) as u64,
+                last_event_sequence: stored_version.max(0) as u64,
+                resulting_state_hash: String::new(),
             };
             replay.replayed_request = true;
             return Ok(replay);
@@ -1273,6 +1593,10 @@ impl WorldEngine {
 
         if request.expected_version != self.head_version {
             return Err(CommitError::ExpectedVersionConflict);
+        }
+
+        if self.format == TimelineFormat::CanonicalPhysiologyV2 {
+            return self.commit_canonical(request);
         }
 
         if let Some((body_id, _)) = &request.body
@@ -1508,6 +1832,9 @@ impl WorldEngine {
         let receipt = CommitReceipt {
             timeline_version: self.head_version + 1,
             replayed_request: false,
+            first_event_sequence: self.head_version + 1,
+            last_event_sequence: self.head_version + 1,
+            resulting_state_hash: resulting_state_hash.clone(),
         };
         {
             let transaction = self._connection.transaction()?;
@@ -1780,6 +2107,265 @@ impl WorldEngine {
         );
         self.head_version = receipt.timeline_version;
 
+        Ok(receipt)
+    }
+
+    fn canonical_bundle(
+        contract_bytes: &[u8],
+        program_bytes: &[u8],
+        abi: ProgramAbi,
+    ) -> Result<ArtifactBundle, CommitError> {
+        let contract = MechanismContract::from_json(contract_bytes)
+            .map_err(|_| CommitError::InvalidCanonicalRequest)?;
+        let bundle = ArtifactBundle::new(contract, program_bytes.to_vec(), abi);
+        bundle.admit()?;
+        Ok(bundle)
+    }
+
+    fn commit_canonical(&mut self, request: CommitRequest) -> Result<CommitReceipt, CommitError> {
+        if request.advance_to_seconds < 0 {
+            return Err(CommitError::InvalidCanonicalAdvance);
+        }
+        if request.sleep_intention
+            || request.ingest_uj.is_some()
+            || request.resolution_changed.is_some()
+            || request.body.is_some()
+            || request.thermal.is_some()
+            || (request.fluid_intake.is_none() && request.advance_to_seconds == 0)
+        {
+            return Err(CommitError::InvalidCanonicalRequest);
+        }
+        #[derive(Clone)]
+        struct Step {
+            start: i64,
+            end: i64,
+            before: OrganismState,
+            after: OrganismState,
+            artifacts: Vec<String>,
+            input: String,
+            cause: &'static str,
+            water: i64,
+            sodium: i64,
+        }
+        let intake = request
+            .fluid_intake
+            .map(|_| {
+                Self::canonical_bundle(
+                    RENAL_INTAKE_CONTRACT_BYTES,
+                    RENAL_INTAKE_PROGRAM_BYTES,
+                    ProgramAbi::RenalIntakeV1,
+                )
+            })
+            .transpose()?;
+        let corrective = (request.advance_to_seconds > 0)
+            .then(|| {
+                Self::canonical_bundle(
+                    RENAL_CORRECTIVE_CONTRACT_BYTES,
+                    RENAL_CORRECTIVE_PROGRAM_BYTES,
+                    ProgramAbi::RenalFluidV1,
+                )
+            })
+            .transpose()?;
+        let blood = Self::canonical_bundle(
+            RENAL_BLOOD_CONTRACT_BYTES,
+            RENAL_BLOOD_PROGRAM_BYTES,
+            ProgramAbi::RenalBloodVolumeV1,
+        )?;
+        let mut organism = self.organism.clone().unwrap_or_else(initial_organism);
+        let mut steps = Vec::new();
+        if let Some((water, sodium)) = request.fluid_intake {
+            let before = organism.clone();
+            let renal = intake
+                .as_ref()
+                .expect("intake bundle")
+                .propose_renal_intake(organism.renal(), water, sodium)?;
+            let delta = renal.plasma_mm3() - organism.renal().plasma_mm3();
+            let next_blood = blood.propose_blood_volume(organism.blood(), delta)?;
+            organism.apply_renal_blood_candidates(renal, next_blood);
+            steps.push(Step {
+                start: self.simulated_second,
+                end: self.simulated_second,
+                before,
+                after: organism.clone(),
+                artifacts: vec![
+                    sha256_digest(RENAL_INTAKE_PROGRAM_BYTES),
+                    sha256_digest(RENAL_BLOOD_PROGRAM_BYTES),
+                ],
+                input: serde_json::json!({"kind":"intake","water_mm3":water,"sodium_umol":sodium})
+                    .to_string(),
+                cause: "canonical_renal_intake",
+                water,
+                sodium,
+            });
+        }
+        for offset in 0..request.advance_to_seconds {
+            let before = organism.clone();
+            let renal = corrective
+                .as_ref()
+                .expect("corrective bundle")
+                .propose_renal_second(organism.renal())?;
+            let delta = renal.plasma_mm3() - organism.renal().plasma_mm3();
+            let next_blood = blood.propose_blood_volume(organism.blood(), delta)?;
+            organism.apply_renal_blood_candidates(renal, next_blood);
+            let start = self
+                .simulated_second
+                .checked_add(offset)
+                .ok_or(CommitError::InvalidCanonicalRequest)?;
+            steps.push(Step {
+                start,
+                end: start
+                    .checked_add(1)
+                    .ok_or(CommitError::InvalidCanonicalRequest)?,
+                before,
+                after: organism.clone(),
+                artifacts: vec![
+                    sha256_digest(RENAL_CORRECTIVE_PROGRAM_BYTES),
+                    sha256_digest(RENAL_BLOOD_PROGRAM_BYTES),
+                ],
+                input: r#"{"kind":"advance"}"#.to_owned(),
+                cause: "canonical_renal_advance",
+                water: 0,
+                sodium: 0,
+            });
+        }
+        let bodies = read_body_states_for_hash(&self._connection)?;
+        let mut previous_hash = if self.head_version == 0 && self.organism.is_none() {
+            initial_genesis_state_hash()
+        } else {
+            compute_state_hash_v4(
+                self.simulated_second,
+                self.sleep_phase,
+                self.sleep_intention_accepted,
+                self.sleep_debt_seconds,
+                self.organism.as_ref(),
+                self.resolution_id.as_deref(),
+                &bodies,
+                self.reservoirs.as_ref(),
+            )
+        };
+        let mut encoded = Vec::new();
+        for step in &steps {
+            let state_hash = compute_state_hash_v4(
+                step.end,
+                self.sleep_phase,
+                self.sleep_intention_accepted,
+                self.sleep_debt_seconds,
+                Some(&step.after),
+                self.resolution_id.as_deref(),
+                &bodies,
+                self.reservoirs.as_ref(),
+            );
+            let mut evidence = transition_evidence(
+                &request,
+                EvidenceState::new(
+                    step.start,
+                    self.sleep_phase,
+                    self.sleep_intention_accepted,
+                    self.sleep_debt_seconds,
+                    Some(&step.before),
+                    self.resolution_id.as_deref(),
+                    &bodies,
+                ),
+                EvidenceState::new(
+                    step.end,
+                    self.sleep_phase,
+                    self.sleep_intention_accepted,
+                    self.sleep_debt_seconds,
+                    Some(&step.after),
+                    self.resolution_id.as_deref(),
+                    &bodies,
+                ),
+            );
+            evidence.causes = vec![CausalCause {
+                kind: step.cause.to_owned(),
+            }];
+            evidence.artifact_digests = step.artifacts.clone();
+            let open_water =
+                step.before.renal().total_body_water_mm3() + step.before.renal().urine_water_mm3();
+            let close_water =
+                step.after.renal().total_body_water_mm3() + step.after.renal().urine_water_mm3();
+            let open_sodium =
+                step.before.renal().plasma_sodium_umol() + step.before.renal().urine_sodium_umol();
+            let close_sodium =
+                step.after.renal().plasma_sodium_umol() + step.after.renal().urine_sodium_umol();
+            evidence.conservation_report = ConservationReport::VerifiedMany {
+                reports: vec![
+                    ConservationReport::Verified {
+                        quantity: "water.body_plus_urine".to_owned(),
+                        unit: "mm3".to_owned(),
+                        opening: open_water,
+                        external_input: step.water,
+                        closing: close_water,
+                        residual: open_water + step.water - close_water,
+                    },
+                    ConservationReport::Verified {
+                        quantity: "sodium.plasma_plus_urine".to_owned(),
+                        unit: "umol".to_owned(),
+                        opening: open_sodium,
+                        external_input: step.sodium,
+                        closing: close_sodium,
+                        residual: open_sodium + step.sodium - close_sodium,
+                    },
+                ],
+            };
+            encoded.push((step.clone(), previous_hash, state_hash.clone(), evidence));
+            previous_hash = state_hash;
+        }
+        if encoded.is_empty() {
+            return Err(CommitError::InvalidCanonicalRequest);
+        }
+        let transaction = self._connection.transaction()?;
+        for (bytes, digest) in [
+            (
+                RENAL_INTAKE_PROGRAM_BYTES,
+                sha256_digest(RENAL_INTAKE_PROGRAM_BYTES),
+            ),
+            (
+                RENAL_CORRECTIVE_PROGRAM_BYTES,
+                sha256_digest(RENAL_CORRECTIVE_PROGRAM_BYTES),
+            ),
+            (
+                RENAL_BLOOD_PROGRAM_BYTES,
+                sha256_digest(RENAL_BLOOD_PROGRAM_BYTES),
+            ),
+        ] {
+            transaction.execute("INSERT INTO artifact_archive (digest, program_bytes) VALUES (?1, ?2) ON CONFLICT(digest) DO NOTHING", params![digest, bytes])?;
+        }
+        let first: i64 = transaction.query_row(
+            "SELECT COALESCE(MAX(sequence), 0) + 1 FROM causal_transitions",
+            [],
+            |row| row.get(0),
+        )?;
+        let mut sequence = first;
+        for (step, previous, state_hash, evidence) in &encoded {
+            transaction.execute("INSERT INTO causal_transitions (sequence, interval_start_second, interval_end_second, previous_state_hash, resulting_state_hash, request_id, causes, unit_deltas, artifact_digests, uncertainty, conservation_report, state_hash_version) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 4)", params![sequence, step.start, step.end, previous, state_hash, request.request_id, encode_causes(&evidence.causes), encode_unit_deltas(&evidence.unit_deltas), encode_artifact_digests(&evidence.artifact_digests), encode_uncertainty(&evidence.uncertainty), encode_conservation_report(&evidence.conservation_report)])?;
+            transaction.execute("INSERT INTO mechanism_execution (sequence, mechanism_id, artifact_digest, input_json) VALUES (?1, ?2, ?3, ?4)", params![sequence, "canonical.renal-fluid-electrolyte-v2", evidence.artifact_digests[0], step.input])?;
+            sequence += 1;
+        }
+        let final_second = self
+            .simulated_second
+            .checked_add(request.advance_to_seconds)
+            .ok_or(CommitError::InvalidCanonicalRequest)?;
+        persist_organism_row(&transaction, &organism)?;
+        transaction.execute("INSERT INTO simulated_clock (singleton, second) VALUES (1, ?1) ON CONFLICT(singleton) DO UPDATE SET second=excluded.second", params![final_second])?;
+        let version = self.head_version + 1;
+        transaction.execute("INSERT OR REPLACE INTO request_receipts (request_id, payload_digest, timeline_version) VALUES (?1, ?2, ?3)", params![request.request_id, request.payload_digest().to_vec(), version])?;
+        transaction.execute("INSERT INTO timeline_head (singleton, version) VALUES (1, ?1) ON CONFLICT(singleton) DO UPDATE SET version=excluded.version", params![version])?;
+        transaction.commit()?;
+        let receipt = CommitReceipt {
+            timeline_version: version,
+            replayed_request: false,
+            first_event_sequence: first as u64,
+            last_event_sequence: (sequence - 1) as u64,
+            resulting_state_hash: previous_hash,
+        };
+        self.organism = Some(organism);
+        self.simulated_second = final_second;
+        self.head_version = version;
+        self.receipts.insert(
+            request.request_id.clone(),
+            (request.payload_digest(), receipt.clone()),
+        );
         Ok(receipt)
     }
 
@@ -2249,6 +2835,14 @@ fn encode_conservation_report(report: &ConservationReport) -> String {
             "external_input": external_input, "closing": closing, "residual": residual,
         })
         .to_string(),
+        ConservationReport::VerifiedMany { reports } => serde_json::json!({
+            "kind": "verified_many",
+            "reports": reports.iter().map(|report| {
+                serde_json::from_str::<serde_json::Value>(&encode_conservation_report(report))
+                    .expect("conservation report encoding is JSON")
+            }).collect::<Vec<_>>(),
+        })
+        .to_string(),
     }
 }
 
@@ -2357,6 +2951,16 @@ fn decode_transition_evidence(
                 .and_then(serde_json::Value::as_i64)
                 .ok_or(())?,
         },
+        Some("verified_many") => {
+            let reports = report_value
+                .get("reports")
+                .and_then(serde_json::Value::as_array)
+                .ok_or(())?
+                .iter()
+                .map(decode_conservation_value)
+                .collect::<Result<Vec<_>, _>>()?;
+            ConservationReport::VerifiedMany { reports }
+        }
         _ => return Err(()),
     };
     Ok(Some(TransitionEvidence {
@@ -2366,6 +2970,47 @@ fn decode_transition_evidence(
         uncertainty,
         conservation_report,
     }))
+}
+
+fn decode_conservation_value(value: &serde_json::Value) -> Result<ConservationReport, ()> {
+    match value.get("kind").and_then(serde_json::Value::as_str) {
+        Some("not_evaluated") => Ok(ConservationReport::NotEvaluated {
+            reason: value
+                .get("reason")
+                .and_then(serde_json::Value::as_str)
+                .ok_or(())?
+                .to_owned(),
+        }),
+        Some("verified") => Ok(ConservationReport::Verified {
+            quantity: value
+                .get("quantity")
+                .and_then(serde_json::Value::as_str)
+                .ok_or(())?
+                .to_owned(),
+            unit: value
+                .get("unit")
+                .and_then(serde_json::Value::as_str)
+                .ok_or(())?
+                .to_owned(),
+            opening: value
+                .get("opening")
+                .and_then(serde_json::Value::as_i64)
+                .ok_or(())?,
+            external_input: value
+                .get("external_input")
+                .and_then(serde_json::Value::as_i64)
+                .ok_or(())?,
+            closing: value
+                .get("closing")
+                .and_then(serde_json::Value::as_i64)
+                .ok_or(())?,
+            residual: value
+                .get("residual")
+                .and_then(serde_json::Value::as_i64)
+                .ok_or(())?,
+        }),
+        _ => Err(()),
+    }
 }
 
 fn apply_transfer(pair: &mut ReservoirPair, transfer: &ThermalTransfer) {
@@ -2527,6 +3172,37 @@ fn renal_artifact_matches(bytes: &[u8]) -> bool {
     bytes == RENAL_ARTIFACT_BYTES
 }
 
+fn canonical_archives_match(
+    connection: &Connection,
+    digests: &[String],
+) -> Result<bool, ReadError> {
+    for digest in digests {
+        let bytes: Option<Vec<u8>> = connection
+            .query_row(
+                "SELECT program_bytes FROM artifact_archive WHERE digest=?1",
+                params![digest],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if bytes
+            .as_deref()
+            .is_none_or(|bytes| sha256_digest(bytes) != *digest)
+        {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+fn canonical_conservation_valid(report: &ConservationReport) -> bool {
+    match report {
+        ConservationReport::VerifiedMany { reports } if reports.len() == 2 => reports
+            .iter()
+            .all(|report| matches!(report, ConservationReport::Verified { residual: 0, .. })),
+        _ => false,
+    }
+}
+
 fn verified_renal_conservation(
     encoded: &str,
     opening: i64,
@@ -2589,10 +3265,14 @@ fn create_timeline(connection: &mut Connection, spec: &OpenSpec) -> Result<(), O
         );",
     )?;
     transaction.execute_batch(RUNTIME_SCHEMA)?;
+    let format_name = match spec.format.unwrap_or(TimelineFormat::AggregateV1) {
+        TimelineFormat::AggregateV1 => "aggregate-v1",
+        TimelineFormat::CanonicalPhysiologyV2 => "canonical-physiology-v2",
+    };
     transaction.execute(
         "INSERT INTO timeline_metadata (singleton, world_id, timeline_id, timeline_format)
-         VALUES (1, ?1, ?2, 'aggregate-v1')",
-        params![spec.world_id.0, spec.timeline_id.0],
+         VALUES (1, ?1, ?2, ?3)",
+        params![spec.world_id.0, spec.timeline_id.0, format_name],
     )?;
     let genesis_hash = initial_genesis_state_hash();
     transaction.execute(
@@ -2609,6 +3289,38 @@ fn create_timeline(connection: &mut Connection, spec: &OpenSpec) -> Result<(), O
     transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;
     transaction.commit()?;
     Ok(())
+}
+
+fn persist_organism_row(
+    transaction: &rusqlite::Transaction<'_>,
+    organism: &OrganismState,
+) -> Result<(), rusqlite::Error> {
+    transaction.execute(
+        "INSERT INTO organism_state (singleton, chemical_store_uj, digestion_buffer_uj, core_internal_energy_uj, ambient_internal_energy_uj, ambient_heat_capacity_uj_per_mk, blood_volume_mm3, hb_tetramer_umol, arterial_o2_umol, venous_co2_umol, map_mpa, lung_diffusion_umol_per_s, total_body_water_mm3, plasma_mm3, plasma_sodium_umol, urine_water_mm3, urine_sodium_umol) VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16) ON CONFLICT(singleton) DO UPDATE SET chemical_store_uj=excluded.chemical_store_uj, digestion_buffer_uj=excluded.digestion_buffer_uj, core_internal_energy_uj=excluded.core_internal_energy_uj, ambient_internal_energy_uj=excluded.ambient_internal_energy_uj, ambient_heat_capacity_uj_per_mk=excluded.ambient_heat_capacity_uj_per_mk, blood_volume_mm3=excluded.blood_volume_mm3, hb_tetramer_umol=excluded.hb_tetramer_umol, arterial_o2_umol=excluded.arterial_o2_umol, venous_co2_umol=excluded.venous_co2_umol, map_mpa=excluded.map_mpa, lung_diffusion_umol_per_s=excluded.lung_diffusion_umol_per_s, total_body_water_mm3=excluded.total_body_water_mm3, plasma_mm3=excluded.plasma_mm3, plasma_sodium_umol=excluded.plasma_sodium_umol, urine_water_mm3=excluded.urine_water_mm3, urine_sodium_umol=excluded.urine_sodium_umol",
+        params![organism.chemical_store_uj(), organism.digestion_buffer_uj(), organism.core_internal_energy_uj(), organism.ambient_internal_energy_uj(), organism.ambient_reservoir().heat_capacity_microjoule_per_millikelvin(), organism.blood_volume_mm3(), organism.blood().hb_tetramer_umol(), organism.arterial_o2_umol(), organism.venous_co2_umol(), organism.mean_arterial_pressure_mpa(), organism.blood().lung_diffusion_umol_per_s(), organism.renal().total_body_water_mm3(), organism.renal().plasma_mm3(), organism.renal().plasma_sodium_umol(), organism.renal().urine_water_mm3(), organism.renal().urine_sodium_umol()],
+    )?;
+    Ok(())
+}
+
+fn read_timeline_format(connection: &Connection) -> Result<TimelineFormat, OpenError> {
+    let has_format: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM pragma_table_info('timeline_metadata') WHERE name = 'timeline_format')",
+        [],
+        |row| row.get(0),
+    )?;
+    if !has_format {
+        return Ok(TimelineFormat::AggregateV1);
+    }
+    let format: String = connection.query_row(
+        "SELECT timeline_format FROM timeline_metadata WHERE singleton = 1",
+        [],
+        |row| row.get(0),
+    )?;
+    match format.as_str() {
+        "aggregate-v1" => Ok(TimelineFormat::AggregateV1),
+        "canonical-physiology-v2" => Ok(TimelineFormat::CanonicalPhysiologyV2),
+        _ => Err(OpenError::IncompatibleStorage),
+    }
 }
 
 const RUNTIME_SCHEMA: &str = "
@@ -2972,6 +3684,7 @@ fn verify_identity(connection: &Connection, spec: &OpenSpec) -> Result<(), OpenE
         {
             let stored = match format.as_str() {
                 "aggregate-v1" => TimelineFormat::AggregateV1,
+                "canonical-physiology-v2" => TimelineFormat::CanonicalPhysiologyV2,
                 _ => return Err(OpenError::IncompatibleStorage),
             };
             if let Some(requested) = spec.format

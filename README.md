@@ -244,6 +244,7 @@ Phase 0 tests дополнительно проверяют JSON Schemas, fixtur
 
 ## Документация
 
+- [PROJECT.md](PROJECT.md) — detailed project architecture, implementation, limitations, and development guide.
 - [AGENTS.md](AGENTS.md) — обязательные правила разработки MakiseWE с coding agents.
 - [Каталог документации](docs/README.md) — рекомендуемый порядок чтения и статус документов.
 - [VISION.md](VISION.md) — цель, границы и release outcome.
