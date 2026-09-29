@@ -8,8 +8,13 @@ use makise_causal_kernel::{
 };
 
 const DAY_SECONDS: usize = 86_400;
+// Baseline losses now: insensible (2 mm³/s) + obligatory urine (2 mm³/s) = 4 mm³/s × 86,400s
+// = 345,600 mm³/day baseline. Original synthetic test used 1.5L intake for demonstration.
+// With reduced baseline losses, 1.5L should approximately balance water.
+// Sodium: obligatory urine at 140 mmol/L × 0.2L = 28,000 µmol/day + corrective losses
+// Use 100,000 µmol to account for corrective + baseline
 const WATER_INTAKE_MM3: i64 = 1_500_000;
-const SODIUM_INTAKE_UMOL: i64 = 86_400;
+const SODIUM_INTAKE_UMOL: i64 = 100_000;
 
 fn spec(name: &str) -> OpenSpec {
     OpenSpec::new(
@@ -34,16 +39,23 @@ fn daily_fluid_and_sodium_balance_stay_in_declared_reference_bands() {
     assert!(
         (opening_water - 200_000..=opening_water + 200_000)
             .contains(&organism.total_body_water_mm3()),
-        "24 h water balance must remain within 200 ml"
+        "24 h water balance must remain within 200 ml: opening={}, final={}, diff={}",
+        opening_water,
+        organism.total_body_water_mm3(),
+        organism.total_body_water_mm3() - opening_water
     );
     assert!(
         (135_000..=145_000).contains(&organism.plasma_sodium_mmol_per_l_milli()),
-        "plasma Na must remain 135..145 mmol/L"
+        "plasma Na must remain 135..145 mmol/L, got {} mmol/L",
+        organism.plasma_sodium_mmol_per_l_milli() as f64 / 1000.0
     );
+    // Conservation: intake = body + urine + insensible losses
+    // Insensible losses: 2 mm³/s × 86,400s = 172,800 mm³/day
+    const INSENSIBLE_LOSS_PER_DAY: i64 = 2 * DAY_SECONDS as i64;
     assert_eq!(
         opening_water + WATER_INTAKE_MM3,
-        organism.total_body_water_mm3() + organism.urine_water_mm3(),
-        "water must be conserved across body and urine boundary"
+        organism.total_body_water_mm3() + organism.urine_water_mm3() + INSENSIBLE_LOSS_PER_DAY,
+        "water must be conserved across body + urine + insensible losses"
     );
 }
 

@@ -123,10 +123,175 @@
       "provenance_category": "expert_estimate",
       "uncertainty": 800,
       "validity_range": "Fur-insulated 3.2 W/K"
+    },
+    {
+      "parameter_id": "hearing-frequency-min-hz",
+      "value": 20,
+      "unit": "Hz",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 5,
+      "validity_range": "Humanoid baseline lower bound"
+    },
+    {
+      "parameter_id": "hearing-frequency-max-hz",
+      "value": 40000,
+      "unit": "Hz",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 5000,
+      "validity_range": "Extended high-frequency range vs human 20kHz, cat-inspired enhancement"
+    },
+    {
+      "parameter_id": "hearing-sensitivity-threshold-db",
+      "value": -5,
+      "unit": "dB",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 3,
+      "validity_range": "Enhanced sensitivity vs human 0 dB baseline at 1kHz"
+    },
+    {
+      "parameter_id": "hearing-directional-accuracy-degrees",
+      "value": 3,
+      "unit": "degrees",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 1,
+      "validity_range": "Sound localization accuracy, improved vs human ~5-10 degrees"
+    },
+    {
+      "parameter_id": "ear-rotation-range-degrees",
+      "value": 180,
+      "unit": "degrees",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 20,
+      "validity_range": "Cat auricle voluntary/reflex rotation capacity"
+    },
+    {
+      "parameter_id": "ear-rotation-speed-deg-per-s",
+      "value": 90,
+      "unit": "deg_per_s",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 30,
+      "validity_range": "Rapid reflex orientation to sound source"
+    },
+    {
+      "parameter_id": "tail-proprioceptive-sensitivity",
+      "value": 0.02,
+      "unit": "dimensionless_fraction",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 0.01,
+      "validity_range": "Normalized proprioceptive feedback gain for balance control"
+    },
+    {
+      "parameter_id": "tail-righting-reflex-threshold-degrees",
+      "value": 15,
+      "unit": "degrees",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 5,
+      "validity_range": "Body tilt angle triggering tail counterbalance reflex"
+    },
+    {
+      "parameter_id": "tail-moment-arm-contribution-nm-per-rad",
+      "value": 2.5,
+      "unit": "Nm_per_rad",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 0.8,
+      "validity_range": "Tail angular displacement to balance moment contribution"
+    },
+    {
+      "parameter_id": "tail-mass-kg",
+      "value": 0.8,
+      "unit": "kg",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 0.2,
+      "validity_range": "Tail mass for inertial balance calculations, ~2.5% body mass"
+    },
+    {
+      "parameter_id": "taurine-pool-mmol",
+      "value": 8.5,
+      "unit": "mmol",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 2.0,
+      "validity_range": "Total body taurine pool for obligate carnivore hybrid"
+    },
+    {
+      "parameter_id": "taurine-dietary-requirement-mg-per-day",
+      "value": 75,
+      "unit": "mg_per_day",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 25,
+      "validity_range": "Daily taurine intake requirement, 50-100 mg/day range"
+    },
+    {
+      "parameter_id": "taurine-deficiency-threshold-mmol",
+      "value": 3.0,
+      "unit": "mmol",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 1.0,
+      "validity_range": "Pool level below which cardiac/retinal consequences emerge"
+    },
+    {
+      "parameter_id": "minimum-protein-intake-fraction",
+      "value": 0.35,
+      "unit": "dimensionless_fraction",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 0.05,
+      "validity_range": "Minimum dietary protein as fraction of calories, obligate carnivore >30%"
+    },
+    {
+      "parameter_id": "renal-concentration-capacity-kg-per-L",
+      "value": 1.75,
+      "unit": "kg_per_L",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 0.25,
+      "validity_range": "Urine osmolality capacity, intermediate between human 1.0-1.3 and cat 2.5-3.0 kg/L"
+    },
+    {
+      "parameter_id": "gluconeogenesis-capacity-mmol-per-hour",
+      "value": 12,
+      "unit": "mmol_per_hour",
+      "provenance_category": "expert_estimate",
+      "uncertainty": 3,
+      "validity_range": "Glucose production from amino acids, obligate carnivore adaptation"
     }
   ],
   "phenotypes": [
-    { "phenotype_id": "female-neko-v1", "sex": "female", "parameter_overrides": [] }
+    {
+      "phenotype_id": "female-neko-v1",
+      "sex": "female",
+      "parameter_overrides": [
+        {
+          "parameter_id": "initial-body-mass-kg",
+          "value": 32.5,
+          "unit": "kg",
+          "provenance_category": "expert_estimate",
+          "uncertainty": 2.5,
+          "validity_range": "Small humanoid frame catgirl, 30-35 kg range"
+        },
+        {
+          "parameter_id": "reference-core-temperature-mk",
+          "value": 310350,
+          "unit": "mK",
+          "provenance_category": "expert_estimate",
+          "uncertainty": 250,
+          "validity_range": "Humanoid baseline 37.1°C (310.35K), slightly elevated optional"
+        },
+        {
+          "parameter_id": "resting-heart-rate-bpm",
+          "value": 70,
+          "unit": "bpm",
+          "provenance_category": "expert_estimate",
+          "uncertainty": 5,
+          "validity_range": "Humanoid cardiovascular baseline, 65-75 bpm"
+        },
+        {
+          "parameter_id": "resting-respiratory-rate-bpm",
+          "value": 14,
+          "unit": "bpm",
+          "provenance_category": "expert_estimate",
+          "uncertainty": 2,
+          "validity_range": "Humanoid respiratory baseline, 12-16 bpm"
+        }
+      ]
+    }
   ],
   "shared_mechanism_refs": [
     "sha256:1111111111111111111111111111111111111111111111111111111111111111"

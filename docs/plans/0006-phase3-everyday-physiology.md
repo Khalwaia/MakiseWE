@@ -98,30 +98,52 @@ System gates определяет [ROADMAP.md](../../ROADMAP.md#phase-3--everyda
 
 **Текущий gate статус (2026-09-22):**
 
+Проведён параллельный review 5 subagents: empirical data status, gate criteria, Neko morphotype, cardiorespiratory realism, renal realism. Результаты консолидированы в [phase3-gate-assessment-2026-09-22.md](phase3-gate-assessment-2026-09-22.md).
+
 **Phase 3.1 (Cardiorespiratory): OPEN**
-- Runtime: `BloodState` O2/CO2 exchange реализован
-- Provenance: `expert_estimate` (Weir 1949, textbook nominals), `synthetic_fixture` (neko scaling)
-- Validation: synthetic only (`tests/blood_gas.rs`)
-- Missing: empirical O2 saturation time-series, cardiovascular solver, Severinghaus curve
-- См. [phase3-provenance-status.md](../research/phase3-provenance-status.md#2-phase-31-cardiorespiratory--gas-exchange--текущий-статус)
+- Runtime: `BloodState` O2/CO2 exchange реализован ✅
+- Conservation, determinism, replay: verified ✅
+- Provenance: `expert_estimate` (Weir 1949), `synthetic_fixture` (neko) — tier 3-4 ❌
+- Validation: synthetic only (`tests/blood_gas.rs`) ❌
+- Missing critical mechanisms: Severinghaus curve, acid-base, venous O2 compartment, cardiac output, MAP from compliance
+- Biological realism: NOT established (9 risks identified)
+- См. [phase3-gate-assessment-2026-09-22.md](phase3-gate-assessment-2026-09-22.md#2-phase-31-cardiorespiratory--gas-exchange--gate-assessment)
 
 **Phase 3.2 (Renal): OPEN**
-- Runtime: canonical timeline activated, intake/excretion/blood coupling реализованы
-- Provenance: `expert_estimate` (baselines), `synthetic_fixture` (mechanism rates)
-- Validation: synthetic only; ни один independent dataset не admitted ([renal-validation-evidence.md](../research/renal-validation-evidence.md))
-- Missing: empirical water/Na time-series (обязательно по решению 2026-09-07), executable resolution upgrade через commit, N-worker shared canonical writer, full dependency manifest
-- См. [phase3-provenance-status.md](../research/phase3-provenance-status.md#3-phase-32-renal--fluids--electrolytes--текущий-статус)
+- Runtime: canonical timeline activated, intake/excretion/blood coupling реализованы ✅
+- Conservation, determinism, worker parity, replay: verified ✅
+- Provenance: `expert_estimate` baselines, `synthetic_fixture` rates — tier 3-4 ❌
+- Validation: synthetic only; ни один independent dataset не admitted ❌
+- Missing critical mechanisms: ICF/ECF compartments, osmolarity, GFR model, ADH/RAAS, insensible loss
+- Biological realism: NOT established (3 major risks + 4 nits)
+- Mandatory empirical validation (решение 2026-09-07): NOT COMPLETED ❌
+- См. [phase3-gate-assessment-2026-09-22.md](phase3-gate-assessment-2026-09-22.md#3-phase-32-renal--fluids--electrolytes--gate-assessment)
+
+**Neko morphotype (catgirl): ЧАСТИЧНО СПЕЦИФИЦИРОВАН**
+- Humanoid baseline: ✅ 30kg acceptable, thermal plausible
+- Functional cat features: ⚠️ declared (hearing, tail, thermoregulation) но underspecified
+- Obligate carnivore metabolism: ❌ not implemented (taurine, protein, renal concentration)
+- Cardiovascular/respiratory: ⚠️ humanoid baseline assumed, explicit rates missing
+- См. [phase3-gate-assessment-2026-09-22.md](phase3-gate-assessment-2026-09-22.md#4-neko-morphotype-realism-assessment)
 
 **Phase 3.3–3.7: NOT STARTED**
 - Digestive/liver/metabolism, endocrine, active thermoregulation, musculoskeletal, excretion/microbiome
 
 **Overall Phase 3 gate: OPEN**
-- ADR-0014 realism criteria not met: no `measured`/`derived` provenance tiers
-- Mandatory empirical validation (2026-09-07 decision) not completed
-- Runtime integrity verified: conservation, determinism, replay работают
-- Biological realism: не доказан без measured parameters и independent validation
+- Runtime integrity: **VERIFIED** ✅ (conservation, determinism, replay)
+- Causal verifiability: **ESTABLISHED** ✅
+- ADR-0014 realism criteria: **NOT MET** ❌ (tier 3-4 only, no empirical validation)
+- Mandatory empirical validation (2026-09-07 decision): **NOT COMPLETED** ❌
+- Biological realism: **NOT ESTABLISHED** ❌
 
-Термин "realistic physiology" не допускается без tier 1/2 provenance и empirical validation. Допустимые термины: "causally verifiable", "dimensionally consistent", "synthetic baseline", "expert estimate envelope", "coarse mechanism".
+**Допустимая терминология:**
+✅ "Causally verifiable", "dimensionally consistent", "synthetic baseline", "expert estimate envelope", "coarse mechanism", "runtime integrity verified"
+❌ "Realistic physiology", "validated model", "calibrated parameters", "biological accuracy" — требуют tier 1/2 + empirical validation
+
+**Критический приоритет для gate closure:**
+1. Найти/admit empirical datasets (O2 saturation для 3.1, water/Na для 3.2)
+2. Implement missing critical mechanisms (Severinghaus, acid-base, ADH/RAAS, compartments)
+3. Executable resolution upgrade через commit
 
 ## 8. Не-цели и rollback
 
