@@ -96,6 +96,33 @@ Airflow/heat через `atmosphere.rs` `RoomAtmosphere`, fluids через `Liq
 
 System gates определяет [ROADMAP.md](../../ROADMAP.md#phase-3--everyday-physiology); causal acceptance matrix — [AGENTS.md](../../AGENTS.md#tdd-и-доказательства-приёмки). Для каждого среза нужны contract, reference observables, upgrade path и focused validation. Текущие coarse tests не закрывают эти gates автоматически. 365-day integration и workstation capacity относятся к release/Phase 8 gates в roadmap; этот план не переносит их в Phase 3 и не меняет фазовую последовательность.
 
+**Текущий gate статус (2026-09-22):**
+
+**Phase 3.1 (Cardiorespiratory): OPEN**
+- Runtime: `BloodState` O2/CO2 exchange реализован
+- Provenance: `expert_estimate` (Weir 1949, textbook nominals), `synthetic_fixture` (neko scaling)
+- Validation: synthetic only (`tests/blood_gas.rs`)
+- Missing: empirical O2 saturation time-series, cardiovascular solver, Severinghaus curve
+- См. [phase3-provenance-status.md](../research/phase3-provenance-status.md#2-phase-31-cardiorespiratory--gas-exchange--текущий-статус)
+
+**Phase 3.2 (Renal): OPEN**
+- Runtime: canonical timeline activated, intake/excretion/blood coupling реализованы
+- Provenance: `expert_estimate` (baselines), `synthetic_fixture` (mechanism rates)
+- Validation: synthetic only; ни один independent dataset не admitted ([renal-validation-evidence.md](../research/renal-validation-evidence.md))
+- Missing: empirical water/Na time-series (обязательно по решению 2026-09-07), executable resolution upgrade через commit, N-worker shared canonical writer, full dependency manifest
+- См. [phase3-provenance-status.md](../research/phase3-provenance-status.md#3-phase-32-renal--fluids--electrolytes--текущий-статус)
+
+**Phase 3.3–3.7: NOT STARTED**
+- Digestive/liver/metabolism, endocrine, active thermoregulation, musculoskeletal, excretion/microbiome
+
+**Overall Phase 3 gate: OPEN**
+- ADR-0014 realism criteria not met: no `measured`/`derived` provenance tiers
+- Mandatory empirical validation (2026-09-07 decision) not completed
+- Runtime integrity verified: conservation, determinism, replay работают
+- Biological realism: не доказан без measured parameters и independent validation
+
+Термин "realistic physiology" не допускается без tier 1/2 provenance и empirical validation. Допустимые термины: "causally verifiable", "dimensionally consistent", "synthetic baseline", "expert estimate envelope", "coarse mechanism".
+
 ## 8. Не-цели и rollback
 
 Не включает: cell division/immunity (Phase 4), genetics/pregnancy (Phase 5), neural plasticity (Phase 6), devices/institutions (Phase 7). Rollback следует [PROTO.md](../../PROTO.md#6-compatibility-migration): отдельная timeline, сохранённые readers и archived bytes, без downcast новых events. Совместимость старых hashes доказывается fixtures/tests, а не наличием default-значений новых колонок.
