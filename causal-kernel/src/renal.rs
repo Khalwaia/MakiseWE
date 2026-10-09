@@ -52,6 +52,7 @@ pub struct RenalState {
 
 /// Extended renal state with ICF/ECF compartments for fine resolution.
 /// This is an intermediate representation before full nephron segments.
+#[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RenalStateCompartments {
     // Compartments: ICF ~28L, ECF ~14L (plasma ~3L + interstitial ~11L)
@@ -66,6 +67,7 @@ pub struct RenalStateCompartments {
     urine_sodium_umol: i64,
 }
 
+#[allow(dead_code)]
 impl RenalStateCompartments {
     pub fn baseline() -> Self {
         const BASELINE_ICF_WATER_MM3: i64 = 28_000_000; // 28 L

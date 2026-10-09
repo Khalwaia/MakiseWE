@@ -1,0 +1,248 @@
+{
+  "$schema": "https://makise.anthro.systems/schema/mechanism-contract/v1",
+  "mechanism_id": "digestive.substrate-v1",
+  "version": "1.0.0",
+  "title": "Digestive Substrate Tracking (Coarse)",
+  "description": "Glucose absorption, fasting maintenance, and fecal output for Phase 3.3 gate. Coarse single-compartment model with tier 3 validation targets.",
+  "fidelity_envelope": {
+    "scope": "Resting baseline adult, oral mixed meal ingestion, 5-hour postprandial window, 8-12 hour fasting maintenance",
+    "excluded": "Fine gut segments, microbiome dynamics, hormonal control (insulin/glucagon deferred to Phase 3.4), active exercise metabolism, pathological states"
+  },
+  "state": {
+    "plasma_glucose_mmol": {
+      "type": "quantity",
+      "unit": "mmol",
+      "description": "Plasma glucose quantity",
+      "bounds": {
+        "min": 175,
+        "max": 600,
+        "comment": "3.5-12.0 mmol/L × 50 L distribution volume (effective)"
+      }
+    },
+    "liver_glycogen_mmol": {
+      "type": "quantity",
+      "unit": "mmol",
+      "description": "Hepatic glycogen storage as glucose equivalents",
+      "bounds": {
+        "min": 0,
+        "max": 600,
+        "comment": "0-600 mmol (~100 g glycogen)"
+      }
+    },
+    "gut_glucose_mmol": {
+      "type": "quantity",
+      "unit": "mmol",
+      "description": "Glucose in gut lumen awaiting absorption",
+      "bounds": {
+        "min": 0,
+        "max": 1000,
+        "comment": "Transient postprandial buffer"
+      }
+    },
+    "fecal_dry_mass_mg": {
+      "type": "quantity",
+      "unit": "mg",
+      "description": "Cumulative fecal dry matter output boundary ledger",
+      "bounds": {
+        "min": 0,
+        "max": 1000000000,
+        "comment": "Monotonic accumulator"
+      }
+    }
+  },
+  "observables": {
+    "plasma_glucose_mmol_per_L": {
+      "description": "Plasma glucose concentration",
+      "projection": "plasma_glucose_mmol / 50.0",
+      "unit": "mmol/L",
+      "validation_targets": [
+        {
+          "name": "fasting_glucose",
+          "range": [3.9, 5.5],
+          "unit": "mmol/L",
+          "provenance": "tier_3",
+          "source": "ADA Standards 2026, PMC12690183",
+          "uncertainty": "normative_range",
+          "comment": "8-12 hour fasting state"
+        },
+        {
+          "name": "postprandial_glucose_peak",
+          "range": [4.0, 8.0],
+          "unit": "mmol/L",
+          "provenance": "tier_3",
+          "source": "Multiple studies, PMC11538917",
+          "uncertainty": "high_individual_variability",
+          "comment": "30-90 min post mixed meal"
+        }
+      ]
+    },
+    "fecal_dry_mass_g_per_day": {
+      "description": "Daily fecal dry matter output rate",
+      "projection": "24h_delta(fecal_dry_mass_mg) / 1000.0",
+      "unit": "g/day",
+      "validation_targets": [
+        {
+          "name": "fecal_output",
+          "range": [12, 81],
+          "unit": "g/day",
+          "provenance": "tier_3",
+          "source": "Rose 2015, DOI:10.1080/10643389.2014.1000761",
+          "uncertainty": "12-81_g_range_diet_dependent",
+          "comment": "Median 29 g/day, n=60 studies"
+        }
+      ]
+    }
+  },
+  "mechanisms": {
+    "glucose_absorption": {
+      "description": "Gut glucose → plasma, first-order approximation of Michaelis-Menten kinetics",
+      "parameters": {
+        "absorption_rate_per_s": {
+          "value": 0.0005,
+          "unit": "1/s",
+          "provenance": "tier_3_derived",
+          "source": "Rose 1999 247±26 mmol over 5h → ~0.014 mmol/s average, distributed over gut buffer",
+          "uncertainty": "±10.5%",
+          "comment": "Coarse rate; fine model requires Vmax/Km"
+        }
+      }
+    },
+    "hepatic_glucose_release": {
+      "description": "Glycogenolysis and gluconeogenesis maintain fasting glucose",
+      "parameters": {
+        "basal_release_mmol_per_s": {
+          "value": 0.0083,
+          "unit": "mmol/s",
+          "provenance": "tier_3_derived",
+          "source": "~0.5 mmol/min hepatic glucose output (textbook nominal)",
+          "uncertainty": "±20%",
+          "comment": "Fasting state baseline"
+        }
+      }
+    },
+    "peripheral_glucose_uptake": {
+      "description": "Tissue glucose consumption",
+      "parameters": {
+        "basal_uptake_mmol_per_s": {
+          "value": 0.0083,
+          "unit": "mmol/s",
+          "provenance": "tier_3_derived",
+          "source": "Matches hepatic release for fasting steady state",
+          "uncertainty": "±20%",
+          "comment": "Insulin-independent baseline"
+        }
+      }
+    },
+    "fecal_output": {
+      "description": "Undigested matter excretion",
+      "parameters": {
+        "digestive_efficiency": {
+          "value": 0.90,
+          "unit": "dimensionless",
+          "provenance": "tier_3",
+          "source": "Rose 2015, 87-93% macronutrient absorption",
+          "uncertainty": "±5%",
+          "comment": "10% of dry intake becomes feces"
+        }
+      }
+    }
+  },
+  "conservation": {
+    "glucose_mass": {
+      "invariant": "Δ(plasma + liver + gut) = absorption - uptake + hepatic_release",
+      "tolerance": "±0.01 mmol per transition",
+      "comment": "Exact integer accounting in implementation units"
+    },
+    "fecal_mass": {
+      "invariant": "Δfecal_dry_mass = (1 - digestive_efficiency) × dry_intake",
+      "tolerance": "±1 mg per transition",
+      "comment": "Monotonic boundary ledger"
+    }
+  },
+  "validation_scenarios": [
+    {
+      "name": "fasting_glucose_maintenance",
+      "description": "8-hour fasting maintains plasma glucose 3.9-5.5 mmol/L",
+      "initial_state": {
+        "plasma_glucose_mmol": 225,
+        "liver_glycogen_mmol": 400,
+        "gut_glucose_mmol": 0
+      },
+      "duration_s": 28800,
+      "expected_observables": {
+        "plasma_glucose_mmol_per_L": {
+          "range": [3.9, 5.5],
+          "tolerance": "±0.5 mmol/L"
+        }
+      }
+    },
+    {
+      "name": "postprandial_glucose_absorption",
+      "description": "Mixed meal absorption produces 4-8 mmol/L peak within 90 min, returns to baseline by 5h",
+      "initial_state": {
+        "plasma_glucose_mmol": 225,
+        "liver_glycogen_mmol": 400,
+        "gut_glucose_mmol": 250
+      },
+      "duration_s": 18000,
+      "expected_observables": {
+        "plasma_glucose_mmol_per_L": {
+          "peak_range": [4.0, 8.0],
+          "peak_time_s": [1800, 5400],
+          "final_range": [3.9, 5.5]
+        }
+      }
+    },
+    {
+      "name": "fecal_mass_conservation",
+      "description": "24h intake 300g dry → 30g fecal output (10%)",
+      "daily_intake_g": 300,
+      "duration_s": 86400,
+      "expected_observables": {
+        "fecal_dry_mass_g_per_day": {
+          "range": [20, 40],
+          "tolerance": "±10 g"
+        }
+      }
+    }
+  ],
+  "resolution_upgrade_path": {
+    "target_mechanism_id": "digestive.substrate-fine-v1",
+    "upgrade_digest": "placeholder_fine_gut_segments_not_implemented",
+    "continuity_requirements": {
+      "totals": "plasma + liver + gut glucose conserved ±1 mmol",
+      "observables": "plasma_glucose_mmol_per_L continuous ±0.5 mmol/L",
+      "lineage": "preserved through resolution boundary"
+    },
+    "comment": "Fine model: stomach/duodenum/jejunum/ileum compartments, Michaelis-Menten Vmax/Km per segment"
+  },
+  "species_proxy": {
+    "human": {
+      "applicability": "direct",
+      "comment": "Validation data from healthy human adults"
+    },
+    "neko": {
+      "applicability": "component_proxy",
+      "adjustments": "Obligate carnivore: reduced carbohydrate intake, higher protein/fat metabolism, taurine requirement",
+      "provenance": "tier_4_synthetic",
+      "uncertainty": "wide (no felid glucose absorption validation data)",
+      "comment": "Human glucose transport mechanisms proxy; macronutrient ratios adjusted"
+    }
+  },
+  "failure_policy": {
+    "outside_envelope": "reject_transition",
+    "conservation_violation": "SafeStop",
+    "invalid_input": "typed_rejection"
+  },
+  "dependencies": [
+    "cardiorespiratory.gas-exchange-v1",
+    "renal.fluid-electrolyte-v1"
+  ],
+  "metadata": {
+    "created": "2026-10-09",
+    "author": "Phase 3.3 planning",
+    "status": "draft_fixture",
+    "validation_tier": "tier_3_targets_declared",
+    "gate_status": "not_started"
+  }
+}

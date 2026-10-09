@@ -63,7 +63,10 @@ pub use contact::{
     GraspAssessment, GraspRequest, HoldState, contact_proposal, grasp_proposal, hold_projection,
     resolve_collision,
 };
-pub use digestion::{ABSORPTION_RATE_UJ_PER_SECOND, absorb_one_second, liver_buffer_one_second, consume_glucose_for_metabolism};
+pub use digestion::{
+    ABSORPTION_RATE_UJ_PER_SECOND, absorb_one_second, consume_glucose_for_metabolism,
+    liver_buffer_one_second,
+};
 pub use episodes::{
     CleanBlocker, CleanControlEpisode, CleanObservables, CleanStep, ControlEpisodeError,
     CookAction, CookBlocker, CookControlEpisode, CookObservables, CookPhase, CookStep,
@@ -1677,11 +1680,12 @@ impl WorldEngine {
                 organism
                     .apply_renal_for_second()
                     .map_err(|error| CommitError::MetabolismRejected(error.into()))?;
-                // Substrate tracking (glucose consumed, parallel accounting)
-                let _glucose_consumed = crate::digestion::consume_glucose_for_metabolism(organism, demand);
-                // Chemical store metabolism (full demand, glucose already included)
+                // Substrate tracking: burn glucose first, then chemical store for remainder
+                let glucose_consumed_uj =
+                    crate::digestion::consume_glucose_for_metabolism(organism, demand);
+                let chemical_store_demand = demand - glucose_consumed_uj;
                 organism
-                    .apply_metabolism(demand)
+                    .apply_metabolism(chemical_store_demand)
                     .map_err(CommitError::MetabolismRejected)?;
             }
             current_sleep_debt =

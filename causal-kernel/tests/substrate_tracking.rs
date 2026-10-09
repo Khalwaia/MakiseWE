@@ -148,7 +148,8 @@ fn substrate_tracking_survives_restart() {
     let fecal_after_meal: i64;
 
     {
-        let (mut engine, _) = WorldEngine::open(spec(), StorageLocation::sqlite(&path)).expect("open");
+        let (mut engine, _) =
+            WorldEngine::open(spec(), StorageLocation::sqlite(&path)).expect("open");
 
         engine
             .commit(CommitRequest::advance_to("burn", 0, 3600))
@@ -170,7 +171,8 @@ fn substrate_tracking_survives_restart() {
 
     // Reopen and verify substrate state persisted
     {
-        let (engine, _) = WorldEngine::open(spec(), StorageLocation::sqlite(&path)).expect("reopen");
+        let (engine, _) =
+            WorldEngine::open(spec(), StorageLocation::sqlite(&path)).expect("reopen");
 
         let organism = engine.organism().expect("organism");
         assert_eq!(

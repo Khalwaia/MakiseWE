@@ -126,8 +126,18 @@ impl OrganismState {
             .core_heat_capacity_uj_per_mk()
             .checked_mul(REFERENCE_CORE_TEMPERATURE_MK)
             .expect("baseline core energy fits i64");
+
+        // Substrate compartments hold energy separate from generic chemical store.
+        // Baseline: 15 mmol glucose + 400 mmol glycogen = 1,165,320,000,000 µJ
+        const GLUCOSE_ENERGY_UJ_PER_MMOL: i64 = 2_808_000;
+        let baseline_glucose_energy = 15_000_i64.saturating_mul(GLUCOSE_ENERGY_UJ_PER_MMOL);
+        let baseline_glycogen_energy = 400_000_i64.saturating_mul(GLUCOSE_ENERGY_UJ_PER_MMOL);
+        let substrate_energy = baseline_glucose_energy.saturating_add(baseline_glycogen_energy);
+        let chemical_store_uj =
+            crate::interoception::INITIAL_CHEMICAL_STORE_UJ.saturating_sub(substrate_energy);
+
         Self {
-            chemical_store_uj: crate::interoception::INITIAL_CHEMICAL_STORE_UJ,
+            chemical_store_uj,
             digestion_buffer_uj: 0,
             core_internal_energy_uj,
             ambient_reservoir: ReservoirState::new(
@@ -361,6 +371,7 @@ impl OrganismState {
         self.fecal_dry_mass_mg = self.fecal_dry_mass_mg.saturating_add(mg);
     }
 
+    #[allow(dead_code)]
     pub(crate) fn clear_fecal_mass(&mut self) {
         self.fecal_dry_mass_mg = 0;
     }
