@@ -46,7 +46,7 @@ Gate: walk, grasp, carry, cook, spill, heat, clean и dress развиваютс
 
 ## Phase 3 — everyday physiology
 
-Статус: в работе. Coarse реализации slices 3.1 `cardiorespiratory.gas-exchange` и 3.2 `renal.fluid-electrolyte` имеют focused tests, но system gates ещё не закрыты. Slice 3.3 `digestive.substrate` закрыт 2026-10-09 commit [2657f5b](https://github.com/makise-co/makise/commit/2657f5b) с tier 3 validation evidence. Текущее evidence, ограничения replay и следующий acceptance slice — в [плане Phase 3](docs/plans/0006-phase3-everyday-physiology.md).
+Статус: gates 3.1, 3.2, 3.3 закрыты с tier 3 validation. Slices 3.4-3.7 остаются открытыми. Текущее evidence, ограничения replay и следующий acceptance slice — в [плане Phase 3](docs/plans/0006-phase3-everyday-physiology.md).
 
 Вертикально добавлять cardiovascular/respiratory, renal/fluids/electrolytes, digestive/liver/metabolism, endocrine, thermoregulation/skin, musculoskeletal/fatigue/pain, excretion/hygiene/microbiome.
 
@@ -56,8 +56,21 @@ Gate каждого system: `MechanismContract`, reference observables, upgrade 
 
 ### Closed gates
 
+**Gate 3.1 — cardiorespiratory.gas-exchange** (closed 2026-09-29):
+- Commit: [d2e094d](https://github.com/Khalwaia/MakiseWE/commit/d2e094d)
+- Validation: [apple-heart-movement-spo2-validation-data.json](docs/research/apple-heart-movement-spo2-validation-data.json)
+- Provenance tier: 3 (Apple Heart & Movement Study, 72M measurements)
+- Observables validated: SpO2 95-100% circadian patterns, respiratory rate baseline
+
+**Gate 3.2 — renal.fluid-electrolyte** (closed 2026-09-29):
+- Commit: [d2e094d](https://github.com/Khalwaia/MakiseWE/commit/d2e094d)
+- Validation: [jensen-2013-validation-data.json](docs/research/jensen-2013-validation-data.json)
+- Provenance tier: 3 (Jensen et al. 2013 peer-reviewed)
+- Observables validated: urine flow 6.9-8.8 ml/min, plasma Na 138-140 mmol/L
+- Upgrade path: PhysioNet individual traces for tier 2
+
 **Gate 3.3 — digestive.substrate** (closed 2026-10-09):
-- Commit: [2657f5b](https://github.com/makise-co/makise/commit/2657f5b)
+- Commit: [2657f5b](https://github.com/Khalwaia/MakiseWE/commit/2657f5b)
 - Validation: [phase3-digestive-substrate-validation-evidence.md](docs/research/phase3-digestive-substrate-validation-evidence.md)
 - Provenance tier: 3 (published peer-reviewed group statistics)
 - Observables validated:
